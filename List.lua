@@ -1064,6 +1064,11 @@ function Spy:AddDetectedToLists(player, timestamp, learnt, source)
 
 		if Spy.db.profile.CurrentList == 1 then
 			Spy:RefreshCurrentList(player, source)
+			-- Also trigger alert for new detections even on Nearby list
+			if not source or source ~= Spy.CharacterName then
+				Spy:AlertPlayer(player, source)
+				if not source then Spy:AnnouncePlayer(player) end
+			end
 		else
 			if not source or source ~= Spy.CharacterName then
 				Spy:AlertPlayer(player, source)
@@ -1086,6 +1091,11 @@ function Spy:AddDetectedToLists(player, timestamp, learnt, source)
 		if Spy.PlayerCommList[player] ~= nil then
 			if Spy.db.profile.CurrentList == 1 then
 				Spy:RefreshCurrentList(player, source)
+				-- Also trigger alert when player becomes active
+				if not source or source ~= Spy.CharacterName then
+					Spy:AlertPlayer(player, source)
+					if not source then Spy:AnnouncePlayer(player) end
+				end
 			else
 				if not source or source ~= Spy.CharacterName then
 					Spy:AlertPlayer(player, source)

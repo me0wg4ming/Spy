@@ -16,7 +16,6 @@ local strsplit, strtrim = AceCore.strsplit, AceCore.strtrim
 local format, strfind, strsub, find = string.format, string.find, string.sub, string.find
 
 Spy = LibStub("AceAddon-3.0"):NewAddon("Spy", "AceConsole-3.0", "AceEvent-3.0", "AceComm-3.0", "AceTimer-3.0")
-Spy.uc = LibStub:GetLibrary("UnitCasting-1.1")
 Spy.parser = ParserLib:GetInstance('1.1')
 Spy.Version = "3.8.6"
 Spy.DatabaseVersion = "1.1"
@@ -1602,6 +1601,22 @@ function SlashCmdList.SPY()
 
 end
 
+SLASH_SPYDEBUG1 = '/spydebug'
+function SlashCmdList.SPYDEBUG()
+	if not Spy.db then
+		DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy]|r Database not loaded yet!")
+		return
+	end
+	
+	if not Spy.db.profile.DebugMode then
+		Spy.db.profile.DebugMode = true
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy]|r Debug mode |cff00ff00ENABLED|r - Will show stealth events")
+	else
+		Spy.db.profile.DebugMode = false
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy]|r Debug mode |cffff0000DISABLED|r")
+	end
+end
+
 local hintString = "|cffffffff%s:|r %s"
 local hintText = {
 	"Spy",
@@ -1793,14 +1808,31 @@ function Spy:OnEnable(first)
 	Spy:RegisterEvent("ZONE_CHANGED_NEW_AREA", "ZoneChangedEvent")
 	Spy:RegisterEvent("PLAYER_ENTERING_WORLD", "ZoneChangedEvent")
 	Spy:RegisterEvent("UNIT_FACTION", "ZoneChangedEvent")
-	Spy:RegisterEvent("PLAYER_TARGET_CHANGED", "PlayerTargetEvent")
-	Spy:RegisterEvent("UPDATE_MOUSEOVER_UNIT", "PlayerMouseoverEvent")
 	
 	-- Use SuperWoW detection if available, otherwise fall back to CombatLog
 	if Spy.HasSuperWoW and Spy.SuperWoW then
 		-- SuperWoW is available - use modern GUID-based scanning
 		Spy.SuperWoW:Enable()
+		-- Don't use old Target/Mouseover events with SuperWoW
+		
+		-- Only register minimal CombatLog events for Win/Loss stats and Stealth
+		local minimalCombatLogEvents = {
+			"CHAT_MSG_COMBAT_FRIENDLY_DEATH",        -- Win/Loss tracking
+			"CHAT_MSG_COMBAT_HOSTILE_DEATH",         -- Win/Loss tracking
+			"CHAT_MSG_SPELL_AURA_GONE_OTHER",        -- Stealth fade detection (out of stealth)
+			"CHAT_MSG_SPELL_HOSTILEPLAYER_BUFF",     -- Stealth/Prowl/Shadowmeld cast (into stealth)
+			"CHAT_MSG_SPELL_PERIODIC_HOSTILEPLAYER_BUFFS", -- Stealth periodic
+		}
+		
+		Spy:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED", "CombatLogEvent")
+		for _, event in pairs(minimalCombatLogEvents) do
+			Spy.parser:RegisterEvent("Spy", event, function(event, info) Spy:CombatLogEvent(event, info) end)
+		end
 	else
+		-- Fallback to classic detection with Target/Mouseover
+		Spy:RegisterEvent("PLAYER_TARGET_CHANGED", "PlayerTargetEvent")
+		Spy:RegisterEvent("UPDATE_MOUSEOVER_UNIT", "PlayerMouseoverEvent")
+		
 		-- Fallback to classic CombatLog detection
 		Spy:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED", "CombatLogEvent")
 		for _, event in pairs(combatLogEvents) do
@@ -2083,18 +2115,27 @@ function Spy:PlayerTargetEvent()
 			local level = tonumber(UnitLevel("target"))
 			local guild = GetGuildInfo("target")
 			local guess = false
-			if level == Spy.Skull then
-				if playerData and playerData.level then
-					if playerData.level > (UnitLevel("player") + 10) and playerData.level < Spy.MaximumPlayerLevel then
-						guess = true
-						level = nil
-					elseif UnitLevel("player") < Spy.MaximumPlayerLevel - 9 then
+			
+			-- Level guessing only if SuperWoW is not active
+			if not Spy.HasSuperWoW then
+				if level == Spy.Skull then
+					if playerData and playerData.level then
+						if playerData.level > (UnitLevel("player") + 10) and playerData.level < Spy.MaximumPlayerLevel then
+							guess = true
+							level = nil
+						elseif UnitLevel("player") < Spy.MaximumPlayerLevel - 9 then
+							guess = true
+							level = UnitLevel("player") + 10
+						end
+					else
 						guess = true
 						level = UnitLevel("player") + 10
 					end
-				else
-					guess = true
-					level = UnitLevel("player") + 10
+				end
+			else
+				-- SuperWoW active: Use 0 for skulls (will display as ??)
+				if level == Spy.Skull then
+					level = 0
 				end
 			end
 
@@ -2128,18 +2169,27 @@ function Spy:PlayerMouseoverEvent()
 			local level = tonumber(UnitLevel("mouseover"))
 			local guild = GetGuildInfo("mouseover")
 			local guess = false
-			if level == Spy.Skull then
-				if playerData and playerData.level then
-					if playerData.level > (UnitLevel("player") + 10) and playerData.level < Spy.MaximumPlayerLevel then
-						guess = true
-						level = nil
-					elseif UnitLevel("player") < Spy.MaximumPlayerLevel - 9 then
+			
+			-- Level guessing only if SuperWoW is not active
+			if not Spy.HasSuperWoW then
+				if level == Spy.Skull then
+					if playerData and playerData.level then
+						if playerData.level > (UnitLevel("player") + 10) and playerData.level < Spy.MaximumPlayerLevel then
+							guess = true
+							level = nil
+						elseif UnitLevel("player") < Spy.MaximumPlayerLevel - 9 then
+							guess = true
+							level = UnitLevel("player") + 10
+						end
+					else
 						guess = true
 						level = UnitLevel("player") + 10
 					end
-				else
-					guess = true
-					level = UnitLevel("player") + 10
+				end
+			else
+				-- SuperWoW active: Use 0 for skulls (will display as ??)
+				if level == Spy.Skull then
+					level = 0
 				end
 			end
 
@@ -2172,11 +2222,36 @@ function Spy:CombatLogEvent(event, info) --_, timestamp, event, srcGUID, srcName
 
 	if Spy.EnabledInZone then
 		if event == "CHAT_MSG_SPELL_AURA_GONE_OTHER" then
-			if (info.skill == BS["Stealth"] or info.skill == BS["Prowl"]) and not Spy:PlayerIsFriend(victim) then
+			-- Debug: Show all AURA_GONE events
+			if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+				DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy Debug]|r AURA_GONE: victim=" .. tostring(victim) .. " skill=" .. tostring(info.skill))
+			end
+			
+			-- Stealth detection - when coming OUT of stealth
+			if (info.skill == BS["Stealth"] or info.skill == BS["Prowl"] or info.skill == BS["Shadowmeld"]) and not Spy:PlayerIsFriend(victim) then
+				if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+					DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy Debug]|r Stealth FADE detected: " .. tostring(victim))
+				end
 				scanName(victim)
 				Spy:AlertStealthPlayer(victim)
 			end
 			return
+		end
+		
+		-- Stealth detection - when going INTO stealth
+		if event == "CHAT_MSG_SPELL_HOSTILEPLAYER_BUFF" or event == "CHAT_MSG_SPELL_PERIODIC_HOSTILEPLAYER_BUFFS" then
+			-- Debug: Show all BUFF events
+			if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+				DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy Debug]|r BUFF: event=" .. tostring(event) .. " source=" .. tostring(source) .. " skill=" .. tostring(info.skill))
+			end
+			
+			if source and (info.skill == BS["Stealth"] or info.skill == BS["Prowl"] or info.skill == BS["Shadowmeld"]) and not Spy:PlayerIsFriend(source) then
+				if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+					DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy Debug]|r Stealth CAST detected: " .. tostring(source))
+				end
+				scanName(source)
+				Spy:AlertStealthPlayer(source)
+			end
 		end
 
 		-- analyse the source unit
@@ -2259,9 +2334,9 @@ function Spy:WorldMapUpdateEvent()
 	for i = 1, Spy.MapNoteLimit do
 		local note = Spy.MapNoteList[i]
 		if note.displayed then
-			Astrolabe:PlaceIconOnWorldMap(WorldMapButton, note.worldIcon, note.continentIndex, note.zoneIndex, note.mapX,
-				note.mapY)
-			Astrolabe:PlaceIconOnMinimap(note.miniIcon, note.continentIndex, note.zoneIndex, note.mapX, note.mapY)
+			-- Protect against unknown zones (custom servers) - silently ignore errors
+			pcall(Astrolabe.PlaceIconOnWorldMap, Astrolabe, WorldMapButton, note.worldIcon, note.continentIndex, note.zoneIndex, note.mapX, note.mapY)
+			pcall(Astrolabe.PlaceIconOnMinimap, Astrolabe, note.miniIcon, note.continentIndex, note.zoneIndex, note.mapX, note.mapY)
 		end
 	end
 end
@@ -2313,9 +2388,8 @@ function Spy:CommReceived(prefix, message, distribution, source)
 						race = nil
 					end
 					if strlen(zone) > 0 then
-						if not Spy:GetZoneID(zone) then
-							return
-						end
+						-- Accept zone even if unknown (custom server zones)
+						-- Just validate it's a string, don't check ZoneID table
 					else
 						zone = nil
 					end
@@ -2405,6 +2479,8 @@ function Spy:ShowMapNote(player)
 		local currentContinentIndex, currentZoneIndex = Spy:GetZoneID(GetZoneText())
 		local continentIndex, zoneIndex = Spy:GetZoneID(playerData.zone)
 		local mapX, mapY = playerData.mapX, playerData.mapY
+		
+		-- Only show map note if zone is known and valid
 		if continentIndex ~= nil and zoneIndex ~= nil and type(playerData.mapX) == "number" and
 			type(playerData.mapY) == "number" and
 			(
@@ -2425,8 +2501,9 @@ function Spy:ShowMapNote(player)
 			note.worldIcon:SetHeight(28 * mapScale)
 			note.worldIcon:Show()
 
-			Astrolabe:PlaceIconOnWorldMap(WorldMapButton, note.worldIcon, continentIndex, zoneIndex, mapX, mapY)
-			Astrolabe:PlaceIconOnMinimap(note.miniIcon, note.continentIndex, note.zoneIndex, note.mapX, note.mapY)
+			-- Protect against unknown zones (custom servers) - silently ignore errors
+			local success1, err1 = pcall(Astrolabe.PlaceIconOnWorldMap, Astrolabe, WorldMapButton, note.worldIcon, continentIndex, zoneIndex, mapX, mapY)
+			local success2, err2 = pcall(Astrolabe.PlaceIconOnMinimap, Astrolabe, note.miniIcon, note.continentIndex, note.zoneIndex, note.mapX, note.mapY)
 
 			for i = 1, Spy.MapNoteLimit do
 				if i ~= Spy.CurrentMapNote and Spy.MapNoteList[i].displayed then

@@ -19,9 +19,6 @@ Benefits with SuperWoW:
 -- This table will be initialized by Spy.lua after it's loaded
 local SpySW = {}
 
--- Debug mode (can be toggled with /spyswdebug)
-SpySW.DebugMode = false
-
 -- Statistics
 SpySW.Stats = {
 	guidsCollected = 0,
@@ -42,13 +39,6 @@ SpySW.SCAN_INTERVAL = 0.5
 
 -- GUID cleanup interval (check if units still exist)
 SpySW.CLEANUP_INTERVAL = 5  -- Check every 5 seconds if GUIDs still exist
-
--- Helper function for debug output
-local function DebugPrint(msg)
-	if SpySW.DebugMode then
-		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r " .. msg)
-	end
-end
 
 --[[===========================================================================
 	Filter Functions (PvP-specific)
@@ -80,17 +70,29 @@ local function PassesSpyFilters(guid)
 		return false
 	end
 	
-	-- Only hostile players
+	-- Check factions
+	local playerFaction = UnitFactionGroup("player")
+	local targetFaction = UnitFactionGroup(guid)
+	
+	-- If we can determine both factions
+	if playerFaction and targetFaction then
+		-- Same faction = friendly, reject
+		if playerFaction == targetFaction then
+			return false
+		end
+		-- Different faction = enemy, accept if alive
+		return IsAlive(guid)
+	end
+	
+	-- Faction unknown (shouldn't happen but fallback to strict checks)
 	if not IsHostile(guid) then
 		return false
 	end
 	
-	-- Only PvP-flagged
 	if not IsPvPFlagged(guid) then
 		return false
 	end
 	
-	-- Only alive
 	if not IsAlive(guid) then
 		return false
 	end
@@ -172,10 +174,6 @@ function SpySW:ScanNearbyPlayers()
 			
 			if playerData then
 				table.insert(foundPlayers, playerData)
-				-- Only log if player is NOT in our detected list
-				if not self.detectedPlayers[playerData.name] then
-					DebugPrint("NEW player found: " .. playerData.name .. " (Lvl " .. playerData.level .. " " .. (playerData.class or "?") .. ")")
-				end
 			end
 		end
 	end
@@ -235,8 +233,6 @@ scanFrame:SetScript("OnUpdate", function()
 			
 			-- Check if player was already detected by US (not by Spy)
 			if not SpySW.detectedPlayers[playerName] then
-				DebugPrint("Sending to Spy: " .. playerName)
-				
 				-- Update player data (creates entry if doesn't exist)
 				local detected = Spy:UpdatePlayerData(
 					playerName,
@@ -248,15 +244,12 @@ scanFrame:SetScript("OnUpdate", function()
 					false  -- isGuess (SuperWoW has real data!)
 				)
 				
-				DebugPrint("  detected=" .. tostring(detected) .. " EnabledInZone=" .. tostring(Spy.EnabledInZone))
-				
 				-- Always mark as detected (even if UpdatePlayerData failed) to prevent spam
 				SpySW.detectedPlayers[playerName] = GetTime()
 				
 				-- Add to detected list if player was successfully added
 				if detected and Spy.EnabledInZone then
 					SpySW.Stats.playersDetected = SpySW.Stats.playersDetected + 1
-					DebugPrint("✓ Added to detected list: " .. playerName)
 					
 					Spy:AddDetected(
 						playerName,
@@ -264,13 +257,6 @@ scanFrame:SetScript("OnUpdate", function()
 						false,  -- learnt (not from combat log parsing)
 						nil     -- source
 					)
-				else
-					if not detected then
-						DebugPrint("✗ UpdatePlayerData failed for: " .. playerName)
-					end
-					if not Spy.EnabledInZone then
-						DebugPrint("✗ Spy not enabled in zone")
-					end
 				end
 			else
 				-- Player already detected - update timestamp to keep them in Nearby list
@@ -371,11 +357,14 @@ function SpySW:PrintStatus()
 	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00========== SpySuperWoW Status ==========|r")
 	
 	-- Check if SuperWoW is available
-	local _, testguid = UnitExists("player")
-	local hasSuperWoW = testguid ~= nil
+	local hasSuperWoW = (GetPlayerBuffID ~= nil and CombatLogAdd ~= nil and SpellInfo ~= nil)
 	
 	if hasSuperWoW then
 		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00SuperWoW:|r |cff00ff00AVAILABLE|r")
+		local _, testguid = UnitExists("player")
+		if testguid then
+			DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00GUID Test:|r " .. testguid)
+		end
 	else
 		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00SuperWoW:|r |cffff0000NOT AVAILABLE|r")
 		DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00Using CombatLog fallback mode|r")
@@ -407,7 +396,6 @@ function SpySW:PrintStatus()
 	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00Settings:|r")
 	DEFAULT_CHAT_FRAME:AddMessage("  Scan Interval: " .. self.SCAN_INTERVAL .. "s")
 	DEFAULT_CHAT_FRAME:AddMessage("  Cleanup Interval: " .. self.CLEANUP_INTERVAL .. "s")
-	DEFAULT_CHAT_FRAME:AddMessage("  Debug Mode: " .. (self.DebugMode and "|cff00ff00ON|r" or "|cff888888OFF|r"))
 	
 	-- Spy status
 	if Spy then
@@ -429,17 +417,24 @@ end
 function SpySW:Initialize()
 	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r Initializing...")
 	
-	-- Check if SuperWoW is available
-	local _, testguid = UnitExists("player")
-	local hasSuperWoW = testguid ~= nil
+	-- Check if SuperWoW is available by testing for SuperWoW-specific functions
+	-- These functions only exist with SuperWoW installed
+	local hasSuperWoW = (GetPlayerBuffID ~= nil and CombatLogAdd ~= nil and SpellInfo ~= nil)
 	
 	if not hasSuperWoW then
 		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r SuperWoW |cffff0000NOT DETECTED|r - using CombatLog fallback")
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r Install SuperWoW for better player detection!")
 		return false
 	end
 	
-	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r SuperWoW |cff00ff00DETECTED|r")
-	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r Commands: /spyswstatus, /spyswdebug")
+	-- Test GUID functionality
+	local _, testguid = UnitExists("player")
+	if testguid then
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r SuperWoW |cff00ff00DETECTED|r - GUID: " .. testguid)
+	else
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r SuperWoW |cff00ff00DETECTED|r")
+	end
+	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r Commands: /spyswstatus")
 	
 	return true
 end
@@ -456,20 +451,6 @@ SLASH_SPYSWSTATUS1 = "/spyswstatus"
 SlashCmdList["SPYSWSTATUS"] = function()
 	if SpyModules and SpyModules.SuperWoW then
 		SpyModules.SuperWoW:PrintStatus()
-	else
-		DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SpySW]|r Module not loaded!")
-	end
-end
-
-SLASH_SPYSWDEBUG1 = "/spyswdebug"
-SlashCmdList["SPYSWDEBUG"] = function()
-	if SpyModules and SpyModules.SuperWoW then
-		SpyModules.SuperWoW.DebugMode = not SpyModules.SuperWoW.DebugMode
-		if SpyModules.SuperWoW.DebugMode then
-			DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r Debug mode |cff00ff00ENABLED|r")
-		else
-			DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r Debug mode |cffff0000DISABLED|r")
-		end
 	else
 		DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SpySW]|r Module not loaded!")
 	end
