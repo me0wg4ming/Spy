@@ -1,230 +1,246 @@
 # Spy - SuperWoW Edition
 
-**Version:** 3.8.6 + SuperWoW Integration  
-**Autor:** Immolation (Original), laytya (Port), SuperWoW-Modul  
-**Für:** World of Warcraft 1.12.1 (Vanilla)
+**Version:** 3.8.6 + SuperWoW Integration
+**Author:** Immolation (Original), laytya (Port), SuperWoW-Module
+**For:** World of Warcraft 1.12.1 (Vanilla)
 
 ---
 
-## 🚀 Was ist neu?
+## 🚀 What's New?
 
-Diese Version von Spy integriert **SuperWoW GUID-basierte Spielererkennung** für deutlich bessere Performance und Zuverlässigkeit.
+This version of Spy integrates **SuperWoW GUID-based player detection** for significantly better performance and reliability.
 
-### Vorteile mit SuperWoW:
+### Advantages with SuperWoW:
 
-✅ **Proaktive Erkennung** - Findet Feinde BEVOR sie dich angreifen  
-✅ **Stealth-Detection** - Erkennt auch unsichtbare Gegner in der Nähe  
-✅ **Echte Level-Daten** - Kein Level-Raten mehr, SuperWoW liefert exakte Werte  
-✅ **Bessere Performance** - Kein CombatLog-Parsing mehr nötig  
-✅ **Mehr Informationen** - Race, Guild, Class - alles korrekt  
+✅ **Proactive Detection** - Finds enemies BEFORE they attack you
+✅ **Stealth Detection** - Also detects invisible nearby enemies
+✅ **Real Level Data** - No more level guessing, SuperWoW provides exact values
+✅ **Better Performance** - No more CombatLog parsing needed
+✅ **More Information** - Race, Guild, Class - everything correct
 
-### Fallback-Modus:
+### Fallback Mode:
 
-❌ **Ohne SuperWoW** → Spy nutzt automatisch die klassische CombatLog-Methode  
-✅ **Mit SuperWoW** → Moderne GUID-basierte Erkennung wie ShaguScan
+❌ **Without SuperWoW** → Spy automatically uses the classic CombatLog method
+✅ **With SuperWoW** → Modern GUID-based detection like ShaguScan
 
 ---
 
 ## 📦 Installation
 
-### Voraussetzungen:
+### Prerequisites:
 
 1. **World of Warcraft 1.12.1** (Vanilla)
-2. **SuperWoW 1.12.1+** (optional, aber empfohlen)
-   - Download: https://github.com/balakethelock/SuperWoW
+2. **SuperWoW 1.12.1+** (optional, but recommended)
+    - Download: https://github.com/balakethelock/SuperWoW
 
 ### Installation:
 
-1. **Altes Spy entfernen/umbenennen:**
-   ```
-   Interface/AddOns/Spy → Interface/AddOns/Spy_OLD
-   ```
+1. **Remove/Rename old Spy:**
+    ```
+    Interface/AddOns/Spy → Interface/AddOns/Spy_OLD
+    ```
 
-2. **Spy-SuperWoW entpacken nach:**
-   ```
-   Interface/AddOns/Spy/
-   ```
+2. **Unpack Spy-SuperWoW to:**
+    ```
+    Interface/AddOns/Spy/
+    ```
 
-3. **WoW starten** → Fertig!
+3. **Start WoW** → Done!
 
-### Testen:
+### Testing:
 
-Beim Einloggen siehst du eine der folgenden Meldungen:
+Upon logging in, you will see one of the following messages:
 
-```
-✅ [SpySW] SuperWoW DETECTED
-   → Spy nutzt GUID-basierte Erkennung
-   
-❌ [SpySW] SuperWoW NOT DETECTED - using CombatLog fallback
-   → Spy nutzt klassische CombatLog-Erkennung
-```
+✅ [SpySW] SuperWoW DETECTED → Spy uses GUID-based detection
+
+❌ [SpySW] SuperWoW NOT DETECTED - using CombatLog fallback → Spy uses classic CombatLog detection
 
 ---
 
-## 🎮 Befehle
+## 🎮 Commands
 
-### Standard Spy-Befehle:
+### Standard Spy Commands:
 
-- `/spy` - Öffnet Spy (wie gewohnt)
-- `/spy show` - Zeigt Spy-Fenster
-- `/spy hide` - Versteckt Spy-Fenster
-- `/spy config` - Öffnet Einstellungen
+- `/spy` - Opens Spy (as usual)
+- `/spy show` - Shows Spy window
+- `/spy hide` - Hides Spy window
+- `/spy config` - Opens settings
 
-### Neue SuperWoW-Befehle:
+### New SuperWoW Commands:
 
-- `/spyswstatus` - Zeigt SuperWoW-Status und Statistiken
-- `/spyswdebug` - Aktiviert/Deaktiviert Debug-Modus
+- `/spyswstatus` - Shows SuperWoW status and statistics
+- `/spyswdebug` - Activates/Deactivates Debug mode
 
 ---
 
-## 🔧 Technische Details
+## 🔧 Technical Details
 
-### Wie funktioniert die SuperWoW-Integration?
+### How does the SuperWoW Integration work?
 
-**Mit SuperWoW:**
-1. GUID-Collection über Events (`UPDATE_MOUSEOVER_UNIT`, `PLAYER_TARGET_CHANGED`, etc.)
-2. Regelmäßiges Scannen aller getrackten GUIDs (0.5s Intervall)
+**With SuperWoW:**
+1. GUID-Collection via Events (`UPDATE_MOUSEOVER_UNIT`, `PLAYER_TARGET_CHANGED`, etc.)
+2. Regular scanning of all tracked GUIDs (0.5s interval)
 3. Filter: player + hostile + pvp + alive
-4. Übergabe an Spy's Main-System
+4. Handover to Spy's Main System
 
-**Ohne SuperWoW:**
-- Klassische CombatLog-basierte Erkennung
-- Funktioniert wie das originale Spy
+**Without SuperWoW:**
+- Classic CombatLog-based detection
+- Works like the original Spy
 
-### Filter-Logik:
+### Filter Logic:
 
 ```lua
-✓ IsPlayer(guid)      → Nur Spieler, keine NPCs
-✓ IsHostile(guid)     → Nur feindliche Spieler
-✓ IsPvPFlagged(guid)  → Nur PvP-geflaggte Spieler
-✓ IsAlive(guid)       → Nur lebende Spieler
-```
+✓ IsPlayer(guid) → Only players, no NPCs
+✓ IsHostile(guid) → Only hostile players
+✓ IsPvPFlagged(guid) → Only PvP-flagged players
+✓ IsAlive(guid) → Only living players
 
-### Performance:
+Performance:
 
-- **Scan-Intervall:** 0.5 Sekunden
-- **Cleanup-Intervall:** 5 Sekunden (entfernt nicht mehr existierende GUIDs)
-- **CPU-Last:** Minimal (~0.5% bei 50 GUIDs)
+    Scan Interval: 0.5 seconds
 
----
+    Cleanup Interval: 5 seconds (removes GUIDs that no longer exist)
 
-## 🐛 Troubleshooting
+    CPU Load: Minimal (~0.5% with 50 GUIDs)
 
-### Problem: Spy lädt nicht
+🐛 Troubleshooting
 
-**Lösung:**
-- Überprüfe die Ordnerstruktur: `Interface/AddOns/Spy/Spy.lua` muss existieren
-- Stelle sicher, dass nur EINE Spy-Version installiert ist
-- Lösche alle `Spy_OLD` Kopien
+Problem: Spy doesn't load
 
-### Problem: SuperWoW nicht erkannt
+Solution:
 
-**Lösung:**
-- SuperWoW Version checken (muss 1.12.1+ sein)
-- `/spyswstatus` eingeben für Details
-- SuperWoW korrekt installiert? Teste mit anderen SuperWoW-Addons
+    Check the folder structure: Interface/AddOns/Spy/Spy.lua must exist
 
-### Problem: Fehler beim Laden
+    Ensure that only ONE Spy version is installed
 
-**Lösung:**
-- Debug-Modus aktivieren: `/spyswdebug`
-- Fehler im Chat lesen
-- SuperWoW deaktivieren (Fallback): Spy.lua editieren, `Spy.HasSuperWoW = false` setzen
+    Delete all Spy_OLD copies
 
-### Problem: Zu viele Detections / Spam
+Problem: SuperWoW not detected
 
-**Lösung:**
-- Debug-Modus deaktivieren: `/spyswdebug`
-- Scan-Intervall anpassen: `SpySW.SCAN_INTERVAL = 1.0` in SpySuperWoW.lua
+Solution:
 
----
+    Check SuperWoW version (must be 1.12.1+)
 
-## 📊 Statistiken
+    Enter /spyswstatus for details
 
-Mit `/spyswstatus` kannst du folgende Infos sehen:
+    Is SuperWoW installed correctly? Test with other SuperWoW add-ons
 
-- **SuperWoW Status** - Verfügbar oder nicht
-- **Tracked GUIDs** - Anzahl der aktuell verfolgten Spieler
-- **GUIDs Collected** - Gesamtzahl gesammelter GUIDs
-- **Events Processed** - Anzahl verarbeiteter Events
-- **Scans Performed** - Anzahl durchgeführter Scans
-- **Players Detected** - Anzahl erkannter Spieler
+Problem: Error on loading
 
----
+Solution:
 
-## 📝 Changelog
+    Activate Debug mode: /spyswdebug
 
-### v3.8.6 + SuperWoW
+    Read the error in chat
 
-**Neu:**
-- SuperWoW-Integration für GUID-basierte Spielererkennung
-- Fallback auf CombatLog wenn SuperWoW nicht verfügbar
-- Neue Befehle: `/spyswstatus`, `/spyswdebug`
-- Verbesserte Performance durch direktes GUID-Scanning
-- Automatische Level-Korrektur für Skulls (-1 → 0)
+    Deactivate SuperWoW (Fallback): Edit Spy.lua, set Spy.HasSuperWoW = false
 
-**Behoben:**
-- Level-Guess-Logik wird mit SuperWoW deaktiviert
-- Doppelte Detections verhindert
-- GUID-Cleanup für nicht mehr existierende Einheiten
+Problem: Too many Detections / Spam
 
-**Beibehalten:**
-- Alle Original-Spy-Features
-- KOS-Listen
-- Blacklist
-- Alert-System
-- Stats
-- Map-Integration
-- UI/GUI
+Solution:
 
----
+    Deactivate Debug mode: /spyswdebug
 
-## ⚠️ Wichtig
+    Adjust Scan Interval: SpySW.SCAN_INTERVAL = 1.0 in SpySuperWoW.lua
 
-✅ **Deine KOS-Listen bleiben erhalten**  
-✅ **Deine Einstellungen bleiben erhalten**  
-✅ **Alle Spy-Features funktionieren wie vorher**  
-✅ **Nur die Detection-Methode ist besser!**
+📊 Statistics
 
----
+With /spyswstatus you can see the following information:
 
-## 💡 Tipps
+    SuperWoW Status - Available or not
 
-### Beste Einstellungen mit SuperWoW:
+    Tracked GUIDs - Number of currently tracked players
 
-1. **Scan-Intervall:** 0.5s (Standard) - für schnelle Erkennung
-2. **Debug-Modus:** AUS - außer zum Testen
-3. **Spy-Einstellungen:** Wie gewohnt nutzen
+    GUIDs Collected - Total number of collected GUIDs
 
-### Performance-Optimierung:
+    Events Processed - Number of processed events
 
-- Bei vielen Spielern (>100): Scan-Intervall auf 1.0s erhöhen
-- Bei PvP-Raids: Debug-Modus ausschalten um Spam zu vermeiden
+    Scans Performed - Number of scans performed
 
----
+    Players Detected - Number of detected players
 
-## 🤝 Credits
+📝 Changelog
 
-- **Immolation** - Original Spy-Addon
-- **laytya** - Vanilla-Port
-- **Shagu** - ShaguScan (Inspiration für GUID-System)
-- **SuperWoW-Team** - SuperWoW-Framework
+v3.8.6 + SuperWoW
 
----
+New:
 
-## 📄 Lizenz
+    SuperWoW integration for GUID-based player detection
 
-Wie das Original-Spy-Addon.
+    Fallback to CombatLog if SuperWoW is not available
 
----
+    New commands: /spyswstatus, /spyswdebug
 
-## 🆘 Support
+    Improved performance through direct GUID-scanning
 
-Bei Problemen:
-1. `/spyswstatus` checken
-2. `/spyswdebug` aktivieren und Fehler lesen
-3. Issue auf GitHub erstellen (falls verfügbar)
+    Automatic level correction for Skulls (-1 → 0)
 
----
+Fixed:
 
-**Viel Spaß beim Jagen! 🎯**
+    Level-Guess logic is deactivated with SuperWoW
+
+    Duplicate detections prevented
+
+    GUID-Cleanup for non-existent units
+
+Retained:
+
+    All Original Spy Features
+
+    KOS Lists
+
+    Blacklist
+
+    Alert System
+
+    Stats
+
+    Map Integration
+
+    UI/GUI
+
+⚠️ Important
+
+✅ Your KOS lists remain intact ✅ Your settings remain intact ✅ All Spy features work as before ✅ Only the detection method is better!
+
+💡 Tips
+
+Best Settings with SuperWoW:
+
+    Scan Interval: 0.5s (Standard) - for fast detection
+
+    Debug Mode: OFF - except for testing
+
+    Spy Settings: Use as usual
+
+Performance Optimization:
+
+    With many players (>100): Increase Scan Interval to 1.0s
+
+    During PvP-Raids: Turn off Debug Mode to avoid spam
+
+🤝 Credits
+
+    Immolation - Original Spy Add-on
+
+    laytya - Vanilla Port
+
+    Shagu - ShaguScan (Inspiration for GUID System)
+
+    SuperWoW-Team - SuperWoW Framework
+
+📄 License
+
+Same as the original Spy Add-on.
+
+🆘 Support
+
+For problems:
+
+    Check /spyswstatus
+
+    Activate /spyswdebug and read the error
+
+    Create an Issue on GitHub (if available)
+
+Have fun hunting! 🎯
