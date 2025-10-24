@@ -434,7 +434,7 @@ function SpySW:Initialize()
 	else
 		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r SuperWoW |cff00ff00DETECTED|r")
 	end
-	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r Commands: /spyswstatus")
+	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r Commands: /spystatus")
 	
 	return true
 end
@@ -447,7 +447,7 @@ SpyModules.SuperWoW = SpySW
 	Slash Commands - Registered AFTER export to global namespace
 =============================================================================]]
 
-SLASH_SPYSWSTATUS1 = "/spyswstatus"
+SLASH_SPYSWSTATUS1 = "/spystatus"
 SlashCmdList["SPYSWSTATUS"] = function()
 	if SpyModules and SpyModules.SuperWoW then
 		SpyModules.SuperWoW:PrintStatus()
