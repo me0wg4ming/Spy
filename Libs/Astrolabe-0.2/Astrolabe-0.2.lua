@@ -137,60 +137,76 @@ function Astrolabe:ComputeDistance( c1, z1, x1, y1, c2, z2, x2, y2 )
 end
 
 function Astrolabe:TranslateWorldMapPosition( C, Z, xPos, yPos, nC, nZ )
-	Z = Z or 0;
-	nZ = nZ or 0;
-	if ( nC < 0 ) then
-		return;
-	end
+    Z = Z or 0;
+    nZ = nZ or 0;
 
-	--Fixes nil error.
-	if(C < 0) then
-		C=2;
-	end
-	if(nC < 0) then
-		nC = 2;
-	end
+    -- Initial input validation (already present)
+    if ( nC < 0 ) then
+        return;
+    end
 
-	local zoneData;
-	if ( C == nC and Z == nZ ) then
-		return xPos, yPos;
-	elseif ( C == nC ) then
-		-- points on the same continent
-		zoneData = WorldMapSize[C];
-		xPos, yPos = getContPosition(zoneData, Z, xPos, yPos);
-		if ( nZ ~= 0 and zoneData[nZ] ~= nil) then
-			zoneData = zoneData[nZ];
-			xPos = xPos - zoneData.xOffset;
-			yPos = yPos - zoneData.yOffset;
-		end
-	elseif ( C and nC) and ( WorldMapSize[C].parentContinent == WorldMapSize[nC].parentContinent ) then
-		-- different continents, same world
-		zoneData = WorldMapSize[C];
-		local parentContinent = zoneData.parentContinent;
-		xPos, yPos = getContPosition(zoneData, Z, xPos, yPos);
-		if ( C ~= parentContinent ) then
-			-- translate up to world map if we aren't there already
-			xPos = xPos + zoneData.xOffset;
-			yPos = yPos + zoneData.yOffset;
-			zoneData = WorldMapSize[parentContinent];
-		end
-		if ( nC ~= parentContinent ) then
-			--translate down to the new continent
-			zoneData = WorldMapSize[nC];
-			xPos = xPos - zoneData.xOffset;
-			yPos = yPos - zoneData.yOffset;
-			if ( nZ ~= 0 and zoneData[nZ] ~= nil) then
-				zoneData = zoneData[nZ];
-				xPos = xPos - zoneData.xOffset;
-				yPos = yPos - zoneData.yOffset;
-			end
-		end
+    -- Fixes nil error (already present)
+    if(C < 0) then
+        C=2;
+    end
+    if(nC < 0) then
+        nC = 2;
+    end
 
-	else
-		return;
-	end
+    -- 💡 CRITICAL FIX: Check if the source continent (C) and target continent (nC) exist.
+    -- If WorldMapSize is nil for either, the code will try to do nil.parentContinent and error.
+    if ( WorldMapSize[C] == nil or WorldMapSize[nC] == nil ) then
+        return; -- Exit early if either continent is invalid
+    end
 
-	return (xPos / zoneData.width), (yPos / zoneData.height);
+    local zoneData;
+    if ( C == nC and Z == nZ ) then
+        return xPos, yPos;
+    elseif ( C == nC ) then
+        -- points on the same continent
+        zoneData = WorldMapSize[C];
+        
+        -- Optional: Check for nZ here (like Option 2 from before)
+        if ( nZ ~= 0 and zoneData[nZ] == nil ) then
+            return; 
+        end
+        
+        xPos, yPos = getContPosition(zoneData, Z, xPos, yPos);
+        if ( nZ ~= 0 and zoneData[nZ] ~= nil) then
+            zoneData = zoneData[nZ];
+            xPos = xPos - zoneData.xOffset;
+            yPos = yPos - zoneData.yOffset;
+        end
+        
+    -- Line 172 is where the error occurred, now protected by the check above
+    elseif ( C and nC) and ( WorldMapSize[C].parentContinent == WorldMapSize[nC].parentContinent ) then
+        -- different continents, same world
+        zoneData = WorldMapSize[C];
+        local parentContinent = zoneData.parentContinent;
+        xPos, yPos = getContPosition(zoneData, Z, xPos, yPos);
+        if ( C ~= parentContinent ) then
+            -- translate up to world map if we aren't there already
+            xPos = xPos + zoneData.xOffset;
+            yPos = yPos + zoneData.yOffset;
+            zoneData = WorldMapSize[parentContinent];
+        end
+        if ( nC ~= parentContinent ) then
+            --translate down to the new continent
+            zoneData = WorldMapSize[nC];
+            xPos = xPos - zoneData.xOffset;
+            yPos = yPos - zoneData.yOffset;
+            if ( nZ ~= 0 and zoneData[nZ] ~= nil) then
+                zoneData = zoneData[nZ];
+                xPos = xPos - zoneData.xOffset;
+                yPos = yPos - zoneData.yOffset;
+            end
+        end
+
+    else
+        return;
+    end
+
+    return (xPos / zoneData.width), (yPos / zoneData.height);
 end
 
 Astrolabe_LastX = 0;
