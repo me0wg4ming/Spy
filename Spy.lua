@@ -1815,6 +1815,9 @@ function Spy:OnEnable(first)
 		Spy.SuperWoW:Enable()
 		-- Don't use old Target/Mouseover events with SuperWoW
 		
+		-- Register RAW_COMBATLOG for direct combat log parsing (SuperWoW feature)
+		Spy:RegisterEvent("RAW_COMBATLOG", "RawCombatLogEvent")
+		
 		-- Only register minimal CombatLog events for Win/Loss stats and Stealth
 		local minimalCombatLogEvents = {
 			"CHAT_MSG_COMBAT_FRIENDLY_DEATH",        -- Win/Loss tracking
@@ -1822,6 +1825,9 @@ function Spy:OnEnable(first)
 			"CHAT_MSG_SPELL_AURA_GONE_OTHER",        -- Stealth fade detection (out of stealth)
 			"CHAT_MSG_SPELL_HOSTILEPLAYER_BUFF",     -- Stealth/Prowl/Shadowmeld cast (into stealth)
 			"CHAT_MSG_SPELL_PERIODIC_HOSTILEPLAYER_BUFFS", -- Stealth periodic
+			"CHAT_MSG_SPELL_HOSTILEPLAYER_DAMAGE",   -- Spell damage (for LastAttack)
+			"CHAT_MSG_SPELL_PERIODIC_HOSTILEPLAYER_DAMAGE", -- DoT damage (for LastAttack)
+			"CHAT_MSG_COMBAT_HOSTILEPLAYER_HITS",    -- Melee hits (for LastAttack)
 		}
 		
 		Spy:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED", "CombatLogEvent")
@@ -2212,6 +2218,14 @@ end
 
 local playerName = UnitName("player")
 function Spy:CombatLogEvent(event, info) --_, timestamp, event, srcGUID, srcName, srcFlags, dstGUID, dstName, dstFlags, ...)
+	-- DEBUG: Log ALL events
+	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+		if info then
+			DEFAULT_CHAT_FRAME:AddMessage("|cff9999ff[Spy Debug]|r EVENT: " .. tostring(event))
+			DEFAULT_CHAT_FRAME:AddMessage("|cff9999ff[Spy Debug]|r   type=" .. tostring(info.type) .. " source=" .. tostring(info.source) .. " victim=" .. tostring(info.victim) .. " skill=" .. tostring(info.skill))
+		end
+	end
+	
 	if not info then return end
 	if info.type == "death" then
 		Spy:DeathLog(event, info)
@@ -2219,6 +2233,15 @@ function Spy:CombatLogEvent(event, info) --_, timestamp, event, srcGUID, srcName
 	end
 	local source = info.source and (info.source == ParserLib_SELF and playerName or info.source) or nil
 	local victim = info.victim and (info.victim == ParserLib_SELF and playerName or info.victim) or nil
+	
+	-- FALLBACK: Track last attacker even when ParserLib fails
+	-- This catches damage events that ParserLib doesn't properly parse
+	if victim == playerName and source and source ~= playerName then
+		Spy.LastAttack = source
+		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy Debug]|r LastAttack set to: " .. tostring(source))
+		end
+	end
 
 	if Spy.EnabledInZone then
 		if event == "CHAT_MSG_SPELL_AURA_GONE_OTHER" then
@@ -2258,6 +2281,33 @@ function Spy:CombatLogEvent(event, info) --_, timestamp, event, srcGUID, srcName
 		if source and source ~= playerName and not Spy:PlayerIsFriend(source) and not SpyPerCharDB.IgnoreData[source] and
 			not find(source, " ") and not find(source, "Unknown") then
 
+			-- DUEL CHECK: Ignore players from same faction (even if UnitIsEnemy = true)
+			local playerFaction = UnitFactionGroup("player")
+			local sourceFaction = nil
+			
+			-- Try GUID-based faction check first (works WITHOUT targeting!)
+			if SpySW and SpySW.GetFactionByName then
+				sourceFaction = SpySW:GetFactionByName(source)
+			end
+			
+			-- Fallback: Try to get source faction if they're targetable
+			if not sourceFaction then
+				if UnitExists("target") and UnitName("target") == source then
+					sourceFaction = UnitFactionGroup("target")
+				elseif UnitExists("mouseover") and UnitName("mouseover") == source then
+					sourceFaction = UnitFactionGroup("mouseover")
+				end
+			end
+			
+			-- If same faction, ignore (it's a duel/friendly fire)
+			if playerFaction and sourceFaction and playerFaction == sourceFaction then
+				-- Same faction = duel, ignore
+				if Spy.db.profile.DebugMode then
+					DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy]|r DUEL DETECTED: " .. source .. " (same faction, ignored)")
+				end
+				return
+			end
+
 			local learnt = false
 			local detected = true
 			local playerData = SpyPerCharDB.PlayerData[source]
@@ -2283,6 +2333,34 @@ function Spy:CombatLogEvent(event, info) --_, timestamp, event, srcGUID, srcName
 		-- analyse the destination unit
 		if victim and victim ~= playerName and not Spy:PlayerIsFriend(victim) and not SpyPerCharDB.IgnoreData[victim] and
 			not find(victim, " ") and not find(victim, "Unknown") then
+			
+			-- DUEL CHECK: Ignore players from same faction (even if UnitIsEnemy = true)
+			local playerFaction = UnitFactionGroup("player")
+			local victimFaction = nil
+			
+			-- Try GUID-based faction check first (works WITHOUT targeting!)
+			if SpySW and SpySW.GetFactionByName then
+				victimFaction = SpySW:GetFactionByName(victim)
+			end
+			
+			-- Fallback: Try to get victim faction if they're targetable
+			if not victimFaction then
+				if UnitExists("target") and UnitName("target") == victim then
+					victimFaction = UnitFactionGroup("target")
+				elseif UnitExists("mouseover") and UnitName("mouseover") == victim then
+					victimFaction = UnitFactionGroup("mouseover")
+				end
+			end
+			
+			-- If same faction, ignore (it's a duel/friendly fire)
+			if playerFaction and victimFaction and playerFaction == victimFaction then
+				-- Same faction = duel, ignore
+				if Spy.db.profile.DebugMode then
+					DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy]|r DUEL DETECTED: " .. victim .. " (same faction, ignored)")
+				end
+				return
+			end
+			
 			local learnt = false
 			local detected = true
 			local playerData = SpyPerCharDB.PlayerData[victim]
@@ -2302,23 +2380,111 @@ function Spy:CombatLogEvent(event, info) --_, timestamp, event, srcGUID, srcName
 end
 
 function Spy:DeathLog(event, info)
+	-- Debug: Show death events
+	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+		DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Debug]|r DEATH EVENT:")
+		DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Debug]|r   source=" .. tostring(info.source))
+		DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Debug]|r   victim=" .. tostring(info.victim))
+		DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Debug]|r   ParserLib_SELF=" .. tostring(ParserLib_SELF))
+		DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Debug]|r   Spy.LastAttack=" .. tostring(Spy.LastAttack))
+	end
+	
 	-- update win statistics
 	--printT({"DeathLog", event, info})
 	if info.source == ParserLib_SELF and info.victim then
 		local playerData = SpyPerCharDB.PlayerData[info.victim]
+		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy Debug]|r WIN: playerData for " .. tostring(info.victim) .. " = " .. tostring(playerData ~= nil))
+		end
 		if playerData then
 			if not playerData.wins then playerData.wins = 0 end
 			playerData.wins = playerData.wins + 1
+			if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+				DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy Debug]|r ✓ WIN counted for " .. tostring(info.victim))
+			end
 		end
 	end
 	if info.victim == ParserLib_SELF and (info.source or Spy.LastAttack) then
-		local playerData = SpyPerCharDB.PlayerData[info.source or Spy.LastAttack]
+		local killerName = info.source or Spy.LastAttack
+		
+		-- If killer is a GUID, try to resolve to name via SpySuperWoW
+		if killerName and string.find(tostring(killerName), "0x") and SpySW and SpySW.GetNameFromGUID then
+			local resolvedName = SpySW:GetNameFromGUID(killerName)
+			if resolvedName then
+				killerName = resolvedName
+				if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+					DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy Debug]|r ✓ Resolved GUID to name: " .. tostring(killerName))
+				end
+			end
+		end
+		
+		local playerData = SpyPerCharDB.PlayerData[killerName]
+		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Debug]|r LOSS: playerData for " .. tostring(killerName) .. " = " .. tostring(playerData ~= nil))
+		end
 		if playerData then
 			if not playerData.loses then playerData.loses = 0 end
 			playerData.loses = playerData.loses + 1
+			if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+				DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Debug]|r ✓ LOSS counted for " .. tostring(killerName))
+			end
 		end
 	end
 
+end
+
+-- RAW_COMBATLOG Event Handler (SuperWoW feature)
+-- Parses raw combat log text to track last attacker
+-- Only used as FALLBACK when ParserLib doesn't provide source name
+function Spy:RawCombatLogEvent()
+	local eventName = arg1
+	local eventText = arg2
+	
+	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+		DEFAULT_CHAT_FRAME:AddMessage("|cffaaff00[Spy Debug]|r RAW_COMBATLOG: " .. tostring(eventName))
+		DEFAULT_CHAT_FRAME:AddMessage("|cffaaff00[Spy Debug]|r   text=" .. tostring(eventText))
+	end
+	
+	-- Only use RAW parsing if LastAttack is not already set or is a GUID
+	-- (ParserLib provides better data when it works)
+	if Spy.LastAttack and not string.find(tostring(Spy.LastAttack), "0x") then
+		-- LastAttack already has a proper name, don't overwrite
+		return
+	end
+	
+	-- Parse damage events to track last attacker
+	-- Format examples:
+	-- "Meow's Moonfire hits you for 15 Arcane damage."
+	-- "You suffer 10 Arcane damage from Meow's Moonfire."
+	-- "Meow hits you for 100."
+	
+	if eventText and (string.find(eventText, "hits you") or string.find(eventText, "damage from") or string.find(eventText, "crits you")) then
+		-- Extract attacker name
+		local attacker = nil
+		
+		-- Pattern 1: "Name's Spell hits you"
+		attacker = string.match(eventText, "^(.+)'s .+ hits you")
+		if not attacker then
+			-- Pattern 2: "Name hits you"
+			attacker = string.match(eventText, "^(.+) hits you")
+		end
+		if not attacker then
+			-- Pattern 3: "You suffer damage from Name's Spell"
+			attacker = string.match(eventText, "damage from (.+)'s")
+		end
+		if not attacker then
+			-- Pattern 4: "Name crits you"
+			attacker = string.match(eventText, "^(.+) crits you")
+		end
+		
+		-- Skip if attacker is a GUID (we want real names)
+		if attacker and attacker ~= playerName and not string.find(attacker, "0x") then
+			Spy.LastAttack = attacker
+			if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+				DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy Debug]|r ✓ LastAttack set to: " .. tostring(attacker))
+			end
+		end
+	end
 end
 
 function Spy:LeftCombatEvent()

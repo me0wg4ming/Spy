@@ -804,10 +804,8 @@ function Spy:SetBar(num, name, desc, value, colorgroup, colorclass, tooltipData,
 		Spy.Colors:RegisterTexture(colorgroup, colorclass, Row.StatusBar, Multi)
 	end
 
-	Row.LeftText:SetTextColor(Spy.db.profile.Colors.Bar["Bar Text"].r, Spy.db.profile.Colors.Bar["Bar Text"].g,
-		Spy.db.profile.Colors.Bar["Bar Text"].b, opacity)
-	Row.RightText:SetTextColor(Spy.db.profile.Colors.Bar["Bar Text"].r, Spy.db.profile.Colors.Bar["Bar Text"].g,
-		Spy.db.profile.Colors.Bar["Bar Text"].b, opacity)
+	Row.LeftText:SetTextColor(1, 1, 1, opacity)  -- Change Name Color in nearby
+	Row.RightText:SetTextColor(1, 1, 1, opacity)  -- Change Name Color in nearby
 end
 
 function Spy:AutomaticallyResize()

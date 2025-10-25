@@ -63,6 +63,68 @@ SpySW.SCAN_INTERVAL = 0.5
 SpySW.CLEANUP_INTERVAL = 5  -- Check every 5 seconds if GUIDs still exist
 
 --[[===========================================================================
+	GUID-based Faction Check (für Duel-Detection)
+=============================================================================]]
+
+-- Cache for player factions (GUID -> Faction)
+SpySW.factionCache = {}
+
+-- Get faction from GUID (works WITHOUT targeting!)
+function SpySW:GetFactionByGUID(guid)
+	if not guid then return nil end
+	
+	-- Check cache first
+	if self.factionCache[guid] then
+		return self.factionCache[guid]
+	end
+	
+	-- Try to get faction from GUID directly
+	if UnitExists(guid) then
+		local faction = UnitFactionGroup(guid)
+		if faction then
+			-- Cache the result
+			self.factionCache[guid] = faction
+			return faction
+		end
+	end
+	
+	return nil
+end
+
+-- Get faction by player name (searches in GUID cache)
+function SpySW:GetFactionByName(playerName)
+	if not playerName then return nil end
+	
+	-- Search through our GUID cache
+	for guid, timestamp in pairs(self.guids) do
+		if UnitExists(guid) then
+			local name = UnitName(guid)
+			if name == playerName then
+				-- Found the player, get their faction
+				local faction = self:GetFactionByGUID(guid)
+				return faction
+			end
+		end
+	end
+	
+	return nil
+end
+
+-- Check if two players are same faction (duel check)
+function SpySW:IsSameFaction(playerName1, playerName2)
+	local faction1 = self:GetFactionByName(playerName1)
+	local faction2 = self:GetFactionByName(playerName2)
+	
+	-- If we can't determine both factions, return nil (unknown)
+	if not faction1 or not faction2 then
+		return nil
+	end
+	
+	-- Return true if same faction (duel), false if different (enemy)
+	return faction1 == faction2
+end
+
+--[[===========================================================================
 	Filter Functions (PvP-specific)
 =============================================================================]]
 
@@ -143,6 +205,22 @@ function SpySW:AddUnit(unit)
 	end
 end
 
+-- Convert GUID to player name
+function SpySW:GetNameFromGUID(guid)
+	if not guid then return nil end
+	
+	-- Check if GUID exists in our tracked GUIDs
+	if self.guids[guid] then
+		-- GUID exists, get name from it
+		if UnitExists(guid) then
+			local name = UnitName(guid)
+			return name
+		end
+	end
+	
+	return nil
+end
+
 --[[===========================================================================
 	Player Data Extraction
 =============================================================================]]
@@ -154,6 +232,11 @@ local function GetPlayerData(guid)
 	
 	local name = UnitName(guid)
 	if not name then
+		return nil
+	end
+	
+	-- Filter out "Unknown" - Blizzard's placeholder when name hasn't loaded yet
+	if name == "Unknown" then
 		return nil
 	end
 	
@@ -769,3 +852,7 @@ SlashCmdList["SPYBUFF"] = function()
 	DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[SpySW]|r")
 	DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[SpySW]|r If 8b or 8c work, we can scan buffs WITHOUT targeting!")
 end
+
+-- Make SpySW globally available for Spy.lua to use
+_G.SpySW = SpySW
+
