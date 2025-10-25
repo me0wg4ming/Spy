@@ -68,8 +68,8 @@ Upon logging in, you will see one of the following messages:
 
 ### New SuperWoW Commands:
 
-- `/spyswstatus` - Shows SuperWoW status and statistics
-- `/spyswdebug` - Activates/Deactivates Debug mode
+- `/spystatus` - Shows SuperWoW status and statistics
+- `/spydebug` - Activates/Deactivates Debug mode
 
 ---
 
