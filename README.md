@@ -139,13 +139,13 @@ Problem: Too many Detections / Spam
 
 Solution:
 
-    Deactivate Debug mode: /spyswdebug
+    Deactivate Debug mode: /spydebug
 
     Adjust Scan Interval: SpySW.SCAN_INTERVAL = 1.0 in SpySuperWoW.lua
 
 📊 Statistics
 
-With /spyswstatus you can see the following information:
+With /spystatus you can see the following information:
 
     SuperWoW Status - Available or not
 
