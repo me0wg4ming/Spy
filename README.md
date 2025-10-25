@@ -237,9 +237,9 @@ Same as the original Spy Add-on.
 
 For problems:
 
-    Check /spyswstatus
+    Check /spystatus
 
-    Activate /spyswdebug and read the error
+    Activate /spydebug and read the error
 
     Create an Issue on GitHub (if available)
 
