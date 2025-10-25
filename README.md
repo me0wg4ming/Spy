@@ -121,7 +121,7 @@ Solution:
 
     Check SuperWoW version (must be 1.12.1+)
 
-    Enter /spyswstatus for details
+    Enter /spystatus for details
 
     Is SuperWoW installed correctly? Test with other SuperWoW add-ons
 
@@ -129,7 +129,7 @@ Problem: Error on loading
 
 Solution:
 
-    Activate Debug mode: /spyswdebug
+    Activate Debug mode: /spydebug
 
     Read the error in chat
 
