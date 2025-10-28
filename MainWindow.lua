@@ -14,54 +14,7 @@ function Spy:SetFontSize(string, size)
 	string:SetFont(Font, size, Flags)
 end
 
-function Spy:CreateMapNote(num)
-	local notemin = 1
-	if num < notemin or Spy.MapNoteList[num] then
-		return
-	end
-
-	local worldIcon = CreateFrame("Button", "Spy_MapNoteList_world" .. num, WorldMapDetailFrame)
-	worldIcon:SetFrameStrata(WorldMapButton:GetFrameStrata())
-	worldIcon:SetParent(WorldMapButton)
-	worldIcon:SetFrameLevel(WorldMapButton:GetFrameLevel() + 5)
-	worldIcon:SetScript("OnEnter", function(self) Spy:ShowMapTooltip(this, true) end)
-	worldIcon:SetScript("OnLeave", function(self) Spy:ShowMapTooltip(this, false) end)
-	worldIcon:SetWidth(28)
-	worldIcon:SetHeight(28)
-	worldIcon.id = num
-
-	local worldTexture = worldIcon:CreateTexture(nil, "OVERLAY")
-	worldTexture:SetTexture("Interface\\AddOns\\Spy\\Textures\\" .. Spy.EnemyFactionName .. "Icon.blp")
-	worldTexture:SetAllPoints(worldIcon)
-	worldIcon.texture = worldTexture
-
-	local mapScale = MinimapCluster:GetScale()
-	local miniIcon = CreateFrame("Button", "Spy_MapNoteList_mini" .. num, Minimap)
-	miniIcon:SetFrameStrata(Minimap:GetFrameStrata())
-	miniIcon:SetParent(Minimap)
-	miniIcon:SetFrameLevel(Minimap:GetFrameLevel() + 5)
-	miniIcon:SetScript("OnEnter", function(self) Spy:ShowMapTooltip(this, true) end)
-	miniIcon:SetScript("OnLeave", function(self) Spy:ShowMapTooltip(this, false) end)
-	miniIcon:SetWidth(24 / mapScale)
-	miniIcon:SetHeight(24 / mapScale)
-	miniIcon.id = num
-
-	local miniTexture = miniIcon:CreateTexture(nil, "OVERLAY")
-	miniTexture:SetTexture("Interface\\AddOns\\Spy\\Textures\\" .. Spy.EnemyFactionName .. "Icon.blp")
-	miniTexture:SetAllPoints(miniIcon)
-	miniIcon.texture = miniTexture
-
-	Spy.MapNoteList[num] = {}
-	Spy.MapNoteList[num].displayed = false
-	Spy.MapNoteList[num].continentIndex = 0
-	Spy.MapNoteList[num].zoneIndex = 0
-	Spy.MapNoteList[num].mapX = 0
-	Spy.MapNoteList[num].mapY = 0
-	Spy.MapNoteList[num].worldIcon = worldIcon
-	Spy.MapNoteList[num].worldIcon:Hide()
-	Spy.MapNoteList[num].miniIcon = miniIcon
-	Spy.MapNoteList[num].miniIcon:Hide()
-end
+-- CreateMapNote function removed - map display feature removed
 
 function Spy:CreateRow(num)
 	local rowmin = 1
@@ -753,12 +706,7 @@ function Spy:CreateMainWindow()
 		Spy:UpdateAlertWindow()
 	end
 
-	if not Spy.MapNoteList then
-		Spy.MapNoteList = {}
-		for i = 1, Spy.MapNoteLimit do
-			Spy:CreateMapNote(i)
-		end
-	end
+	-- MapNoteList initialization removed - map display feature removed
 
 	if not Spy.MapTooltip then
 		Spy.MapTooltip = CreateFrame("GameTooltip", "Spy_GameTooltip", nil, "GameTooltipTemplate")
@@ -858,6 +806,10 @@ end
 function Spy:SetCurrentList(mode)
 	if not mode or mode > tgetn(Spy.ListTypes) then
 		mode = 1
+	end
+	-- Safety check: ensure profile is loaded
+	if not Spy.db or not Spy.db.profile then
+		return
 	end
 	Spy.db.profile.CurrentList = mode
 	Spy:ManageExpirations()

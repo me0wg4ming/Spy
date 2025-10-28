@@ -1,3 +1,4 @@
+--local Astrolabe = LibStub("Astrolabe-0.3")
 local AceLocale = LibStub("AceLocale-3.0")
 local L = AceLocale:GetLocale("Spy")
 
@@ -211,7 +212,7 @@ function Spy:ManageNearbyListExpirations()
 				if Spy.PlayerCommList[player] ~= nil then
 					Spy.MapNoteList[Spy.PlayerCommList[player]].displayed = false
 					Spy.MapNoteList[Spy.PlayerCommList[player]].worldIcon:Hide()
-					-- Map icon removal - Astrolabe removed
+					Astrolabe:RemoveIconFromMinimap(Spy.MapNoteList[Spy.PlayerCommList[player]].miniIcon)
 					Spy.PlayerCommList[player] = nil
 				end
 				Spy.InactiveList[player] = nil
@@ -251,7 +252,7 @@ function Spy:RemovePlayerFromList(player)
 	if Spy.PlayerCommList[player] ~= nil then
 		Spy.MapNoteList[Spy.PlayerCommList[player]].displayed = false
 		Spy.MapNoteList[Spy.PlayerCommList[player]].worldIcon:Hide()
-		-- Map icon removal - Astrolabe removed
+		Astrolabe:RemoveIconFromMinimap(Spy.MapNoteList[Spy.PlayerCommList[player]].miniIcon)
 		Spy.PlayerCommList[player] = nil
 	end
 	Spy:RefreshCurrentList()
@@ -270,7 +271,7 @@ function Spy:ClearList()
 		for i = 1, Spy.MapNoteLimit do
 			Spy.MapNoteList[i].displayed = false
 			Spy.MapNoteList[i].worldIcon:Hide()
-			-- Map icon removal - Astrolabe removed
+			Astrolabe:RemoveIconFromMinimap(Spy.MapNoteList[i].miniIcon)
 		end
 		Spy:SetCurrentList(1)
 		if IsControlKeyDown() then

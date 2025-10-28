@@ -16,14 +16,11 @@ local strsplit, strtrim = AceCore.strsplit, AceCore.strtrim
 local format, strfind, strsub, find = string.format, string.find, string.sub, string.find
 
 Spy = LibStub("AceAddon-3.0"):NewAddon("Spy", "AceConsole-3.0", "AceEvent-3.0", "AceComm-3.0", "AceTimer-3.0")
-Spy.parser = ParserLib:GetInstance('1.1')
 Spy.Version = "3.8.6"
 Spy.DatabaseVersion = "1.1"
 Spy.Signature = "[Spy]"
 Spy.MaximumPlayerLevel = 60
-Spy.MapNoteLimit = 20
-Spy.MapProximityThreshold = 0.02
-Spy.CurrentMapNote = 1
+-- Map note variables removed - map display feature removed
 Spy.ZoneID = {}
 Spy.KOSGuild = {}
 Spy.CurrentList = {}
@@ -178,19 +175,8 @@ Spy.options = {
 						end
 					end,
 				},
-				ShowKoSButton = {
-					name = L["ShowKoSButton"],
-					desc = L["ShowKoSButtonDescription"],
-					type = "toggle",
-					order = 9,
-					width = "full",
-					get = function(info)
-						return Spy.db.profile.ShowKoSButton
-					end,
-					set = function(info, value)
-						Spy.db.profile.ShowKoSButton = value
-					end,
-				},
+				-- ShowKoSButton option removed - doesn't work in Vanilla 1.12.1
+				-- Target frame API not available, KOS button only works in Nearby list
 			},
 		},
 		DisplayOptions = {
@@ -805,79 +791,8 @@ Spy.options = {
 						Spy.db.profile.MinimapDetails = value
 					end,
 				},
-				DisplayOnMap = {
-					name = L["DisplayOnMap"],
-					desc = L["DisplayOnMapDescription"],
-					type = "toggle",
-					order = 5,
-					width = "full",
-					get = function(info)
-						return Spy.db.profile.DisplayOnMap
-					end,
-					set = function(info, value)
-						Spy.db.profile.DisplayOnMap = value
-					end,
-				},
-				SwitchToZone = {
-					name = L["SwitchToZone"],
-					desc = L["SwitchToZoneDescription"],
-					type = "toggle",
-					order = 6,
-					width = "full",
-					get = function(info)
-						return Spy.db.profile.SwitchToZone
-					end,
-					set = function(info, value)
-						Spy.db.profile.SwitchToZone = value
-					end,
-				},
-				MapDisplayLimit = {
-					name = L["MapDisplayLimit"],
-					type = "group",
-					order = 7,
-					inline = true,
-					args = {
-						None = {
-							name = L["LimitNone"],
-							desc = L["LimitNoneDescription"],
-							type = "toggle",
-							order = 1,
-							width = "full",
-							get = function(info)
-								return Spy.db.profile.MapDisplayLimit == "None"
-							end,
-							set = function(info, value)
-								Spy.db.profile.MapDisplayLimit = "None"
-							end,
-						},
-						SameZone = {
-							name = L["LimitSameZone"],
-							desc = L["LimitSameZoneDescription"],
-							type = "toggle",
-							order = 2,
-							width = "full",
-							get = function(info)
-								return Spy.db.profile.MapDisplayLimit == "SameZone"
-							end,
-							set = function(info, value)
-								Spy.db.profile.MapDisplayLimit = "SameZone"
-							end,
-						},
-						SameContinent = {
-							name = L["LimitSameContinent"],
-							desc = L["LimitSameContinentDescription"],
-							type = "toggle",
-							order = 3,
-							width = "full",
-							get = function(info)
-								return Spy.db.profile.MapDisplayLimit == "SameContinent"
-							end,
-							set = function(info, value)
-								Spy.db.profile.MapDisplayLimit = "SameContinent"
-							end,
-						},
-					},
-				},
+				-- Map display options removed - don't work in Vanilla for solo players
+				-- Only useful with data sharing between multiple Spy users
 			},
 		},
 		DataOptions = {
@@ -1359,9 +1274,7 @@ local Default_Profile = {
 		DisableWhenPVPUnflagged = false,
 		MinimapDetection = false,
 		MinimapDetails = true,
-		DisplayOnMap = true,
-		SwitchToZone = false,
-		MapDisplayLimit = "SameZone",
+		-- Map display options removed (DisplayOnMap, SwitchToZone, MapDisplayLimit)
 		DisplayTooltipNearSpyWindow = false,
 		TooltipAnchor = "ANCHOR_CURSOR",
 		DisplayWinLossStatistics = true,
@@ -1434,123 +1347,6 @@ function Spy:CheckDatabase()
 	if SpyDB.removeKOSData == nil then SpyDB.removeKOSData = {} end
 	if SpyDB.removeKOSData[Spy.RealmName] == nil then SpyDB.removeKOSData[Spy.RealmName] = {} end
 	if SpyDB.removeKOSData[Spy.RealmName][Spy.FactionName] == nil then SpyDB.removeKOSData[Spy.RealmName][Spy.FactionName] = {} end
-	--[[	if Spy.db.profile == nil then Spy.db.profile = Default_Profile.profile end
-	if Spy.db.profile.Colors == nil then Spy.db.profile.Colors = Default_Profile.profile.Colors end
-	if Spy.db.profile.Colors["Window"] == nil then Spy.db.profile.Colors["Window"] = Default_Profile.profile.Colors["Window"] end
-	if Spy.db.profile.Colors["Window"]["Title"] == nil then Spy.db.profile.Colors["Window"]["Title"] = Default_Profile.profile.Colors["Window"]["Title"] end
-	if Spy.db.profile.Colors["Window"]["Background"] == nil then Spy.db.profile.Colors["Window"]["Background"] = Default_Profile.profile.Colors["Window"]["Background"] end
-	if Spy.db.profile.Colors["Window"]["Title Text"] == nil then Spy.db.profile.Colors["Window"]["Title Text"] = Default_Profile.profile.Colors["Window"]["Title Text"] end
-	if Spy.db.profile.Colors["Other Windows"] == nil then Spy.db.profile.Colors["Other Windows"] = Default_Profile.profile.Colors["Other Windows"] end
-	if Spy.db.profile.Colors["Other Windows"]["Title"] == nil then Spy.db.profile.Colors["Other Windows"]["Title"] = Default_Profile.profile.Colors["Other Windows"]["Title"] end
-	if Spy.db.profile.Colors["Other Windows"]["Background"] == nil then Spy.db.profile.Colors["Other Windows"]["Background"] = Default_Profile.profile.Colors["Other Windows"]["Background"] end
-	if Spy.db.profile.Colors["Other Windows"]["Title Text"] == nil then Spy.db.profile.Colors["Other Windows"]["Title Text"] = Default_Profile.profile.Colors["Other Windows"]["Title Text"] end
-	if Spy.db.profile.Colors["Bar"] == nil then Spy.db.profile.Colors["Bar"] = Default_Profile.profile.Colors["Bar"] end
-	if Spy.db.profile.Colors["Bar"]["Bar Text"] == nil then Spy.db.profile.Colors["Bar"]["Bar Text"] = Default_Profile.profile.Colors["Bar"]["Bar Text"] end
-	if Spy.db.profile.Colors["Warning"] == nil then Spy.db.profile.Colors["Warning"] = Default_Profile.profile.Colors["Warning"] end
-	if Spy.db.profile.Colors["Warning"]["Warning Text"] == nil then Spy.db.profile.Colors["Warning"]["Warning Text"] = Default_Profile.profile.Colors["Warning"]["Warning Text"] end
-	if Spy.db.profile.Colors["Tooltip"] == nil then Spy.db.profile.Colors["Tooltip"] = Default_Profile.profile.Colors["Tooltip"] end
-	if Spy.db.profile.Colors["Tooltip"]["Title Text"] == nil then Spy.db.profile.Colors["Tooltip"]["Title Text"] = Default_Profile.profile.Colors["Tooltip"]["Title Text"] end
-	if Spy.db.profile.Colors["Tooltip"]["Details Text"] == nil then Spy.db.profile.Colors["Tooltip"]["Details Text"] = Default_Profile.profile.Colors["Tooltip"]["Details Text"] end
-	if Spy.db.profile.Colors["Tooltip"]["Location Text"] == nil then Spy.db.profile.Colors["Tooltip"]["Location Text"] = Default_Profile.profile.Colors["Tooltip"]["Location Text"] end
-	if Spy.db.profile.Colors["Tooltip"]["Reason Text"] == nil then Spy.db.profile.Colors["Tooltip"]["Reason Text"] = Default_Profile.profile.Colors["Tooltip"]["Reason Text"] end
-	if Spy.db.profile.Colors["Alert"] == nil then Spy.db.profile.Colors["Alert"] = Default_Profile.profile.Colors["Alert"] end
-	if Spy.db.profile.Colors["Alert"]["Background"] == nil then Spy.db.profile.Colors["Alert"]["Background"] = Default_Profile.profile.Colors["Alert"]["Background"] end
-	if Spy.db.profile.Colors["Alert"]["Icon"] == nil then Spy.db.profile.Colors["Alert"]["Icon"] = Default_Profile.profile.Colors["Alert"]["Icon"] end
-	if Spy.db.profile.Colors["Alert"]["KOS Border"] == nil then Spy.db.profile.Colors["Alert"]["KOS Border"] = Default_Profile.profile.Colors["Alert"]["KOS Border"] end
-	if Spy.db.profile.Colors["Alert"]["KOS Text"] == nil then Spy.db.profile.Colors["Alert"]["KOS Text"] = Default_Profile.profile.Colors["Alert"]["KOS Text"] end
-	if Spy.db.profile.Colors["Alert"]["KOS Guild Border"] == nil then Spy.db.profile.Colors["Alert"]["KOS Guild Border"] = Default_Profile.profile.Colors["Alert"]["KOS Guild Border"] end
-	if Spy.db.profile.Colors["Alert"]["KOS Guild Text"] == nil then Spy.db.profile.Colors["Alert"]["KOS Guild Text"] = Default_Profile.profile.Colors["Alert"]["KOS Guild Text"] end
-	if Spy.db.profile.Colors["Alert"]["Stealth Border"] == nil then Spy.db.profile.Colors["Alert"]["Stealth Border"] = Default_Profile.profile.Colors["Alert"]["Stealth Border"] end
-	if Spy.db.profile.Colors["Alert"]["Stealth Text"] == nil then Spy.db.profile.Colors["Alert"]["Stealth Text"] = Default_Profile.profile.Colors["Alert"]["Stealth Text"] end
-	if Spy.db.profile.Colors["Alert"]["Away Border"] == nil then Spy.db.profile.Colors["Alert"]["Away Border"] = Default_Profile.profile.Colors["Alert"]["Away Border"] end
-	if Spy.db.profile.Colors["Alert"]["Away Text"] == nil then Spy.db.profile.Colors["Alert"]["Away Text"] = Default_Profile.profile.Colors["Alert"]["Away Text"] end
-	if Spy.db.profile.Colors["Alert"]["Location Text"] == nil then Spy.db.profile.Colors["Alert"]["Location Text"] = Default_Profile.profile.Colors["Alert"]["Location Text"] end
-	if Spy.db.profile.Colors["Alert"]["Name Text"] == nil then Spy.db.profile.Colors["Alert"]["Name Text"] = Default_Profile.profile.Colors["Alert"]["Name Text"] end
-	if Spy.db.profile.Colors["Class"] == nil then Spy.db.profile.Colors["Class"] = Default_Profile.profile.Colors["Class"] end
-	if Spy.db.profile.Colors["Class"]["HUNTER"] == nil then Spy.db.profile.Colors["Class"]["HUNTER"] = Default_Profile.profile.Colors["Class"]["HUNTER"] end
-	if Spy.db.profile.Colors["Class"]["WARLOCK"] == nil then Spy.db.profile.Colors["Class"]["WARLOCK"] = Default_Profile.profile.Colors["Class"]["WARLOCK"] end
-	if Spy.db.profile.Colors["Class"]["PRIEST"] == nil then Spy.db.profile.Colors["Class"]["PRIEST"] = Default_Profile.profile.Colors["Class"]["PRIEST"] end
-	if Spy.db.profile.Colors["Class"]["PALADIN"] == nil then Spy.db.profile.Colors["Class"]["PALADIN"] = Default_Profile.profile.Colors["Class"]["PALADIN"] end
-	if Spy.db.profile.Colors["Class"]["MAGE"] == nil then Spy.db.profile.Colors["Class"]["MAGE"] = Default_Profile.profile.Colors["Class"]["MAGE"] end
-	if Spy.db.profile.Colors["Class"]["ROGUE"] == nil then Spy.db.profile.Colors["Class"]["ROGUE"] = Default_Profile.profile.Colors["Class"]["ROGUE"] end
-	if Spy.db.profile.Colors["Class"]["DRUID"] == nil then Spy.db.profile.Colors["Class"]["DRUID"] = Default_Profile.profile.Colors["Class"]["DRUID"] end
-	if Spy.db.profile.Colors["Class"]["SHAMAN"] == nil then Spy.db.profile.Colors["Class"]["SHAMAN"] = Default_Profile.profile.Colors["Class"]["SHAMAN"] end
-	if Spy.db.profile.Colors["Class"]["WARRIOR"] == nil then Spy.db.profile.Colors["Class"]["WARRIOR"] = Default_Profile.profile.Colors["Class"]["WARRIOR"] end
-	if Spy.db.profile.Colors["Class"]["DEATHKNIGHT"] == nil then Spy.db.profile.Colors["Class"]["DEATHKNIGHT"] = Default_Profile.profile.Colors["Class"]["DEATHKNIGHT"] end
-	if Spy.db.profile.Colors["Class"]["PET"] == nil then Spy.db.profile.Colors["Class"]["PET"] = Default_Profile.profile.Colors["Class"]["PET"] end
-	if Spy.db.profile.Colors["Class"]["MOB"] == nil then Spy.db.profile.Colors["Class"]["MOB"] = Default_Profile.profile.Colors["Class"]["MOB"] end
-	if Spy.db.profile.Colors["Class"]["UNKNOWN"] == nil then Spy.db.profile.Colors["Class"]["UNKNOWN"] = Default_Profile.profile.Colors["Class"]["UNKNOWN"] end
-	if Spy.db.profile.Colors["Class"]["HOSTILE"] == nil then Spy.db.profile.Colors["Class"]["HOSTILE"] = Default_Profile.profile.Colors["Class"]["HOSTILE"] end
-	if Spy.db.profile.Colors["Class"]["UNGROUPED"] == nil then Spy.db.profile.Colors["Class"]["UNGROUPED"] = Default_Profile.profile.Colors["Class"]["UNGROUPED"] end
-	if Spy.db.profile.MainWindow == nil then Spy.db.profile.MainWindow = Default_Profile.profile.MainWindow end
-	if Spy.db.profile.MainWindow.Buttons == nil then Spy.db.profile.MainWindow.Buttons = Default_Profile.profile.MainWindow.Buttons end
-	if Spy.db.profile.MainWindow.Buttons.ClearButton == nil then Spy.db.profile.MainWindow.Buttons.ClearButton = Default_Profile.profile.MainWindow.Buttons.ClearButton end
-	if Spy.db.profile.MainWindow.Buttons.LeftButton == nil then Spy.db.profile.MainWindow.Buttons.LeftButton = Default_Profile.profile.MainWindow.Buttons.LeftButton end
-	if Spy.db.profile.MainWindow.Buttons.RightButton == nil then Spy.db.profile.MainWindow.Buttons.RightButton = Default_Profile.profile.MainWindow.Buttons.RightButton end
-	if Spy.db.profile.MainWindow.RowHeight == nil then Spy.db.profile.MainWindow.RowHeight = Default_Profile.profile.MainWindow.RowHeight end
-	if Spy.db.profile.MainWindow.RowSpacing == nil then Spy.db.profile.MainWindow.RowSpacing = Default_Profile.profile.MainWindow.RowSpacing end
-	if Spy.db.profile.MainWindow.TextHeight == nil then Spy.db.profile.MainWindow.TextHeight = Default_Profile.profile.MainWindow.TextHeight end
-	if Spy.db.profile.MainWindow.AutoHide == nil then Spy.db.profile.MainWindow.AutoHide = Default_Profile.profile.MainWindow.AutoHide end
-	if Spy.db.profile.MainWindow.BarText == nil then Spy.db.profile.MainWindow.BarText = Default_Profile.profile.MainWindow.BarText end
-	if Spy.db.profile.MainWindow.BarText.RankNum == nil then Spy.db.profile.MainWindow.BarText.RankNum = Default_Profile.profile.MainWindow.BarText.RankNum end
-	if Spy.db.profile.MainWindow.BarText.PerSec == nil then Spy.db.profile.MainWindow.BarText.PerSec = Default_Profile.profile.MainWindow.BarText.PerSec end
-	if Spy.db.profile.MainWindow.BarText.Percent == nil then Spy.db.profile.MainWindow.BarText.Percent = Default_Profile.profile.MainWindow.BarText.Percent end
-	if Spy.db.profile.MainWindow.BarText.NumFormat == nil then Spy.db.profile.MainWindow.BarText.NumFormat = Default_Profile.profile.MainWindow.BarText.NumFormat end
-	if Spy.db.profile.MainWindow.Position == nil then Spy.db.profile.MainWindow.Position = Default_Profile.profile.MainWindow.Position end
-	if Spy.db.profile.MainWindow.Position.x == nil then Spy.db.profile.MainWindow.Position.x = Default_Profile.profile.MainWindow.Position.x end
-	if Spy.db.profile.MainWindow.Position.y == nil then Spy.db.profile.MainWindow.Position.y = Default_Profile.profile.MainWindow.Position.y end
-	if Spy.db.profile.MainWindow.Position.w == nil then Spy.db.profile.MainWindow.Position.w = Default_Profile.profile.MainWindow.Position.w end
-	if Spy.db.profile.MainWindow.Position.h == nil then Spy.db.profile.MainWindow.Position.h = Default_Profile.profile.MainWindow.Position.h end
-	if Spy.db.profile.AlertWindowNameSize == nil then Spy.db.profile.AlertWindowNameSize = Default_Profile.profile.AlertWindowNameSize end
-	if Spy.db.profile.AlertWindowLocationSize == nil then Spy.db.profile.AlertWindowLocationSize = Default_Profile.profile.AlertWindowLocationSize end
-	if Spy.db.profile.BarTexture == nil then Spy.db.profile.BarTexture = Default_Profile.profile.BarTexture end
-	if Spy.db.profile.MainWindowVis == nil then Spy.db.profile.MainWindowVis = Default_Profile.profile.MainWindowVis end
-	if Spy.db.profile.CurrentList == nil then Spy.db.profile.CurrentList = Default_Profile.profile.CurrentList end
-	if Spy.db.profile.Locked == nil then Spy.db.profile.Locked = Default_Profile.profile.Locked end
-	if Spy.db.profile.Font == nil then Spy.db.profile.Font = Default_Profile.profile.Font end
-	if Spy.db.profile.Scaling == nil then Spy.db.profile.Scaling = Default_Profile.profile.Scaling end
-	if Spy.db.profile.Enabled == nil then Spy.db.profile.Enabled = Default_Profile.profile.Enabled end
-	if Spy.db.profile.EnabledInBattlegrounds == nil then Spy.db.profile.EnabledInBattlegrounds = Default_Profile.profile.EnabledInBattlegrounds end
-	if Spy.db.profile.DisableWhenPVPUnflagged == nil then Spy.db.profile.DisableWhenPVPUnflagged = Default_Profile.profile.DisableWhenPVPUnflagged end
-	if Spy.db.profile.MinimapDetection == nil then Spy.db.profile.MinimapDetection = Default_Profile.profile.MinimapDetection end
-	if Spy.db.profile.MinimapDetails == nil then Spy.db.profile.MinimapDetails = Default_Profile.profile.MinimapDetails end
-	if Spy.db.profile.DisplayOnMap == nil then Spy.db.profile.DisplayOnMap = Default_Profile.profile.DisplayOnMap end
-	if Spy.db.profile.SwitchToZone == nil then Spy.db.profile.SwitchToZone = Default_Profile.profile.SwitchToZone end	
-	if Spy.db.profile.MapDisplayLimit == nil then Spy.db.profile.MapDisplayLimit = Default_Profile.profile.MapDisplayLimit end
-	if Spy.db.profile.DisplayTooltipNearSpyWindow == nil then Spy.db.profile.DisplayTooltipNearSpyWindow = Default_Profile.profile.DisplayTooltipNearSpyWindow end	
-	if Spy.db.profile.TooltipAnchor == nil then Spy.db.profile.TooltipAnchor = Default_Profile.profile.TooltipAnchor end	
-	if Spy.db.profile.DisplayWinLossStatistics == nil then Spy.db.profile.DisplayWinLossStatistics = Default_Profile.profile.DisplayWinLossStatistics end
-	if Spy.db.profile.DisplayKOSReason == nil then Spy.db.profile.DisplayKOSReason = Default_Profile.profile.DisplayKOSReason end
-	if Spy.db.profile.DisplayLastSeen == nil then Spy.db.profile.DisplayLastSeen = Default_Profile.profile.DisplayLastSeen end
-	if Spy.db.profile.ShowOnDetection == nil then Spy.db.profile.ShowOnDetection = Default_Profile.profile.ShowOnDetection end
-	if Spy.db.profile.HideSpy == nil then Spy.db.profile.HideSpy = Default_Profile.profile.HideSpy end
---	if Spy.db.profile.ShowOnlyPvPFlagged == nil then Spy.db.profile.ShowOnlyPvPFlagged = Default_Profile.profile.ShowOnlyPvPFlagged end	
-	if Spy.db.profile.ShowKoSButton == nil then Spy.db.profile.ShowKoSButton = Default_Profile.profile.ShowKoSButton end	
-	if Spy.db.profile.InvertSpy == nil then Spy.db.profile.InvertSpy = Default_Profile.profile.InvertSpy end
-	if Spy.db.profile.ResizeSpy == nil then Spy.db.profile.ResizeSpy = Default_Profile.profile.ResizeSpy end
-	if Spy.db.profile.ResizeSpyLimit == nil then Spy.db.profile.ResizeSpyLimit = Default_Profile.profile.ResizeSpyLimit end 
-	if Spy.db.profile.Announce == nil then Spy.db.profile.Announce = Default_Profile.profile.Announce end
-	if Spy.db.profile.OnlyAnnounceKoS == nil then Spy.db.profile.OnlyAnnounceKoS = Default_Profile.profile.OnlyAnnounceKoS end
-	if Spy.db.profile.WarnOnStealth == nil then Spy.db.profile.WarnOnStealth = Default_Profile.profile.WarnOnStealth end
-	if Spy.db.profile.WarnOnKOS == nil then Spy.db.profile.WarnOnKOS = Default_Profile.profile.WarnOnKOS end
-	if Spy.db.profile.WarnOnKOSGuild == nil then Spy.db.profile.WarnOnKOSGuild = Default_Profile.profile.WarnOnKOSGuild end
-	if Spy.db.profile.WarnOnRace == nil then Spy.db.profile.WarnOnRace = Default_Profile.profile.WarnOnRace end
-	if Spy.db.profile.SelectWarnRace == nil then Spy.db.profile.SelectWarnRace = Default_Profile.profile.SelectWarnRace end
-	if Spy.db.profile.DisplayWarningsInErrorsFrame == nil then Spy.db.profile.DisplayWarningsInErrorsFrame = Default_Profile.profile.DisplayWarningsInErrorsFrame end
-	if Spy.db.profile.EnableSound == nil then Spy.db.profile.EnableSound = Default_Profile.profile.EnableSound end
-	if Spy.db.profile.OnlySoundKoS == nil then Spy.db.profile.OnlySoundKoS = Default_Profile.profile.OnlySoundKoS end	
-	if Spy.db.profile.StopAlertsOnTaxi == nil then Spy.db.profile.StopAlertsOnTaxi = Default_Profile.profile.StopAlertsOnTaxi end 	
-	if Spy.db.profile.RemoveUndetected == nil then Spy.db.profile.RemoveUndetected = Default_Profile.profile.RemoveUndetected end
-	if Spy.db.profile.ShowNearbyList == nil then Spy.db.profile.ShowNearbyList = Default_Profile.profile.ShowNearbyList end
-	if Spy.db.profile.PrioritiseKoS == nil then Spy.db.profile.PrioritiseKoS = Default_Profile.profile.PrioritiseKoS end
-	if Spy.db.profile.PurgeData == nil then Spy.db.profile.PurgeData = Default_Profile.profile.PurgeData end
-	if Spy.db.profile.PurgeKoS == nil then Spy.db.profile.PurgeKoS = Default_Profile.profile.PurgeKoSData end	
-	if Spy.db.profile.PurgeWinLossData == nil then Spy.db.profile.PurgeWinLossData = Default_Profile.profile.PurgeWinLossData end	
-	if Spy.db.profile.ShareData == nil then Spy.db.profile.ShareData = Default_Profile.profile.ShareData end
-	if Spy.db.profile.UseData == nil then Spy.db.profile.UseData = Default_Profile.profile.UseData end
-	if Spy.db.profile.ShareKOSBetweenCharacters == nil then Spy.db.profile.ShareKOSBetweenCharacters = Default_Profile.profile.ShareKOSBetweenCharacters end
-	if Spy.db.profile.AppendUnitNameCheck == nil then Spy.db.profile.AppendUnitNameCheck = Default_Profile.profile.AppendUnitNameCheck end
-	if Spy.db.profile.AppendUnitKoSCheck == nil then Spy.db.profile.AppendUnitKoSCheck = Default_Profile.profile.AppendUnitKoSCheck end	]] --
 end
 
 function Spy:ResetProfile()
@@ -1558,13 +1354,22 @@ function Spy:ResetProfile()
 end
 
 function Spy:HandleProfileChanges()
+	-- Access db.profile to trigger the metatable and load the profile
+	-- This is safe even during profile switching
+	local profile = Spy.db.profile
+	
+	-- Ensure ldbIcon table exists for new/switched profiles
+	if not profile.ldbIcon then
+		profile.ldbIcon = {}
+	end
+	
 	Spy:CreateMainWindow()
-	Spy:RestoreMainWindowPosition(Spy.db.profile.MainWindow.Position.x, Spy.db.profile.MainWindow.Position.y,
-		Spy.db.profile.MainWindow.Position.w, 34)
+	Spy:RestoreMainWindowPosition(profile.MainWindow.Position.x, profile.MainWindow.Position.y,
+		profile.MainWindow.Position.w, 34)
 	Spy:ResizeMainWindow()
 	Spy:UpdateTimeoutSettings()
-	Spy:LockWindows(Spy.db.profile.Locked)
-	--	Spy:ClampToScreen(Spy.db.profile.ClampToScreen)
+	Spy:LockWindows(profile.Locked)
+	--	Spy:ClampToScreen(profile.ClampToScreen)
 end
 
 function Spy:RegisterModuleOptions(name, optionTbl, displayName)
@@ -1588,6 +1393,46 @@ function Spy:SetupOptions()
 	self.optionsFrames.DataOptions = ACD3:AddToBlizOptions("Spy", L["DataOptions"], "Spy", "DataOptions")
 
 	self:RegisterModuleOptions("Profiles", LibStub("AceDBOptions-3.0"):GetOptionsTable(self.db), L["Profiles"])
+	
+	-- Wrap the SetProfile and GetProfile functions to prevent selecting the same profile
+	local profileOptions = Spy.options.args.Profiles.args
+	if profileOptions and profileOptions.choose then
+		local originalGet = profileOptions.choose.get
+		local originalSet = profileOptions.choose.set
+		
+		-- Wrap get to ensure it always returns a valid string
+		profileOptions.choose.get = function(info)
+			local current
+			if type(originalGet) == "string" then
+				local handler = Spy.options.args.Profiles.handler
+				if handler and handler[originalGet] then
+					current = handler[originalGet](handler, info)
+				end
+			elseif type(originalGet) == "function" then
+				current = originalGet(info)
+			end
+			-- Ensure we always return a valid profile name, never nil
+			return current or "Default"
+		end
+		
+		-- Wrap set to prevent selecting the same profile
+		profileOptions.choose.set = function(info, value)
+			-- Don't do anything if trying to select the current profile or value is nil
+			if not value or value == Spy.db:GetCurrentProfile() then
+				return
+			end
+			-- Call original SetProfile
+			if type(originalSet) == "string" then
+				local handler = Spy.options.args.Profiles.handler
+				if handler and handler[originalSet] then
+					handler[originalSet](handler, info, value)
+				end
+			elseif type(originalSet) == "function" then
+				originalSet(info, value)
+			end
+		end
+	end
+	
 	Spy.options.args.Profiles.order = -2
 	Spy:InitDBIcon()
 end
@@ -1691,25 +1536,25 @@ end
 
 function Spy:UpdateTimeoutSettings()
 	if not Spy.db.profile.RemoveUndetected or Spy.db.profile.RemoveUndetected == "OneMinute" then
-		Spy.ActiveTimeout = 30
+		Spy.ActiveTimeout = 5
 		Spy.InactiveTimeout = 60
 	elseif Spy.db.profile.RemoveUndetected == "TwoMinutes" then
-		Spy.ActiveTimeout = 60
+		Spy.ActiveTimeout = 5
 		Spy.InactiveTimeout = 120
 	elseif Spy.db.profile.RemoveUndetected == "FiveMinutes" then
-		Spy.ActiveTimeout = 150
+		Spy.ActiveTimeout = 5
 		Spy.InactiveTimeout = 300
 	elseif Spy.db.profile.RemoveUndetected == "TenMinutes" then
-		Spy.ActiveTimeout = 300
+		Spy.ActiveTimeout = 5
 		Spy.InactiveTimeout = 600
 	elseif Spy.db.profile.RemoveUndetected == "FifteenMinutes" then
-		Spy.ActiveTimeout = 450
+		Spy.ActiveTimeout = 5
 		Spy.InactiveTimeout = 900
 	elseif Spy.db.profile.RemoveUndetected == "Never" then
-		Spy.ActiveTimeout = 30
+		Spy.ActiveTimeout = 5
 		Spy.InactiveTimeout = -1
 	else
-		Spy.ActiveTimeout = 150
+		Spy.ActiveTimeout = 5
 		Spy.InactiveTimeout = 300
 	end
 end
@@ -1756,27 +1601,16 @@ function Spy:OnEnable(first)
 		-- Register RAW_COMBATLOG for direct combat log parsing (SuperWoW feature)
 		Spy:RegisterEvent("RAW_COMBATLOG", "RawCombatLogEvent")
 		
-		-- Only register minimal CombatLog events for Win/Loss stats and LastAttack tracking
-		-- (Stealth detection is handled by SpySuperWoW.lua)
-		local minimalCombatLogEvents = {
-			"CHAT_MSG_COMBAT_FRIENDLY_DEATH",        -- Win/Loss tracking
-			"CHAT_MSG_COMBAT_HOSTILE_DEATH",         -- Win/Loss tracking
-			"CHAT_MSG_SPELL_HOSTILEPLAYER_DAMAGE",   -- Spell damage (for LastAttack)
-			"CHAT_MSG_SPELL_PERIODIC_HOSTILEPLAYER_DAMAGE", -- DoT damage (for LastAttack)
-			"CHAT_MSG_COMBAT_HOSTILEPLAYER_HITS",    -- Melee hits (for LastAttack)
-		}
-		
-		Spy:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED", "CombatLogEvent")
-		for _, event in pairs(minimalCombatLogEvents) do
-			Spy.parser:RegisterEvent("Spy", event, function(event, info) Spy:CombatLogEvent(event, info) end)
-		end
+		-- Register minimal events for Win/Loss tracking
+		Spy:RegisterEvent("CHAT_MSG_COMBAT_FRIENDLY_DEATH", "DeathLogEvent")
+		Spy:RegisterEvent("CHAT_MSG_COMBAT_HOSTILE_DEATH", "DeathLogEvent")
 	else
 		-- SuperWoW NOT available - Spy will not function
 		DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy]|r ERROR: SuperWoW is required! Spy is disabled.")
 		return
 	end
 	
-	Spy:RegisterEvent("WORLD_MAP_UPDATE", "WorldMapUpdateEvent")
+	-- WORLD_MAP_UPDATE removed - map display feature removed
 	Spy:RegisterEvent("PLAYER_REGEN_ENABLED", "LeftCombatEvent")
 	--Spy:RegisterEvent("PLAYER_DEAD", "PlayerDeadEvent")
 	Spy:RegisterComm(Spy.Signature, "CommReceived")
@@ -1811,16 +1645,15 @@ function Spy:OnDisable()
 	Spy:UnregisterEvent("ZONE_CHANGED_NEW_AREA")
 	Spy:UnregisterEvent("PLAYER_ENTERING_WORLD")
 	Spy:UnregisterEvent("UNIT_FACTION")
-	Spy:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
 	Spy:UnregisterEvent("RAW_COMBATLOG")
-	Spy:UnregisterEvent("WORLD_MAP_UPDATE")
+	Spy:UnregisterEvent("CHAT_MSG_COMBAT_FRIENDLY_DEATH")
+	Spy:UnregisterEvent("CHAT_MSG_COMBAT_HOSTILE_DEATH")
+	-- WORLD_MAP_UPDATE removed - map display feature removed
 	Spy:UnregisterEvent("PLAYER_REGEN_ENABLED")
 	Spy:UnregisterEvent("PLAYER_DEAD")
 	Spy:UnregisterComm(Spy.Signature)
 
 	--	self.uc.UnregisterAllCallbacks(self)
-
-	Spy.parser:UnregisterAllEvents("Spy")
 
 	Spy.IsEnabled = false
 end
@@ -2028,145 +1861,57 @@ function Spy:GetCensusData()
 end
 
 local playerName = UnitName("player")
-function Spy:CombatLogEvent(event, info)
-    -- Safely check if info exists
-    if not info then 
-        if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-            DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Debug]|r ParserLib returned nil info for event: " .. tostring(event))
-        end
-        return 
-    end
-    
-    -- DEBUG: Log ALL events
-    if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-        DEFAULT_CHAT_FRAME:AddMessage("|cff9999ff[Spy Debug]|r EVENT: " .. tostring(event))
-        DEFAULT_CHAT_FRAME:AddMessage("|cff9999ff[Spy Debug]|r   type=" .. tostring(info.type) .. " source=" .. tostring(info.source) .. " victim=" .. tostring(info.victim) .. " skill=" .. tostring(info.skill))
-    end
-    
-    -- Handle death events separately
-    if info.type == "death" then
-        Spy:DeathLog(event, info)
-        return
-    end
-    
-    -- Safely extract source/victim
-    local source = nil
-    local victim = nil
-    
-    if info.source then
-        if info.source == ParserLib_SELF then
-            source = playerName
-        else
-            source = info.source
-        end
-    end
-    
-    if info.victim then
-        if info.victim == ParserLib_SELF then
-            victim = playerName
-        else
-            victim = info.victim
-        end
-    end
-    
-    -- GUID-to-Name Resolution (for SuperWoW RAW_COMBATLOG)
-    if source and string.find(tostring(source), "0x") and SpySW and SpySW.GetNameFromGUID then
-        local resolvedName = SpySW:GetNameFromGUID(source)
-        if resolvedName then
-            source = resolvedName
-        end
-    end
-    
-    if victim and string.find(tostring(victim), "0x") and SpySW and SpySW.GetNameFromGUID then
-        local resolvedName = SpySW:GetNameFromGUID(victim)
-        if resolvedName then
-            victim = resolvedName
-        end
-    end
-    
-    -- FALLBACK: Track last attacker even when ParserLib fails
-    if victim == playerName and source and source ~= playerName then
-        Spy.LastAttack = source
-        if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-            DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy Debug]|r LastAttack set to: " .. tostring(source))
-        end
-    end
-
-    if Spy.EnabledInZone then
-        -- ✅ Stealth detection is now handled by SpySuperWoW.lua (removed from here)
-        
-        -- Track LastAttack for death log (simple tracking without player detection)
-        if source and source ~= playerName and not Spy:PlayerIsFriend(source) and not SpyPerCharDB.IgnoreData[source] and
-            not find(source, " ") and not find(source, "Unknown") then
-            
-            -- Only track LastAttack when attacked
-            if victim == playerName then
-                Spy.LastAttack = source
-                if Spy.db.profile.DebugMode then
-                    DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy Debug]|r LastAttack updated to: " .. source)
-                end
-            end
-        end
-    end
-end
-
-function Spy:DeathLog(event, info)
-	-- Debug: Show death events
-	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-		DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Debug]|r DEATH EVENT:")
-		DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Debug]|r   source=" .. tostring(info.source))
-		DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Debug]|r   victim=" .. tostring(info.victim))
-		DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Debug]|r   ParserLib_SELF=" .. tostring(ParserLib_SELF))
-		DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Debug]|r   Spy.LastAttack=" .. tostring(Spy.LastAttack))
-	end
+function Spy:DeathLogEvent()
+	-- Parse death messages from CHAT_MSG_COMBAT_*_DEATH events
+	-- arg1 = death message text
+	local message = arg1
+	if not message then return end
 	
-	-- update win statistics
-	--printT({"DeathLog", event, info})
-	if info.source == ParserLib_SELF and info.victim then
-		local playerData = SpyPerCharDB.PlayerData[info.victim]
-		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-			DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy Debug]|r WIN: playerData for " .. tostring(info.victim) .. " = " .. tostring(playerData ~= nil))
-		end
+	local playerName = UnitName("player")
+	
+	-- Pattern: "You have slain PlayerName!"
+	local _, _, victim = string.find(message, "You have slain (.+)!")
+	if victim then
+		local playerData = SpyPerCharDB.PlayerData[victim]
 		if playerData then
 			if not playerData.wins then playerData.wins = 0 end
 			playerData.wins = playerData.wins + 1
 			if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-				DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy Debug]|r ✓ WIN counted for " .. tostring(info.victim))
+				DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy Debug]|r ✓ WIN counted for " .. victim)
 			end
 		end
+		return
 	end
-	if info.victim == ParserLib_SELF and (info.source or Spy.LastAttack) then
-		local killerName = info.source or Spy.LastAttack
-		
-		-- If killer is a GUID, try to resolve to name via SpySuperWoW
-		if killerName and string.find(tostring(killerName), "0x") and SpySW and SpySW.GetNameFromGUID then
-			local resolvedName = SpySW:GetNameFromGUID(killerName)
+	
+	-- Pattern: "You are slain by PlayerName!"
+	local _, _, killer = string.find(message, "You are slain by (.+)!")
+	if not killer and Spy.LastAttack then
+		-- Fallback: use LastAttack if no killer found in message
+		killer = Spy.LastAttack
+	end
+	
+	if killer then
+		-- If killer is a GUID, try to resolve to name
+		if string.find(tostring(killer), "0x") and SpySW and SpySW.GetNameFromGUID then
+			local resolvedName = SpySW:GetNameFromGUID(killer)
 			if resolvedName then
-				killerName = resolvedName
-				if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-					DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy Debug]|r ✓ Resolved GUID to name: " .. tostring(killerName))
-				end
+				killer = resolvedName
 			end
 		end
 		
-		local playerData = SpyPerCharDB.PlayerData[killerName]
-		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Debug]|r LOSS: playerData for " .. tostring(killerName) .. " = " .. tostring(playerData ~= nil))
-		end
+		local playerData = SpyPerCharDB.PlayerData[killer]
 		if playerData then
 			if not playerData.loses then playerData.loses = 0 end
 			playerData.loses = playerData.loses + 1
 			if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-				DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Debug]|r ✓ LOSS counted for " .. tostring(killerName))
+				DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Debug]|r ✓ LOSS counted for " .. killer)
 			end
 		end
 	end
-
 end
 
 -- RAW_COMBATLOG Event Handler (SuperWoW feature)
 -- Parses raw combat log text to track last attacker
--- Only used as FALLBACK when ParserLib doesn't provide source name
 local playerName = UnitName("player")
 
 function Spy:RawCombatLogEvent()
@@ -2235,20 +1980,7 @@ function Spy:LeftCombatEvent()
 	Spy:RefreshCurrentList()
 end
 
-function Spy:WorldMapUpdateEvent()
-	if not Spy.MapNoteList then
-		Spy:ScheduleTimer("WorldMapUpdateEvent", 1)
-		return
-	end
-	for i = 1, Spy.MapNoteLimit do
-		local note = Spy.MapNoteList[i]
-		if note.displayed then
-			-- Protect against unknown zones (custom servers) - silently ignore errors
-			pcall(Astrolabe.PlaceIconOnWorldMap, Astrolabe, WorldMapButton, note.worldIcon, note.continentIndex, note.zoneIndex, note.mapX, note.mapY)
-			pcall(Astrolabe.PlaceIconOnMinimap, Astrolabe, note.miniIcon, note.continentIndex, note.zoneIndex, note.mapX, note.mapY)
-		end
-	end
-end
+-- WorldMapUpdateEvent removed - map display feature removed
 
 function Spy:CommReceived(prefix, message, distribution, source)
 	if Spy.EnabledInZone and Spy.db.profile.UseData then
@@ -2337,9 +2069,7 @@ function Spy:CommReceived(prefix, message, distribution, source)
 					if playerData and playerData.isEnemy and not SpyPerCharDB.IgnoreData[player] then
 						Spy.PlayerCommList[player] = Spy.CurrentMapNote
 						Spy:AddDetected(player, time(), learnt, source)
-						if Spy.db.profile.DisplayOnMap then
-							Spy:ShowMapNote(player)
-						end
+						-- Map display removed - don't show map notes
 					end
 				end
 			end
@@ -2382,62 +2112,7 @@ function Spy:FilterNotInParty(frame, event, message)
 	return false
 end
 
-function Spy:ShowMapNote(player)
-	local playerData = SpyPerCharDB.PlayerData[player]
-	if playerData then
-		local currentContinentIndex, currentZoneIndex = Spy:GetZoneID(GetZoneText())
-		local continentIndex, zoneIndex = Spy:GetZoneID(playerData.zone)
-		local mapX, mapY = playerData.mapX, playerData.mapY
-		
-		-- Only show map note if zone is known and valid
-		if continentIndex ~= nil and zoneIndex ~= nil and type(playerData.mapX) == "number" and
-			type(playerData.mapY) == "number" and
-			(
-			Spy.db.profile.MapDisplayLimit == "None" or
-				(Spy.db.profile.MapDisplayLimit == "SameZone" and zoneIndex == currentZoneIndex) or
-				(Spy.db.profile.MapDisplayLimit == "SameContinent" and continentIndex == currentContinentIndex)) then
-			local note = Spy.MapNoteList[Spy.CurrentMapNote]
-			note.displayed = true
-			note.continentIndex = continentIndex
-			note.zoneIndex = zoneIndex
-			note.mapX = mapX
-			note.mapY = mapY
-			local mapScale = MinimapCluster:GetScale()
-			note.miniIcon:SetWidth(24 / mapScale)
-			note.miniIcon:SetHeight(24 / mapScale)
-			mapScale = WorldMapFrame:GetScale()
-			note.worldIcon:SetWidth(28 * mapScale)
-			note.worldIcon:SetHeight(28 * mapScale)
-			note.worldIcon:Show()
-
-			-- Protect against unknown zones (custom servers) - silently ignore errors
-			local success1, err1 = pcall(Astrolabe.PlaceIconOnWorldMap, Astrolabe, WorldMapButton, note.worldIcon, continentIndex, zoneIndex, mapX, mapY)
-			local success2, err2 = pcall(Astrolabe.PlaceIconOnMinimap, Astrolabe, note.miniIcon, note.continentIndex, note.zoneIndex, note.mapX, note.mapY)
-
-			for i = 1, Spy.MapNoteLimit do
-				if i ~= Spy.CurrentMapNote and Spy.MapNoteList[i].displayed then
-					if continentIndex == Spy.MapNoteList[i].continentIndex and zoneIndex == Spy.MapNoteList[i].zoneIndex and
-						abs(mapX - Spy.MapNoteList[i].mapX) < Spy.MapProximityThreshold and
-						abs(mapY - Spy.MapNoteList[i].mapY) < Spy.MapProximityThreshold then
-						Spy.MapNoteList[i].displayed = false
-						Spy.MapNoteList[i].worldIcon:Hide()
-						Astrolabe:RemoveIconFromMinimap(Spy.MapNoteList[i].miniIcon)
-						for player in pairs(Spy.PlayerCommList) do
-							if Spy.PlayerCommList[player] == i then
-								Spy.PlayerCommList[player] = Spy.CurrentMapNote
-							end
-						end
-					end
-				end
-			end
-
-			Spy.CurrentMapNote = Spy.CurrentMapNote + 1
-			if Spy.CurrentMapNote > Spy.MapNoteLimit then
-				Spy.CurrentMapNote = 1
-			end
-		end
-	end
-end
+-- ShowMapNote function removed - map display feature removed
 
 function Spy:GetPlayerLocation(playerData)
 	local location = playerData.zone
