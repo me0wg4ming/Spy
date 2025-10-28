@@ -958,6 +958,9 @@ function SpySW:Initialize()
             
             SLASH_SPYPETTEST1 = "/spypet"
             SlashCmdList["SPYPETTEST"] = showDisabledMessage
+
+			SLASH_SPYPETTEST1 = "/spyevent"
+            SlashCmdList["SPYPETTEST"] = showDisabledMessage
             
             SLASH_SPYTARGET1 = "/spytarget"
             SlashCmdList["SPYTARGET"] = showDisabledMessage
@@ -1400,5 +1403,3 @@ end)
 -- Register slash command
 SLASH_SPYEVENT1 = "/spyevent"
 SlashCmdList["SPYEVENT"] = ToggleCastLogger
-
-DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r Cast Logger loaded. Type |cffFFFF00/spyevent|r to toggle logging.")
