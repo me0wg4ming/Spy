@@ -1,5 +1,5 @@
 ## Interface: 11200
-## Title: |CFF00FF00 Spy |CFFFF0000[SuperWoW]
+## Title: |CFF00FF00Spy |CFFFF0000[SuperWoW]
 ## Notes: Detects and alerts you to the presence of nearby enemy players.
 ## Author: SuperWoW modification by @me0wg4ming
 ## Version: 3.9.0
