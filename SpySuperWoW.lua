@@ -70,22 +70,6 @@ SpySW.SCAN_INTERVAL = 0.5
 -- GUID cleanup interval (check if units still exist)
 SpySW.CLEANUP_INTERVAL = 5  -- Check every 5 seconds if GUIDs still exist
 
--- ✅ Stealth Spell IDs (for UNIT_CASTEVENT detection)
-SpySW.STEALTH_SPELL_IDS = {
-	[1784] = "Stealth",      -- Rogue Stealth (Rank 1)
-	[1785] = "Stealth",      -- Rogue Stealth (Rank 2)
-	[1786] = "Stealth",      -- Rogue Stealth (Rank 3)
-	[1787] = "Stealth",      -- Rogue Stealth (Rank 4)
-	[5215] = "Prowl",        -- Druid Prowl (Rank 1)
-	[6783] = "Prowl",        -- Druid Prowl (Rank 2)
-	[9913] = "Prowl",        -- Druid Prowl (Rank 3)
-	[20580] = "Shadowmeld",  -- Night Elf Shadowmeld
-	[1856] = "Vanish",       -- Rogue Vanish (Rank 1)
-	[11327] = "Vanish",      -- Rogue Vanish (Rank 1)
-    [1857] = "Vanish",       -- Rogue Vanish (Rank 2)
-    [11329] = "Vanish",      -- Rogue Vanish (Rank 2)
-}
-
 --[[===========================================================================
 	GUID-based Faction Check (für Duel-Detection)
 =============================================================================]]
@@ -515,103 +499,67 @@ scanFrame:SetScript("OnUpdate", function()
 			
 			-- Check if player was already detected by US (not by Spy)
 			if not SpySW.detectedPlayers[playerName] then
-				-- ✅ Check if player is on Ignore list
-				if SpyPerCharDB and SpyPerCharDB.IgnoreData and SpyPerCharDB.IgnoreData[playerName] then
-					-- Player is ignored, skip detection
-					if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-						DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW]|r IGNORED: " .. playerName .. " (on Ignore list)")
-					end
-					-- Mark as detected to prevent spam, but don't add to Spy
-					SpySW.detectedPlayers[playerName] = GetTime()
-				else
-					-- Player NOT ignored - proceed with normal detection
-					-- Debug output (uses Spy's debug system)
-					if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-						local stealthStatus = playerData.isStealthed and (" [" .. (playerData.stealthType or "STEALTH") .. "]") or ""
-						DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r NEW: " .. playerName .. " Lvl" .. level .. " " .. (playerData.class or "?") .. stealthStatus)
-						DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r   Race: " .. (playerData.race or "?") .. " | PvP: " .. tostring(IsPvPFlagged(playerData.guid)) .. " | Hostile: " .. tostring(IsHostile(playerData.guid)))
-						DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r   GUID: " .. tostring(playerData.guid))
-					end
+				-- Debug output (uses Spy's debug system)
+				if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+					local stealthStatus = playerData.isStealthed and (" [" .. (playerData.stealthType or "STEALTH") .. "]") or ""
+					DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r NEW: " .. playerName .. " Lvl" .. level .. " " .. (playerData.class or "?") .. stealthStatus)
+					DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r   Race: " .. (playerData.race or "?") .. " | PvP: " .. tostring(IsPvPFlagged(playerData.guid)) .. " | Hostile: " .. tostring(IsHostile(playerData.guid)))
+					DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r   GUID: " .. tostring(playerData.guid))
+				end
+				
+				-- Update player data (creates entry if doesn't exist)
+				local detected = Spy:UpdatePlayerData(
+					playerName,
+					playerData.classToken,
+					level,
+					playerData.race,
+					playerData.guild,
+					true,  -- isEnemy
+					false  -- isGuess (SuperWoW has real data!)
+				)
+				
+				-- Always mark as detected (even if UpdatePlayerData failed) to prevent spam
+				SpySW.detectedPlayers[playerName] = GetTime()
+				
+				-- Add to detected list if player was successfully added
+				if detected and Spy.EnabledInZone then
+					SpySW.Stats.playersDetected = SpySW.Stats.playersDetected + 1
 					
-					-- Update player data (creates entry if doesn't exist)
-					local detected = Spy:UpdatePlayerData(
+					Spy:AddDetected(
 						playerName,
-						playerData.classToken,
-						level,
-						playerData.race,
-						playerData.guild,
-						true,  -- isEnemy
-						false  -- isGuess (SuperWoW has real data!)
+						playerData.time,
+						false,  -- learnt (not from combat log parsing)
+						nil     -- source
 					)
 					
-					-- Always mark as detected (even if UpdatePlayerData failed) to prevent spam
-					SpySW.detectedPlayers[playerName] = GetTime()
-					
-					-- Add to detected list if player was successfully added
-					if detected and Spy.EnabledInZone then
-						SpySW.Stats.playersDetected = SpySW.Stats.playersDetected + 1
-						
-						Spy:AddDetected(
-							playerName,
-							playerData.time,
-							false,  -- learnt (not from combat log parsing)
-							nil     -- source
-						)
-						
-						-- Trigger stealth alert if player is stealthed
-						if playerData.isStealthed and Spy.AlertStealthPlayer then
-							-- ✅ FIX: Check battleground setting
-							local allowAlert = true
-							
-							if Spy.InInstance and not Spy.db.profile.EnabledInBattlegrounds then
-								allowAlert = false
-								if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-									DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW]|r Stealth alert skipped: Battlegrounds disabled")
-								end
-							end
-							
-							-- ✅ FIX: Check PvP flag requirement
-							if allowAlert and Spy.db and Spy.db.profile and Spy.db.profile.DisableWhenPVPUnflagged then
-								if not UnitIsPVP("player") then
-									allowAlert = false
-									if Spy.db.profile.DebugMode then
-										DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW]|r Stealth alert skipped: Player not PvP flagged")
-									end
-								end
-							end
-							
-							if allowAlert then
-								if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-									DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SpySW]|r ✓ STEALTH ALERT: " .. playerName .. " (" .. (playerData.stealthType or "Unknown") .. ")")
-								end
-								Spy:AlertStealthPlayer(playerName)
-							end
+					-- Trigger stealth alert if player is stealthed
+					if playerData.isStealthed and Spy.AlertStealthPlayer then
+						if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+							DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SpySW]|r ✓ STEALTH ALERT: " .. playerName .. " (" .. (playerData.stealthType or "Unknown") .. ")")
 						end
+						Spy:AlertStealthPlayer(playerName)
 					end
 				end
 			else
 				-- Player already detected - update timestamp to keep them in Nearby list
-				-- ✅ Check if player is on Ignore list (even for already detected players)
-				if not (SpyPerCharDB and SpyPerCharDB.IgnoreData and SpyPerCharDB.IgnoreData[playerName]) then
-					Spy:UpdatePlayerData(
+				Spy:UpdatePlayerData(
+					playerName,
+					playerData.classToken,
+					level,
+					playerData.race,
+					playerData.guild,
+					true,
+					false
+				)
+				
+				-- WICHTIG: Auch AddDetected aufrufen damit Spy den Timestamp updated
+				if Spy.EnabledInZone then
+					Spy:AddDetected(
 						playerName,
-						playerData.classToken,
-						level,
-						playerData.race,
-						playerData.guild,
-						true,
-						false
+						playerData.time,
+						false,
+						nil
 					)
-					
-					-- WICHTIG: Auch AddDetected aufrufen damit Spy den Timestamp updated
-					if Spy.EnabledInZone then
-						Spy:AddDetected(
-							playerName,
-							playerData.time,
-							false,
-							nil
-						)
-					end
 				end
 			end
 		end
@@ -666,9 +614,6 @@ guidFrame:SetScript("OnEvent", function()
 		if UnitExists(unit2) and UnitIsPlayer(unit2) then
 			SpySW:AddUnit(unit2)
 		end
-	elseif event == "UNIT_CASTEVENT" then
-		-- ✅ NEW: Handle UNIT_CASTEVENT for instant Stealth detection
-		SpySW:OnUnitCastEvent(arg1, arg2, arg3, arg4, arg5)
 	else
 		-- Für alle anderen Events (UNIT_COMBAT, etc): Nur Spieler sammeln
 		local unit = arg1
@@ -677,140 +622,6 @@ guidFrame:SetScript("OnEvent", function()
 		end
 	end
 end)
-
---[[===========================================================================
-	UNIT_CASTEVENT Handler (Instant Stealth Detection)
-=============================================================================]]
-
-function SpySW:OnUnitCastEvent(casterGUID, targetGUID, eventType, spellID, castDuration)
-	-- Only process CAST and CHANNEL events (when spell actually happens)
-	if eventType ~= "CAST" and eventType ~= "CHANNEL" then
-		return
-	end
-	
-	-- Check if it's a Stealth spell
-	local stealthType = self.STEALTH_SPELL_IDS[spellID]
-	if not stealthType then
-		return  -- Not a stealth spell
-	end
-	
-	-- ✅ FIX: Check if Spy is enabled in current zone
-	if not Spy or not Spy.EnabledInZone then
-		return  -- Spy disabled in this zone
-	end
-	
-	-- ✅ FIX: Check battleground setting
-	if Spy.InInstance and not Spy.db.profile.EnabledInBattlegrounds then
-		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-			DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW UNIT_CASTEVENT]|r Stealth detection skipped: Battlegrounds disabled")
-		end
-		return  -- Battlegrounds disabled
-	end
-	
-	-- ✅ FIX: Check PvP flag requirement
-	if Spy.db and Spy.db.profile and Spy.db.profile.DisableWhenPVPUnflagged then
-		if not UnitIsPVP("player") then
-			if Spy.db.profile.DebugMode then
-				DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW UNIT_CASTEVENT]|r Stealth detection skipped: Player not PvP flagged")
-			end
-			return  -- Player not PvP flagged
-		end
-	end
-	
-	-- Get caster info
-	if not casterGUID or not UnitExists(casterGUID) then
-		return
-	end
-	
-	-- Check if caster is a player (not NPC)
-	if not UnitIsPlayer(casterGUID) then
-		return
-	end
-	
-	-- ✅ FIX: Use UnitCanAttack instead of UnitIsEnemy
-	-- UnitCanAttack is more precise for actual attackable enemies
-	-- Returns true ONLY for actual enemies (opposite faction OR same faction with PvP flag)
-	-- Returns false for friendlies AND neutrals (same faction without PvP flag)
-	if not UnitCanAttack("player", casterGUID) then
-		return  -- Cannot attack this player, ignore
-	end
-	
-	-- ✅ Additional Same-Faction Check (like in Buff-Scanner)
-	-- Ignore same-faction players (even if PvP-flagged in duel)
-	local playerFaction = UnitFactionGroup("player")
-	local casterFaction = UnitFactionGroup(casterGUID)
-	
-	if playerFaction and casterFaction and playerFaction == casterFaction then
-		return  -- Same faction, ignore (no alerts for duels)
-	end
-	
-	-- Get player name
-	local playerName = UnitName(casterGUID)
-	if not playerName then
-		return
-	end
-	
-	-- ✅ Check Ignore list
-	if SpyPerCharDB and SpyPerCharDB.IgnoreData and SpyPerCharDB.IgnoreData[playerName] then
-		if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-			DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW UNIT_CASTEVENT]|r IGNORED: " .. playerName .. " (on Ignore list)")
-		end
-		return
-	end
-	
-	-- Debug output
-	if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-		DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[SpySW UNIT_CASTEVENT]|r " .. playerName .. " cast " .. stealthType .. " (Spell ID: " .. spellID .. ")")
-	end
-	
-	-- Add unit to GUID tracking (will be picked up by scanner)
-	self:AddUnit(casterGUID)
-	
-	-- ✅ NEW: Add player to Spy IMMEDIATELY (don't wait for scanner)
-	-- We already know this is an enemy (passed UnitCanAttack and Same-Faction checks)
-	if Spy and Spy.EnabledInZone then
-		-- Get player data
-		local level = UnitLevel(casterGUID) or 0
-		if level < 0 then level = 0 end  -- Convert skull to 0
-		
-		local _, class = UnitClass(casterGUID)
-		local race, _ = UnitRace(casterGUID)
-		local guild = GetGuildInfo(casterGUID)
-		
-		-- Update player data in Spy
-		local detected = Spy:UpdatePlayerData(
-			playerName,
-			class,
-			level,
-			race,
-			guild,
-			true,  -- isEnemy
-			false  -- isGuess (SuperWoW has real data!)
-		)
-		
-		-- Add to detected list
-		if detected then
-			Spy:AddDetected(
-				playerName,
-				time(),
-				false,  -- learnt
-				nil     -- source
-			)
-			
-			-- Mark as detected by SpySW to prevent duplicate processing
-			SpySW.detectedPlayers[playerName] = GetTime()
-			
-			if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-				DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW UNIT_CASTEVENT]|r ✓ Added to Spy: " .. playerName .. " Lvl" .. level .. " " .. (class or "?"))
-			end
-		end
-	end
-	
-	-- ✅ IMPORTANT: Alert about stealth cast
-	if Spy and Spy.AlertStealthPlayer then
-		Spy:AlertStealthPlayer(playerName)
-	end
-end
 
 --[[===========================================================================
 	Enable/Disable
@@ -1029,13 +840,13 @@ function SpySW:Initialize()
     local _, testguid = UnitExists("player")
     if testguid then
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r SuperWoW |cff00ff00DETECTED [OK]|r")
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r Your GUID: |cff00ff00" .. testguid .. "|r")
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r Your GUID: |cff888888" .. testguid .. "|r")
     else
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r SuperWoW |cff00ff00DETECTED [OK]|r")
     end
     DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r GUID-based player detection: |cff00ff00ACTIVE|r")
     DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r Proactive scanning: |cff00ff00ACTIVE|r")
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r Commands: /spystatus, /spybuff, /spypet")
+    DEFAULT_CHAT_FRAME:AddMessage("|cff888888[SpySW]|r Commands: /spystatus, /spybuff, /spypet")
    
     return true
 end
@@ -1371,34 +1182,3 @@ SlashCmdList["SPYTARGET"] = function()
 	
 	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r === TEST COMPLETE ===")
 end
-
--- Temporary: Log ALL spell casts with IDs (toggleable)
-local castLogger = CreateFrame("Frame")
-local isLogging = false
-
-local function ToggleCastLogger()
-    isLogging = not isLogging
-    
-    if isLogging then
-        castLogger:RegisterEvent("UNIT_CASTEVENT")
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r Cast Logger ENABLED - all casts will be logged!")
-    else
-        castLogger:UnregisterEvent("UNIT_CASTEVENT")
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SpySW]|r Cast Logger DISABLED")
-    end
-end
-
-castLogger:SetScript("OnEvent", function()
-    local casterGUID, targetGUID, eventType, spellID, castDuration = arg1, arg2, arg3, arg4, arg5
-    if eventType == "CAST" or eventType == "CHANNEL" then
-        local casterName = UnitName(casterGUID) or "Unknown"
-        local spellName, rank = SpellInfo(spellID)
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[CAST LOG]|r " .. casterName .. " cast " .. tostring(spellName) .. " (" .. tostring(rank) .. ") - ID: " .. spellID)
-    end
-end)
-
--- Register slash command
-SLASH_SPYEVENT1 = "/spyevent"
-SlashCmdList["SPYEVENT"] = ToggleCastLogger
-
-DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r Cast Logger loaded. Type |cffFFFF00/spyevent|r to toggle logging.")

@@ -185,10 +185,6 @@ function Spy:UpdateActiveCount()
 end
 
 function Spy:ManageExpirations()
-	-- Safety check: ensure profile is loaded
-	if not Spy.db or not Spy.db.profile then
-		return
-	end
 	local mode = Spy.db.profile.CurrentList
 	local expirationFunction = Spy.ListTypes[mode][3]
 	if expirationFunction then 
