@@ -58,14 +58,14 @@ function Spy:SetupBar(row)
 	row.LeftText:SetJustifyH("LEFT")
 	row.LeftText:SetHeight(Spy.db.profile.MainWindow.TextHeight)
 	row.LeftText:SetTextColor(1, 1, 1, 1)
-	Spy:SetFontSize(row.LeftText, math.max(Spy.db.profile.MainWindow.RowHeight * 0.75, Spy.db.profile.MainWindow.RowHeight - 3))
+	Spy:SetFontSize(row.LeftText, math.max(Spy.db.profile.MainWindow.RowHeight * 0.85, Spy.db.profile.MainWindow.RowHeight - 1))
 	Spy:AddFontString(row.LeftText)
 
 	row.RightText = row.StatusBar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	row.RightText:SetPoint("RIGHT", row.StatusBar, "RIGHT", -2, 0)
 	row.RightText:SetJustifyH("RIGHT")
 	row.RightText:SetTextColor(1, 1, 1, 1)
-	Spy:SetFontSize(row.RightText,  math.max(Spy.db.profile.MainWindow.RowHeight * 0.65, Spy.db.profile.MainWindow.RowHeight - 12))
+	Spy:SetFontSize(row.RightText,  math.max(Spy.db.profile.MainWindow.RowHeight * 0.75, Spy.db.profile.MainWindow.RowHeight - 8))
 	Spy:AddFontString(row.RightText)
 
 	Spy.Colors:RegisterFont("Bar", "Bar Text", row.LeftText)
@@ -611,14 +611,16 @@ function Spy:CreateMainWindow()
 
 		theFrame.CountFrame = CreateFrame("Frame", "CountFrame", theFrame)
 		theFrame.CountFrame:SetPoint("RIGHT", theFrame.StatsButton,"LEFT", -4, 0)
+		theFrame.CountFrame:SetWidth(30)
 		theFrame.CountFrame:SetHeight(Spy.db.profile.MainWindow.RowHeight)
-		theFrame.CountFrame.Text = CountFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-		theFrame.CountFrame.Text:SetPoint("RIGHT", theFrame.StatsButton,"LEFT", -4, 0)
-		theFrame.CountFrame.Text:SetFont("GameFontNormal", Spy.db.profile.MainWindow.RowHeight * 0.85, "OUTLINE")
+		theFrame.CountFrame.Text = theFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		theFrame.CountFrame.Text:SetPoint("RIGHT", theFrame.StatsButton, "LEFT", -20, 0)
+		local fontPath, _, fontFlags = GameFontNormal:GetFont()
+		theFrame.CountFrame.Text:SetFont(fontPath, 14, "OUTLINE")
 		theFrame.CountFrame.Text:SetJustifyH("RIGHT")
 		theFrame.CountFrame.Text:SetJustifyV("MIDDLE")
-		theFrame.CountFrame.Text:SetTextColor(1, 1, 1, 1)
-		theFrame.CountFrame.Text:SetText("|cFF0070DE0|r")
+		theFrame.CountFrame.Text:SetTextColor(1, 1, 0, 1)
+		theFrame.CountFrame.Text:SetText("0")
 		--theFrame.CountFrame.Text:SetScale(1)
 	
 		theFrame.CountButton = CreateFrame("Button", nil, theFrame)
@@ -627,7 +629,7 @@ function Spy:CreateMainWindow()
 		theFrame.CountButton:SetHighlightTexture("Interface\\AddOns\\Spy\\Textures\\button-highlight.tga")
 		theFrame.CountButton:SetWidth(12)
 		theFrame.CountButton:SetHeight(12)
-		theFrame.CountButton:SetAlpha(.0)		
+		theFrame.CountButton:SetAlpha(1)		
 		theFrame.CountButton:SetPoint("RIGHT", theFrame.StatsButton,"LEFT", -4, 0)
 		theFrame.CountButton:SetScript("OnEnter", function()
 			GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
@@ -637,6 +639,24 @@ function Spy:CreateMainWindow()
 		end)
 		theFrame.CountButton:SetScript("OnLeave", function()
 			GameTooltip:Hide()
+		end)
+		theFrame.CountButton:SetScript("OnClick", function()
+			local count = 0
+			for k in pairs(Spy.ActiveList) do
+				count = count + 1
+			end
+			
+			local channel = "SAY"
+			local numRaid = GetNumRaidMembers()
+			local numParty = GetNumPartyMembers()
+			
+			if numRaid > 0 then
+				channel = "RAID"
+			elseif numParty > 0 then
+				channel = "PARTY"
+			end
+			
+			SendChatMessage("Nearby enemy players: " .. count, channel)
 		end)
 		theFrame.CountButton:SetFrameLevel(theFrame.StatsButton:GetFrameLevel() + 1)
 
@@ -718,13 +738,19 @@ function Spy:CreateMainWindow()
 end
 
 function Spy:BarsChanged()
-	if not Spy.MainWindow then return end  -- Safety check: MainWindow might not be created yet
+	if not Spy.MainWindow then return end
 	for k, v in pairs(Spy.MainWindow.Rows) do
 		v:SetHeight(Spy.db.profile.MainWindow.RowHeight)
 		v:SetPoint("TOPLEFT", Spy.MainWindow, "TOPLEFT", 2, -34 - (Spy.db.profile.MainWindow.RowHeight + Spy.db.profile.MainWindow.RowSpacing) * (k - 1))			
-		Spy:SetFontSize(v.LeftText, math.max(Spy.db.profile.MainWindow.RowHeight * 0.75, Spy.db.profile.MainWindow.RowHeight - 3))
-		Spy:SetFontSize(v.RightText, math.max(Spy.db.profile.MainWindow.RowHeight * 0.5, Spy.db.profile.MainWindow.RowHeight - 12))
+		Spy:SetFontSize(v.LeftText, math.max(Spy.db.profile.MainWindow.RowHeight * 0.85, Spy.db.profile.MainWindow.RowHeight - 1))
+		Spy:SetFontSize(v.RightText, math.max(Spy.db.profile.MainWindow.RowHeight * 0.75, Spy.db.profile.MainWindow.RowHeight - 8))
 	end
+	
+	-- Update CountFrame height
+	if Spy.MainWindow.CountFrame then
+		Spy.MainWindow.CountFrame:SetHeight(Spy.db.profile.MainWindow.RowHeight)
+	end
+	
 	Spy:ResizeMainWindow()
 end
 

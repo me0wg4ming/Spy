@@ -1243,7 +1243,7 @@ local Default_Profile = {
 			Position = {
 				x = 4,
 				y = 740,
-				w = 160,
+				w = 175,
 				h = 34,
 			},
 		},
@@ -1456,6 +1456,70 @@ function SlashCmdList.SPYDEBUG()
 		Spy.db.profile.DebugMode = false
 		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy]|r Debug mode |cffff0000DISABLED|r")
 	end
+end
+
+SLASH_SPYCOUNTDEBUG1 = '/spycount'
+function SlashCmdList.SPYCOUNTDEBUG()
+	DEFAULT_CHAT_FRAME:AddMessage("=== SPY COUNT DEBUG ===")
+	
+	if not Spy.MainWindow then
+		DEFAULT_CHAT_FRAME:AddMessage("|cffff0000MainWindow not found!|r")
+		return
+	end
+	
+	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00MainWindow exists|r")
+	DEFAULT_CHAT_FRAME:AddMessage("MainWindow position: " .. (Spy.MainWindow:GetLeft() or "nil") .. ", " .. (Spy.MainWindow:GetTop() or "nil"))
+	DEFAULT_CHAT_FRAME:AddMessage("MainWindow size: " .. Spy.MainWindow:GetWidth() .. " x " .. Spy.MainWindow:GetHeight())
+	DEFAULT_CHAT_FRAME:AddMessage("MainWindow visible: " .. (Spy.MainWindow:IsShown() and "YES" or "NO"))
+	
+	if Spy.MainWindow.Title then
+		DEFAULT_CHAT_FRAME:AddMessage("Title exists: " .. (Spy.MainWindow.Title:GetText() or "nil"))
+		DEFAULT_CHAT_FRAME:AddMessage("Title position: " .. (Spy.MainWindow.Title:GetLeft() or "nil") .. ", " .. (Spy.MainWindow.Title:GetTop() or "nil"))
+	end
+	
+	if not Spy.MainWindow.CountFrame then
+		DEFAULT_CHAT_FRAME:AddMessage("|cffff0000CountFrame not found!|r")
+		return
+	end
+	
+	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00CountFrame exists|r")
+	local visible = Spy.MainWindow.CountFrame:IsShown() and "VISIBLE" or "HIDDEN"
+	DEFAULT_CHAT_FRAME:AddMessage("CountFrame status: |cff00ffff" .. visible .. "|r")
+	DEFAULT_CHAT_FRAME:AddMessage("CountFrame position: " .. (Spy.MainWindow.CountFrame:GetLeft() or "nil") .. ", " .. (Spy.MainWindow.CountFrame:GetTop() or "nil"))
+	DEFAULT_CHAT_FRAME:AddMessage("CountFrame size: " .. Spy.MainWindow.CountFrame:GetWidth() .. " x " .. Spy.MainWindow.CountFrame:GetHeight())
+	DEFAULT_CHAT_FRAME:AddMessage("CountFrame parent: " .. (Spy.MainWindow.CountFrame:GetParent():GetName() or "nil"))
+	
+	if not Spy.MainWindow.CountFrame.Text then
+		DEFAULT_CHAT_FRAME:AddMessage("|cffff0000CountFrame.Text not found!|r")
+		return
+	end
+	
+	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00CountFrame.Text exists|r")
+	local textVisible = Spy.MainWindow.CountFrame.Text:IsShown() and "VISIBLE" or "HIDDEN"
+	DEFAULT_CHAT_FRAME:AddMessage("CountFrame.Text status: |cff00ffff" .. textVisible .. "|r")
+	DEFAULT_CHAT_FRAME:AddMessage("CountFrame.Text position: " .. (Spy.MainWindow.CountFrame.Text:GetLeft() or "nil") .. ", " .. (Spy.MainWindow.CountFrame.Text:GetTop() or "nil"))
+	DEFAULT_CHAT_FRAME:AddMessage("CountFrame.Text size: " .. (Spy.MainWindow.CountFrame.Text:GetWidth() or "nil") .. " x " .. (Spy.MainWindow.CountFrame.Text:GetHeight() or "nil"))
+	DEFAULT_CHAT_FRAME:AddMessage("CountFrame.Text parent: " .. (Spy.MainWindow.CountFrame.Text:GetParent():GetName() or "nil"))
+	local fontName, fontSize, fontFlags = Spy.MainWindow.CountFrame.Text:GetFont()
+	DEFAULT_CHAT_FRAME:AddMessage("CountFrame.Text font: " .. (fontName or "nil") .. ", size: " .. (fontSize or "nil"))
+	local r, g, b, a = Spy.MainWindow.CountFrame.Text:GetTextColor()
+	DEFAULT_CHAT_FRAME:AddMessage("CountFrame.Text color: " .. r .. ", " .. g .. ", " .. b .. ", " .. a)
+	
+	local currentText = Spy.MainWindow.CountFrame.Text:GetText() or "NIL"
+	DEFAULT_CHAT_FRAME:AddMessage("Current text: |cff00ffff" .. currentText .. "|r")
+	
+	-- Count active list
+	local count = 0
+	for k in pairs(Spy.ActiveList) do
+		count = count + 1
+	end
+	DEFAULT_CHAT_FRAME:AddMessage("Active players in list: |cff00ffff" .. count .. "|r")
+	
+	-- Try to force update
+	DEFAULT_CHAT_FRAME:AddMessage("Forcing update...")
+	Spy:UpdateActiveCount()
+	
+	DEFAULT_CHAT_FRAME:AddMessage("=== END DEBUG ===")
 end
 
 local hintString = "|cffffffff%s:|r %s"

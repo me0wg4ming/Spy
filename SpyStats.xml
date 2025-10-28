@@ -8,7 +8,7 @@
         </Anchors>
         <Size x="100" y="15" />
     </FontString>
-    <FontString name="SpyStatsLevelTemplate" inherits="SpyStatsStringTemplate" virtual="true">
+    <FontString name="SpyStatsLevelTemplate" inherits="SpyStatsStringTemplate" justifyH="CENTER" virtual="true">
         <Anchors>
             <Anchor point="LEFT" relativeTo="$parentName" relativePoint="RIGHT">
                 <Offset x="8" y="0" />
@@ -16,7 +16,7 @@
         </Anchors>
         <Size x="33" y="15" />
     </FontString>
-    <FontString name="SpyStatsClassTemplate" inherits="SpyStatsStringTemplate" virtual="true">
+    <FontString name="SpyStatsClassTemplate" inherits="SpyStatsStringTemplate" justifyH="CENTER" virtual="true">
         <Anchors>
             <Anchor point="LEFT" relativeTo="$parentLevel" relativePoint="RIGHT">
                 <Offset x="8" y="0" />
@@ -48,7 +48,7 @@
         </Anchors>
         <Size x="250" y="15" />
     </FontString>
-    <FontString name="SpyStatsTimeTemplate" inherits="SpyStatsStringTemplate" virtual="true">
+    <FontString name="SpyStatsTimeTemplate" inherits="SpyStatsStringTemplate" justifyH="CENTER" virtual="true">
         <Anchors>
         <Anchor point="RIGHT" relativeTo="$parentList" relativePoint="LEFT">  
                 <Offset x="-8" y="0" />
@@ -144,12 +144,13 @@
     <Button name="SpyStatsPlayersLevelSortTemplate" inherits="SpyStatsSortButtonTemplate" text="LEVEL_ABBR" virtual="true">
         <Anchors>
             <Anchor point="LEFT" relativeTo="SpyStatsPlayersNameSort" relativePoint="RIGHT">
-                <Offset x="10" y="0" />
+                <Offset x="8" y="0" />
             </Anchor>
         </Anchors>
         <Size>
 			<AbsDimension x="33" y="15"/>
 		</Size>
+        <ButtonText justifyH="CENTER" />
     </Button>
     <Button name="SpyStatsPlayersClassSortTemplate" inherits="SpyStatsSortButtonTemplate" text="CLASS" virtual="true">
         <Anchors>
@@ -160,6 +161,7 @@
         <Size>
 			<AbsDimension x="54" y="15"/>
 		</Size>
+        <ButtonText justifyH="CENTER" />
     </Button>
     <Button name="SpyStatsPlayersGuildSortTemplate" inherits="SpyStatsSortButtonTemplate" text="GUILD" virtual="true">
         <Anchors>
@@ -232,6 +234,7 @@
         <Size>
 			<AbsDimension x="34" y="15"/>
 		</Size>
+        <ButtonText justifyH="CENTER" />
     </Button>	
     <Frame name="SpyStatsFrame" parent="UIParent" frameStrata="MEDIUM" movable="true" toplevel="true" enableMouse="true" hidden="true">
         <Size x="1100" y="610" />		

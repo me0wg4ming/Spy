@@ -177,11 +177,15 @@ function Spy:UpdateActiveCount()
         activeCount = activeCount + 1
     end
 	local theFrame = Spy.MainWindow
-	if not theFrame then return end  -- Safety check: MainWindow might not be created yet
+	if not theFrame then return end
+	if not theFrame.CountFrame or not theFrame.CountFrame.Text then return end
+	
     if activeCount > 0 then 
-		theFrame.CountFrame.Text:SetText("|cFF0070DE" .. activeCount .. "|r") 
+		theFrame.CountFrame.Text:SetText(activeCount) 
+		theFrame.CountFrame.Text:SetTextColor(1, 1, 0, 1)
     else 
-        theFrame.CountFrame.Text:SetText("|cFF0070DE0|r")
+        theFrame.CountFrame.Text:SetText("0")
+		theFrame.CountFrame.Text:SetTextColor(0.5, 0.5, 0.5, 1)
     end
 end
 
@@ -1062,6 +1066,7 @@ function Spy:AddDetectedToLists(player, timestamp, learnt, source)
 			Spy.LastHourList[player] = timestamp
 			Spy.ActiveList[player] = timestamp
 			Spy.InactiveList[player] = nil
+			Spy:UpdateActiveCount()
 		end
 
 		if Spy.db.profile.CurrentList == 1 then
@@ -1084,6 +1089,7 @@ function Spy:AddDetectedToLists(player, timestamp, learnt, source)
 		Spy.LastHourList[player] = timestamp
 		Spy.ActiveList[player] = timestamp
 		Spy.InactiveList[player] = nil
+		Spy:UpdateActiveCount()
 
 		if Spy.PlayerCommList[player] ~= nil then
 			if Spy.db.profile.CurrentList == 1 then
@@ -1102,6 +1108,7 @@ function Spy:AddDetectedToLists(player, timestamp, learnt, source)
 	else
 		Spy.ActiveList[player] = timestamp
 		Spy.LastHourList[player] = timestamp
+		Spy:UpdateActiveCount()
 		if learnt and Spy.db.profile.CurrentList == 1 then
 			Spy:RefreshCurrentList()
 		end

@@ -24,6 +24,7 @@ function Spy:InitOrder()
 end
 
 function Spy:SetWindowTop(window)
+	if not window then return end
 	local Check = window.Above
 
 	while Check ~= nil do
@@ -33,12 +34,18 @@ function Spy:SetWindowTop(window)
 		Check.Below = window.Below
 		window.Below = Check
 
-		Check.Below.Above = Check
+		if Check.Below then
+			Check.Below.Above = Check
+		end
 
-		Spy:SetLevel(Check, Check.Below:GetFrameLevel() + 10)
+		if Check.Below then
+			Spy:SetLevel(Check, Check.Below:GetFrameLevel() + 10)
+		end
 		Check = window.Above
 	end
-	Spy:SetLevel(window, window.Below:GetFrameLevel() + 10)
+	if window.Below then
+		Spy:SetLevel(window, window.Below:GetFrameLevel() + 10)
+	end
 	TopWindow = window
 end
 
