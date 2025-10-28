@@ -7,6 +7,7 @@ local format, strfind, strsub = string.format, string.find, string.sub
 
 function Spy:RefreshCurrentList(player, source)
 	local MainWindow = Spy.MainWindow
+	if not MainWindow then return end  -- Safety check: MainWindow might not be created yet
 	if not MainWindow:IsShown() then
 		return
 	end
@@ -177,6 +178,7 @@ function Spy:UpdateActiveCount()
         activeCount = activeCount + 1
     end
 	local theFrame = Spy.MainWindow
+	if not theFrame then return end  -- Safety check: MainWindow might not be created yet
     if activeCount > 0 then 
 		theFrame.CountFrame.Text:SetText("|cFF0070DE" .. activeCount .. "|r") 
     else 
@@ -205,12 +207,7 @@ function Spy:ManageNearbyListExpirations()
 	if Spy.db.profile.RemoveUndetected ~= "Never" then
 		for player in pairs(Spy.InactiveList) do
 			if (currentTime - Spy.InactiveList[player]) > Spy.InactiveTimeout then
-				if Spy.PlayerCommList[player] ~= nil then
-					Spy.MapNoteList[Spy.PlayerCommList[player]].displayed = false
-					Spy.MapNoteList[Spy.PlayerCommList[player]].worldIcon:Hide()
-					Astrolabe:RemoveIconFromMinimap(Spy.MapNoteList[Spy.PlayerCommList[player]].miniIcon)
-					Spy.PlayerCommList[player] = nil
-				end
+				-- Map note cleanup removed - MapNoteList no longer exists
 				Spy.InactiveList[player] = nil
 				Spy.NearbyList[player] = nil
 				expired = true
@@ -221,7 +218,9 @@ function Spy:ManageNearbyListExpirations()
 		Spy:RefreshCurrentList()
 		Spy:UpdateActiveCount()
 		if Spy.db.profile.HideSpy and Spy:GetNearbyListSize() == 0 then
-			Spy.MainWindow:Hide()
+			if Spy.MainWindow then  -- Safety check
+				Spy.MainWindow:Hide()
+			end
 		end
 	end
 end
@@ -245,12 +244,7 @@ function Spy:RemovePlayerFromList(player)
 	Spy.NearbyList[player] = nil
 	Spy.ActiveList[player] = nil
 	Spy.InactiveList[player] = nil
-	if Spy.PlayerCommList[player] ~= nil then
-		Spy.MapNoteList[Spy.PlayerCommList[player]].displayed = false
-		Spy.MapNoteList[Spy.PlayerCommList[player]].worldIcon:Hide()
-		Astrolabe:RemoveIconFromMinimap(Spy.MapNoteList[Spy.PlayerCommList[player]].miniIcon)
-		Spy.PlayerCommList[player] = nil
-	end
+	-- Map note cleanup removed - MapNoteList no longer exists
 	Spy:RefreshCurrentList()
 	Spy:UpdateActiveCount()
 end
@@ -264,11 +258,7 @@ function Spy:ClearList()
 		Spy.InactiveList = {}
 		Spy.PlayerCommList = {}
 		Spy.ListAmountDisplayed = 0
-		for i = 1, Spy.MapNoteLimit do
-			Spy.MapNoteList[i].displayed = false
-			Spy.MapNoteList[i].worldIcon:Hide()
-			Astrolabe:RemoveIconFromMinimap(Spy.MapNoteList[i].miniIcon)
-		end
+		-- Map note cleanup loop removed - MapNoteList no longer exists
 		Spy:SetCurrentList(1)
 		if IsControlKeyDown() then
 			Spy:EnableSpy(not Spy.db.profile.Enabled, false)

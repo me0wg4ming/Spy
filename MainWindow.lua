@@ -1,6 +1,5 @@
 local SM = LibStub:GetLibrary("LibSharedMedia-3.0")
-local Astrolabe = AceLibrary("Astrolabe-0.2")
---local Astrolabe = LibStub("Astrolabe-0.3")
+-- Astrolabe libraries removed - map display feature removed
 local Events = LibStub("AceEvent-3.0")
 local AceLocale = LibStub("AceLocale-3.0")
 local L = AceLocale:GetLocale("Spy")
@@ -14,54 +13,7 @@ function Spy:SetFontSize(string, size)
 	string:SetFont(Font, size, Flags)
 end
 
-function Spy:CreateMapNote(num)
-	local notemin = 1
-	if num < notemin or Spy.MapNoteList[num] then
-		return
-	end
-
-	local worldIcon = CreateFrame("Button", "Spy_MapNoteList_world" .. num, WorldMapDetailFrame)
-	worldIcon:SetFrameStrata(WorldMapButton:GetFrameStrata())
-	worldIcon:SetParent(WorldMapButton)
-	worldIcon:SetFrameLevel(WorldMapButton:GetFrameLevel() + 5)
-	worldIcon:SetScript("OnEnter", function(self) Spy:ShowMapTooltip(this, true) end)
-	worldIcon:SetScript("OnLeave", function(self) Spy:ShowMapTooltip(this, false) end)
-	worldIcon:SetWidth(28)
-	worldIcon:SetHeight(28)
-	worldIcon.id = num
-
-	local worldTexture = worldIcon:CreateTexture(nil, "OVERLAY")
-	worldTexture:SetTexture("Interface\\AddOns\\Spy\\Textures\\" .. Spy.EnemyFactionName .. "Icon.blp")
-	worldTexture:SetAllPoints(worldIcon)
-	worldIcon.texture = worldTexture
-
-	local mapScale = MinimapCluster:GetScale()
-	local miniIcon = CreateFrame("Button", "Spy_MapNoteList_mini" .. num, Minimap)
-	miniIcon:SetFrameStrata(Minimap:GetFrameStrata())
-	miniIcon:SetParent(Minimap)
-	miniIcon:SetFrameLevel(Minimap:GetFrameLevel() + 5)
-	miniIcon:SetScript("OnEnter", function(self) Spy:ShowMapTooltip(this, true) end)
-	miniIcon:SetScript("OnLeave", function(self) Spy:ShowMapTooltip(this, false) end)
-	miniIcon:SetWidth(24 / mapScale)
-	miniIcon:SetHeight(24 / mapScale)
-	miniIcon.id = num
-
-	local miniTexture = miniIcon:CreateTexture(nil, "OVERLAY")
-	miniTexture:SetTexture("Interface\\AddOns\\Spy\\Textures\\" .. Spy.EnemyFactionName .. "Icon.blp")
-	miniTexture:SetAllPoints(miniIcon)
-	miniIcon.texture = miniTexture
-
-	Spy.MapNoteList[num] = {}
-	Spy.MapNoteList[num].displayed = false
-	Spy.MapNoteList[num].continentIndex = 0
-	Spy.MapNoteList[num].zoneIndex = 0
-	Spy.MapNoteList[num].mapX = 0
-	Spy.MapNoteList[num].mapY = 0
-	Spy.MapNoteList[num].worldIcon = worldIcon
-	Spy.MapNoteList[num].worldIcon:Hide()
-	Spy.MapNoteList[num].miniIcon = miniIcon
-	Spy.MapNoteList[num].miniIcon:Hide()
-end
+-- CreateMapNote function removed - map display feature removed
 
 function Spy:CreateRow(num)
 	local rowmin = 1
@@ -753,12 +705,7 @@ function Spy:CreateMainWindow()
 		Spy:UpdateAlertWindow()
 	end
 
-	if not Spy.MapNoteList then
-		Spy.MapNoteList = {}
-		for i = 1, Spy.MapNoteLimit do
-			Spy:CreateMapNote(i)
-		end
-	end
+	-- MapNoteList initialization removed - map display feature removed
 
 	if not Spy.MapTooltip then
 		Spy.MapTooltip = CreateFrame("GameTooltip", "Spy_GameTooltip", nil, "GameTooltipTemplate")
@@ -770,7 +717,8 @@ function Spy:CreateMainWindow()
 	end
 end
 
-function Spy:BarsChanged()  
+function Spy:BarsChanged()
+	if not Spy.MainWindow then return end  -- Safety check: MainWindow might not be created yet
 	for k, v in pairs(Spy.MainWindow.Rows) do
 		v:SetHeight(Spy.db.profile.MainWindow.RowHeight)
 		v:SetPoint("TOPLEFT", Spy.MainWindow, "TOPLEFT", 2, -34 - (Spy.db.profile.MainWindow.RowHeight + Spy.db.profile.MainWindow.RowSpacing) * (k - 1))			
@@ -809,6 +757,7 @@ function Spy:SetBar(num, name, desc, value, colorgroup, colorclass, tooltipData,
 end
 
 function Spy:AutomaticallyResize()
+	if not Spy.MainWindow then return end  -- Safety check: MainWindow might not be created yet
 	local detected = Spy.ListAmountDisplayed
 	if detected > Spy.db.profile.ResizeSpyLimit then detected = Spy.db.profile.ResizeSpyLimit end
 	local height = 35 + (detected * (Spy.db.profile.MainWindow.RowHeight + Spy.db.profile.MainWindow.RowSpacing))
@@ -842,6 +791,7 @@ function Spy:ManageBarsDisplayed()
 end
 
 function Spy:ResizeMainWindow()
+	if not Spy.MainWindow then return end  -- Safety check: MainWindow might not be created yet
 	if Spy.MainWindow.Rows[0] then 
 		Spy.MainWindow.Rows[0]:Hide() 
 	end
@@ -856,6 +806,7 @@ function Spy:ResizeMainWindow()
 end
 
 function Spy:SetCurrentList(mode)
+	if not Spy.MainWindow then return end  -- Safety check: MainWindow might not be created yet
 	if not mode or mode > tgetn(Spy.ListTypes) then
 		mode = 1
 	end
@@ -1025,52 +976,7 @@ function Spy:ShowTooltip(show, id)
 	end
 end
 
-function Spy:ShowMapTooltip(icon, show)
-	local tooltip = Spy.MapTooltip
-	if show then
-		local titleText = Spy.db.profile.Colors.Tooltip["Details Text"]
-		local locationText = Spy.db.profile.Colors.Tooltip["Location Text"]
-
-		local distance = Astrolabe:GetDistanceToIcon(icon)
-		if distance == nil then
-			distance = ""
-		else
-			distance = math.floor(distance) .. " " .. L["Yards"]
-		end
-
-		tooltip:SetOwner(icon, "ANCHOR_NONE")
-		tooltip:SetPoint("TOPLEFT", icon, "TOPRIGHT", 16, 0)
-		tooltip:ClearLines()
-		tooltip:AddDoubleLine(Spy.EnemyFactionName .. " " .. L["Located"], distance, titleText.r, titleText.g, titleText.b,
-			locationText.r, locationText.g, locationText.b)
-
-		for player in pairs(Spy.PlayerCommList) do
-			if Spy.PlayerCommList[player] == icon.id then
-				local name, description = player, ""
-				local playerData = SpyPerCharDB.PlayerData[player]
-				if playerData and playerData.isEnemy then
-					if playerData.guild and strlen(playerData.guild) > 0 then
-						name = name .. L["MinimapGuildText"] .. " <" .. playerData.guild .. ">"
-					end
-					if playerData.class and playerData.level then
-						local levelText = (playerData.level == 0) and "??" or playerData.level
-						description = description ..
-							L["MinimapClassText" .. playerData.class] .. "[" .. levelText .. " " .. L[playerData.class] .. "]"
-					elseif playerData.class then
-						description = description .. L["MinimapClassText" .. playerData.class] .. "[" .. L[playerData.class] .. "]"
-					elseif playerData.level then
-						local levelText = (playerData.level == 0) and "??" or playerData.level
-						description = description .. "[" .. levelText .. "]"
-					end
-				end
-				tooltip:AddDoubleLine(name, description)
-			end
-		end
-		tooltip:Show()
-	else
-		tooltip:Hide()
-	end
-end
+-- ShowMapTooltip function removed - map display feature removed
 
 function Spy:SaveAlertWindowPosition()
 	Spy.db.profile.AlertWindow.Position.x = Spy.AlertWindow:GetLeft()
