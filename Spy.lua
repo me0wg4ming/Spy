@@ -5,8 +5,6 @@ local AceLocale = LibStub("AceLocale-3.0")
 local L = AceLocale:GetLocale("Spy")
 local ACD3 = LibStub("AceConfigDialog-3.0")
 local AceCore = LibStub("AceCore-3.0")
-local B = LibStub("LibBabble-Spell-3.0")
-local BS = B:GetLookupTable()
 local fonts = SM:List("font")
 
 local LDB = LibStub("LibDataBroker-1.1", true)
