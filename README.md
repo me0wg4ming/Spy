@@ -1,6 +1,6 @@
 # Spy - SuperWoW Edition
 
-**Version:** 3.8.6 + SuperWoW Integration
+**Version:** 3.8.9 + SuperWoW Integration
 **Author:** Immolation (Original), laytya (Port), SuperWoW-Module
 **For:** World of Warcraft 1.12.1 (Vanilla)
 

@@ -1,4 +1,3 @@
---local Astrolabe = LibStub("Astrolabe-0.3")
 local AceLocale = LibStub("AceLocale-3.0")
 local L = AceLocale:GetLocale("Spy")
 

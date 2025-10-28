@@ -1,6 +1,4 @@
 local SM = LibStub:GetLibrary("LibSharedMedia-3.0")
-local Astrolabe = AceLibrary("Astrolabe-0.2")
---Astrolabe3 = LibStub("Astrolabe-0.3")
 local AceLocale = LibStub("AceLocale-3.0")
 local L = AceLocale:GetLocale("Spy")
 local ACD3 = LibStub("AceConfigDialog-3.0")
