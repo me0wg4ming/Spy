@@ -28,8 +28,6 @@ Libs\AceGUI-3.0-SharedMediaWidgets\widget.xml
 Libs\AceConfig-3.0\AceConfig-3.0.xml
 Libs\Astrolabe-0.2\Astrolabe-0.2.lua
 Libs\LibBabble-Class-3.0\lib.xml
-Libs\LibBabble-Spell-3.0\lib.xml
-Libs\ParserLib\lib.xml
 Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
 Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
 
