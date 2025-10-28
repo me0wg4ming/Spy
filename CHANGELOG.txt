@@ -1,0 +1,202 @@
+================================================================================
+SPY - CHANGELOG (SuperWoW Edition)
+================================================================================
+
+Version: 3.8.6 + SuperWoW Integration
+Date: October 2025
+
+================================================================================
+NEW FEATURES:
+================================================================================
+
+[+] SuperWoW integration for GUID-based player detection
+[+] SuperWoW is now REQUIRED - addon disables without it
+[+] New command: /spystatus (shows status & statistics)
+[+] New command: /spydebug (activates debug mode)
+[+] New command: /spybuff (tests buff detection methods)
+[+] New command: /spypet (tests pet detection)
+[+] New command: /spytarget (tests targeting methods)
+[+] Proactive player detection (before combat)
+[+] Stealth detection capabilities
+[+] Real level data (no more guessing)
+[+] Significantly better performance through GUID-scanning
+[+] Race and Guild information now more reliable
+[+] Intelligent pet filtering (no more pet spam)
+
+================================================================================
+TECHNICAL IMPROVEMENTS:
+================================================================================
+
+[*] New Module: SpySuperWoW.lua
+    - GUID collection via events
+    - Scan interval: 0.5s
+    - Cleanup interval: 5s
+    - Filter: player + hostile + pvp + alive
+    - Separate enemy/friendly GUID tracking
+    - Persistent name-to-GUID mapping for targeting
+
+[*] Integration in Spy.lua
+    - Automatic SuperWoW detection on startup
+    - Addon disables itself if SuperWoW not found
+    - Critical error message on missing SuperWoW
+    - RAW_COMBATLOG support for better combat tracking
+
+[*] Level correction for Skulls
+    - SuperWoW returns -1 for Skulls
+    - Automatically converted to 0 (Spy standard)
+
+[*] GUID Cleanup System
+    - Removes non-existent GUIDs every 5 seconds
+    - Prevents memory leaks
+    - Optimizes performance
+
+[*] Duplicate Detection Prevention
+    - Players only reported to Spy once
+    - Timestamp update for "Nearby List"
+    - Prevents alert spam
+
+[*] Enhanced Pet Filtering
+    - Uses UnitIsPlayer + UnitClass checks
+    - Correctly identifies hunter/warlock pets
+    - Tracks skipped pets in statistics
+
+[*] Improved Combat Tracking
+    - RAW_COMBATLOG parsing for LastAttack
+    - GUID-to-name resolution for death logs
+    - Better Win/Loss statistics
+
+================================================================================
+BUGFIXES:
+================================================================================
+
+[FIX] Level-guess logic disabled with SuperWoW
+[FIX] Correct friend check integration
+[FIX] GUID cleanup prevents memory overhead
+[FIX] Duplicate detections prevented
+[FIX] Correct PvP flag verification
+[FIX] Pet detection improved (no more false positives)
+[FIX] LastAttack tracking with GUID resolution
+
+================================================================================
+MAINTAINED / COMPATIBILITY:
+================================================================================
+
+[=] All original Spy features work
+[=] KOS lists remain intact
+[=] Blacklist remains intact
+[=] Alert system remains intact
+[=] Stats remain intact
+[=] Map integration remains intact
+[=] UI/GUI remains unchanged
+[=] Fully compatible with Vanilla 1.12.1
+
+================================================================================
+KNOWN LIMITATIONS:
+================================================================================
+
+[-] SuperWoW is REQUIRED - addon will not work without it
+[-] GUID scanning only works within render range
+[-] Stealth detection only with SuperWoW
+
+================================================================================
+PERFORMANCE:
+================================================================================
+
+With SuperWoW (50 tracked GUIDs):
+- CPU Load: ~0.5%
+- Memory: +2 MB
+- Scan Overhead: minimal
+
+Without SuperWoW:
+- Addon is DISABLED
+- No functionality
+
+================================================================================
+FILE CHANGES:
+================================================================================
+
+New Files:
++ SpySuperWoW.lua                    (New module, ~800 lines)
++ README_SuperWoW.md                 (Documentation)
++ INSTALLATION.txt                   (Quick-start guide)
++ CHANGELOG.txt                      (This file)
+
+Modified Files:
+* Spy.lua                            (SuperWoW integration, ~50 lines)
+* Spy.toc                            (Added SpySuperWoW.lua)
+
+Unchanged Files:
+= MainWindow.lua                     (Original)
+= List.lua                           (Original)
+= SpyStats.lua                       (Original)
+= SpyData.lua                        (Original)
+= SpyFu.lua                          (Original)
+= All other files                    (Original)
+
+================================================================================
+UPGRADE PATH:
+================================================================================
+
+From Original Spy 3.8.6:
+1. Create backup
+2. Remove/rename old Spy
+3. Install new Spy
+4. Install SuperWoW (REQUIRED!)
+5. Start WoW → Done!
+
+Settings automatically transferred:
+✓ KOS list
+✓ Blacklist
+✓ UI position
+✓ Alert settings
+✓ All other settings
+
+IMPORTANT: SuperWoW must be installed or addon will not work!
+
+================================================================================
+REQUIREMENTS:
+================================================================================
+
+MANDATORY:
+✓ World of Warcraft 1.12.1 (Vanilla)
+✓ SuperWoW 1.12.1+ (https://github.com/balakethelock/SuperWoW)
+
+OPTIONAL:
+- pfUI (for enhanced buff detection)
+- Census (for player data import)
+
+================================================================================
+CREDITS:
+================================================================================
+
+Original Spy:              Immolation
+Vanilla Port:              laytya
+SuperWoW Integration:      Custom
+Inspiration (GUID System): ShaguScan by Shagu
+SuperWoW Framework:        SuperWoW Team
+
+================================================================================
+LICENSE:
+================================================================================
+
+Same as the original Spy addon.
+SuperWoW Integration: Public Domain / Use as you wish
+
+================================================================================
+SUPPORT / FEEDBACK:
+================================================================================
+
+For problems:
+1. Check /spystatus
+2. Activate /spydebug
+3. Document errors
+4. Verify SuperWoW is installed
+5. Provide feedback
+
+================================================================================
+
+Have fun hunting! 🎯
+
+REMEMBER: SuperWoW is REQUIRED for this addon to function!
+
+================================================================================

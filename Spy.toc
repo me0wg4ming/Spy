@@ -1,0 +1,50 @@
+## Interface: 11200
+## Title: |CFF00FF00 Spy |CFFFF0000[SuperWoW]
+## Notes: Detects and alerts you to the presence of nearby enemy players.
+## Author: SuperWoW modification by @me0wg4ming
+## Version: 3.8.6
+## OptionalDeps:  Ace3, LibSharedMedia-3.0, LibBabble-Class-3.0
+## SavedVariables: SpyDB
+## SavedVariablesPerCharacter: SpyPerCharDB, SpyFuDB
+
+Libs\LibStub\LibStub.lua
+Libs\AceLibrary\AceLibrary.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
+Libs\AceCore-3.0\AceCore-3.0.xml
+Libs\AceLocale-3.0\AceLocale-3.0.xml
+Libs\AceAddon-3.0\AceAddon-3.0.xml
+Libs\AceDB-3.0\AceDB-3.0.xml
+Libs\AceDBOptions-3.0\AceDBOptions-3.0.xml
+Libs\AceConsole-3.0\AceConsole-3.0.xml
+Libs\AceComm-3.0\AceComm-3.0.xml
+Libs\AceSerializer-3.0\AceSerializer-3.0.xml
+Libs\AceEvent-3.0\AceEvent-3.0.xml
+Libs\AceTimer-3.0\AceTimer-3.0.xml
+Libs\AceHook-3.0\AceHook-3.0.xml
+Libs\AceGUI-3.0\AceGUI-3.0.xml
+Libs\AceGUI-3.0\widgets\widgets.xml
+Libs\LibSharedMedia-3.0\lib.xml
+Libs\AceGUI-3.0-SharedMediaWidgets\widget.xml
+Libs\AceConfig-3.0\AceConfig-3.0.xml
+Libs\Astrolabe-0.2\Astrolabe-0.2.lua
+Libs\LibBabble-Class-3.0\lib.xml
+Libs\LibBabble-Spell-3.0\lib.xml
+Libs\ParserLib\lib.xml
+Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
+
+Spy.xml
+Locales\Spy-enUS.lua
+Locales\Spy-ruRU.lua
+Spy.lua
+SpySuperWoW.lua
+Fonts.lua
+Colors.lua
+Widgets.lua
+WindowOrder.lua
+MainWindow.lua
+List.lua
+SpyFu.lua
+SpyStats.xml
+SpyStats.lua
+SpyData.lua
