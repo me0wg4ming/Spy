@@ -560,10 +560,32 @@ scanFrame:SetScript("OnUpdate", function()
 						
 						-- Trigger stealth alert if player is stealthed
 						if playerData.isStealthed and Spy.AlertStealthPlayer then
-							if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-								DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SpySW]|r ✓ STEALTH ALERT: " .. playerName .. " (" .. (playerData.stealthType or "Unknown") .. ")")
+							-- ✅ FIX: Check battleground setting
+							local allowAlert = true
+							
+							if Spy.InInstance and not Spy.db.profile.EnabledInBattlegrounds then
+								allowAlert = false
+								if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+									DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW]|r Stealth alert skipped: Battlegrounds disabled")
+								end
 							end
-							Spy:AlertStealthPlayer(playerName)
+							
+							-- ✅ FIX: Check PvP flag requirement
+							if allowAlert and Spy.db and Spy.db.profile and Spy.db.profile.DisableWhenPVPUnflagged then
+								if not UnitIsPVP("player") then
+									allowAlert = false
+									if Spy.db.profile.DebugMode then
+										DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW]|r Stealth alert skipped: Player not PvP flagged")
+									end
+								end
+							end
+							
+							if allowAlert then
+								if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+									DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SpySW]|r ✓ STEALTH ALERT: " .. playerName .. " (" .. (playerData.stealthType or "Unknown") .. ")")
+								end
+								Spy:AlertStealthPlayer(playerName)
+							end
 						end
 					end
 				end
@@ -670,6 +692,29 @@ function SpySW:OnUnitCastEvent(casterGUID, targetGUID, eventType, spellID, castD
 	local stealthType = self.STEALTH_SPELL_IDS[spellID]
 	if not stealthType then
 		return  -- Not a stealth spell
+	end
+	
+	-- ✅ FIX: Check if Spy is enabled in current zone
+	if not Spy or not Spy.EnabledInZone then
+		return  -- Spy disabled in this zone
+	end
+	
+	-- ✅ FIX: Check battleground setting
+	if Spy.InInstance and not Spy.db.profile.EnabledInBattlegrounds then
+		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW UNIT_CASTEVENT]|r Stealth detection skipped: Battlegrounds disabled")
+		end
+		return  -- Battlegrounds disabled
+	end
+	
+	-- ✅ FIX: Check PvP flag requirement
+	if Spy.db and Spy.db.profile and Spy.db.profile.DisableWhenPVPUnflagged then
+		if not UnitIsPVP("player") then
+			if Spy.db.profile.DebugMode then
+				DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW UNIT_CASTEVENT]|r Stealth detection skipped: Player not PvP flagged")
+			end
+			return  -- Player not PvP flagged
+		end
 	end
 	
 	-- Get caster info
@@ -984,7 +1029,7 @@ function SpySW:Initialize()
     local _, testguid = UnitExists("player")
     if testguid then
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r SuperWoW |cff00ff00DETECTED [OK]|r")
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r Your GUID: |cff888888" .. testguid .. "|r")
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r Your GUID: |cff00ff00" .. testguid .. "|r")
     else
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r SuperWoW |cff00ff00DETECTED [OK]|r")
     end
