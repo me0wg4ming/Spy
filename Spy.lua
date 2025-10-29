@@ -142,6 +142,8 @@ Spy.options = {
 						["Everlook"] = L["Everlook"],
 						["Gadgetzan"] = L["Gadgetzan"],
 						["Ratchet"] = L["Ratchet"],
+						["Nordanaar"] = L["Nordanaar"],
+						["Tel Co. Basecamp"] = L["Tel Co. Basecamp"],
 					},
 				},
 				ShowOnDetection = {
@@ -1340,6 +1342,8 @@ local Default_Profile = {
 			["Gadgetzan"] = false,
 			["Ratchet"] = false,
 			["Everlook"] = false,
+			["Nordanaar"] = false,
+			["Tel Co. Basecamp"] = false,
 
 		},
 	}

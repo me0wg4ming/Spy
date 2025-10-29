@@ -68,6 +68,8 @@ L["Booty Bay"] = "Booty Bay"
 L["Everlook"] = "Everlook"
 L["Gadgetzan"] = "Gadgetzan"
 L["Ratchet"] = "Ratchet"
+L["Nordanaar"] = "Nordanaar"
+L["Tel Co. Basecamp"] = "Tel Co. Basecamp"
 
 L["DisplayOptions"] = "Display"
 L["DisplayOptionsDescription"] = [[
