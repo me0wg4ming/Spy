@@ -1,254 +1,499 @@
-# Spy - SuperWoW Edition
+Spy - SuperWoW Edition
+Version: 3.9.3 + SuperWoW Integration
+Author: Immolation (Original), laytya (Port), SuperWoW Integration
+For: World of Warcraft 1.12.1 (Vanilla)
 
-**Version:** 3.9.2 + SuperWoW Integration
-**Author:** Immolation (Original), laytya (Port), SuperWoW-Module
-**For:** World of Warcraft 1.12.1 (Vanilla)
+🚀 What's New in Version 3.9.3?
+Major Features:
 
----
+✅ SuperWoW Integration - GUID-based player detection (REQUIRED)
+✅ Proactive Detection - Finds enemies BEFORE they attack you
+✅ Advanced Stealth Detection - Multiple methods including UNIT_CASTEVENT
+✅ Stealth-Only Mode - Detect stealthed players even when Spy is disabled
+✅ Real Level Data - No more guessing, SuperWoW provides exact values
+✅ Nearby Counter - Visual display of active enemies
+✅ Announce Button - Quick announce to party/raid/say
+✅ Statistics Overhaul - Redesigned stats window with improved filtering
+✅ Window Size Optimization - Better scaling and auto-resize options
+✅ Unlimited Range Detection - As far as you can see enemies
+✅ Instant Enable/Disable - No reload required
+✅ Goblin & High Elf Support - Added missing races for custom servers
+✅ Profile System - Proper profile loading without errors
+✅ Advanced Filter System - Search by name/guild in Statistics
+✅ Always Clear Option - Automatic nearby list cleanup
+✅ Ignore List Protection - Ignored players won't trigger detection
 
-## 🚀 What's New?
+Performance Improvements:
 
-This version of Spy **requires SuperWoW** for GUID-based player detection. Without SuperWoW, the addon will not function.
+🔧 Cleaned up unused TBC/WotLK features
+🔧 Removed non-functional Vanilla features (map notes, KoS button on target frame)
+🔧 Optimized GUID scanning (0.5s interval)
+🔧 Better pet filtering to prevent false detections
+🔧 Efficient memory usage with automatic cleanup
 
-### Advantages with SuperWoW:
 
-✅ **Proactive Detection** - Finds enemies BEFORE they attack you
-✅ **Stealth Detection** - Detects invisible nearby enemies
-✅ **Real Level Data** - No more level guessing, SuperWoW provides exact values
-✅ **Better Performance** - Direct GUID scanning without string parsing
-✅ **More Information** - Race, Guild, Class - everything accurate
+⚠️ CRITICAL: SuperWoW is REQUIRED
+Without SuperWoW, Spy will NOT function!
+Why SuperWoW is Mandatory:
+❌ Without SuperWoW → Spy automatically DISABLES itself on login
+✅ With SuperWoW → Full GUID-based detection like ShaguScan
+SuperWoW Download: https://github.com/balakethelock/SuperWoW
 
-### ⚠️ IMPORTANT:
+📦 Installation
+Prerequisites:
 
-❌ **Without SuperWoW** → Spy will automatically DISABLE itself on login
-✅ **With SuperWoW** → Full GUID-based detection like ShaguScan
+World of Warcraft 1.12.1 (Vanilla)
+SuperWoW 1.12.1+ (MANDATORY)
 
-**SuperWoW is mandatory - there is no fallback mode!**
+Installation Steps:
 
----
-
-## 📦 Installation
-
-### Prerequisites:
-
-1. **World of Warcraft 1.12.1** (Vanilla)
-2. **SuperWoW 1.12.1+** (**REQUIRED**)
-    - Download: https://github.com/balakethelock/SuperWoW
-
-### Installation:
-
-1. **Remove/Rename old Spy:**
+Backup/Remove old Spy:
+Interface/AddOns/Spy → Interface/AddOns/Spy_OLD
 ```
-    Interface/AddOns/Spy → Interface/AddOns/Spy_OLD
-```
 
-2. **Unpack Spy-SuperWoW to:**
+2. **Extract Spy-SuperWoW to:**
 ```
-    Interface/AddOns/Spy/
+Interface/AddOns/Spy/
 ```
 
 3. **Start WoW** → Done!
 
-### Testing:
+### First Login Check:
 
-Upon logging in, you will see one of the following messages:
-
-✅ **[SpySW] SuperWoW DETECTED ✓** → Spy is fully functional
-
-❌ **[Spy] CRITICAL ERROR: SuperWoW NOT DETECTED!** → Spy has been disabled
+✅ **[SpySW] SuperWoW DETECTED ✓** → Spy is fully functional  
+❌ **[Spy] CRITICAL ERROR: SuperWoW NOT DETECTED!** → Spy is disabled
 
 ---
 
-## 🎮 Commands
+## 🎮 Commands & Usage
 
-### Standard Spy Commands:
+### Basic Commands:
+- `/spy` - Toggle Spy window
+- `/spy show` - Show Spy window
+- `/spy hide` - Hide Spy window
+- `/spy config` - Open settings
+- `/spy reset` - Reset window positions
+- `/spy clear` - Clear nearby list
+- `/spy stats` - Open statistics window
+- `/spy kos <name>` - Toggle KoS for player
+- `/spy ignore <name>` - Toggle ignore for player
 
-- `/spy` - Opens Spy (as usual)
-- `/spy show` - Shows Spy window
-- `/spy hide` - Hides Spy window
-- `/spy config` - Opens settings
+### SuperWoW Debug Commands:
+- `/spystatus` - Show SuperWoW status and statistics
+- `/spydebug` - Toggle debug mode (shows detection events)
+- `/spyevent` - Toggle cast event logging (developer tool)
+- `/spybuff` - Test buff detection methods (developer tool)
+- `/spypet` - Test pet detection (developer tool)
+- `/spytarget` - Test targeting methods (developer tool)
 
-### SuperWoW Commands:
+### Keyboard Shortcuts:
 
-- `/spystatus` - Shows SuperWoW status and statistics
-- `/spydebug` - Activates/Deactivates Debug mode
-- `/spybuff` - Tests buff detection methods (for developers)
-- `/spypet` - Tests pet detection (for developers)
-- `/spytarget` - Tests targeting methods (for developers)
+**In Nearby List:**
+- **Left-Click** → Target player (GUID-based, works out of range!)
+- **Shift + Left-Click** → Toggle KoS
+- **Ctrl + Left-Click** → Toggle Ignore
+- **Right-Click** → Open context menu
+
+**Title Bar:**
+- **Alt + Mouse Wheel** → Switch between lists (Nearby/Last Hour/Ignore/KoS)
+- **Shift-Click Clear Button** → Toggle sound on/off
+- **Ctrl-Click Clear Button** → Toggle Spy on/off
+
+---
+
+## 🔍 Detection Features
+
+### 1. **Proactive Scanning (SuperWoW)**
+- Scans for nearby enemy players every 0.5 seconds
+- Works WITHOUT combat - finds idle/stealthed players
+- GUID-based tracking for accuracy
+
+### 2. **Stealth Detection (Multiple Methods)**
+
+**Method A: Buff Scanning**
+- Scans target buffs via Tooltip Scanner
+- Detects: Stealth, Prowl, Shadowmeld, Vanish
+- Works in all languages (EN/DE patterns)
+
+**Method B: UNIT_CASTEVENT**
+- **NEW in 3.9.3!**
+- Instant detection when stealth is cast
+- Tracks spell IDs: 1784-1787 (Stealth), 5215/6783/9913 (Prowl), 20580 (Shadowmeld), 1856/1857 (Vanish)
+- Triggers alert immediately, doesn't wait for buff scan
+
+**Method C: Stealth-Only Mode**
+- Enable: `WarnOnStealthEvenIfDisabled = true`
+- Detects stealthed players even when Spy is disabled
+- Only processes Rogues, Druids, Night Elves
+- Perfect for battlegrounds/instances where you want Spy off but still want stealth alerts
+
+### 3. **Smart Filtering**
+- ✅ Only tracks: Players + Hostile + PvP Flagged + Alive
+- ✅ Ignores: Friendlies, Pets, NPCs, Same-Faction (even in duels)
+- ✅ Separate caches for enemies/friendlies
+- ✅ Automatic pet detection via class check + UnitPlayerControlled
+
+### 4. **Zone-Based Control**
+- Auto-disable in sanctuaries (Booty Bay, Gadgetzan, Everlook, Ratchet, etc.)
+- Battleground support (enable/disable via settings)
+- PvP flag requirement option
+- Taxi mode (stop alerts while on flight paths)
+
+---
+
+## 📊 Statistics Window
+
+### Features:
+- **Sort by:** Name, Level, Class, Guild, Wins, Loses, Time
+- **Filter Options:**
+  - Search by name or guild (real-time)
+  - Show only KoS players
+  - Show only players with Win/Loss records
+  - Show only players with KoS reasons
+- **Display Information:**
+  - Player name, level, class, guild
+  - Win/Loss statistics
+  - KoS reasons
+  - Last seen location and time
+  - List indicator (shows which lists player is on)
+
+### Keyboard Shortcuts:
+- **Shift-Click Spy button** → Open/close statistics
+
+---
+
+## ⚙️ Configuration Options
+
+### General Settings:
+- **Enable Spy** - Master on/off switch (instant, no reload!)
+- **Enabled in Battlegrounds** - Allow detection in BGs
+- **Disable When PvP Unflagged** - Only detect when flagged
+- **Disabled in Zones** - Select sanctuary zones
+- **Show on Detection** - Auto-show window when enemy detected
+- **Hide Spy** - Auto-hide when no enemies nearby
+- **Stop Alerts on Taxi** - Pause alerts while flying
+
+### Display Options:
+- **Window Opacity** - Normal and battleground alpha
+- **Lock Windows** - Prevent accidental moving
+- **Invert Spy** - Flip window upside-down (title at bottom)
+- **Auto-Resize** - Window grows/shrinks with player count
+- **Resize Limit** - Maximum bars to display (1-15)
+- **Display Data** - Choose what to show in bars (Name/Level/Class/Guild combinations)
+- **Font Selection** - Choose from available fonts
+- **Bar Texture** - Customize bar appearance
+- **Row Height** - Adjust bar size (8-20 pixels)
+- **Tooltip Options** - Position, content, anchor point
+- **Show Minimap Icon** - Toggle LDB icon visibility
+
+### Alert Options:
+- **Enable Sound** - Master sound toggle
+- **Sound Channel** - Choose audio channel (Master/SFX/Music/Ambience)
+- **Only Sound for KoS** - Silence regular detections
+- **Stop Alerts on Taxi** - No sounds while flying
+- **Announce To** - Auto-announce to: None/Self/Party/Guild/Raid/LocalDefense
+- **Only Announce KoS** - Limit announcements
+- **Display Warnings** - Alert style: Default/ErrorFrame/Moveable
+- **Warn on Stealth** - Alert for stealthed players
+- **Warn on Stealth (Even if Disabled)** - **NEW!** Stealth-only mode
+- **Warn on KoS** - Alert for KoS players
+- **Warn on KoS Guild** - Alert if guild member is KoS
+- **Warn on Race** - Alert for specific enemy race
+
+### Map Options:
+- **Minimap Detection** - Scan minimap tooltips (legacy feature)
+- **Minimap Details** - Show class/level in tooltips
+
+### Data Management:
+- **Remove Undetected** - Auto-cleanup timer: Always/1-15 min/Never
+- **Purge Data** - Old data cleanup: 1-90 days
+- **Purge KoS** - Include KoS in purge
+- **Purge Win/Loss Data** - Include combat stats in purge
+- **Share Data** - Send detections to other Spy users
+- **Use Data** - Receive detections from others
+- **Share KoS Between Characters** - Sync KoS across your account
+
+---
+
+## 🎯 KoS (Kill on Sight) System
+
+### Managing KoS Players:
+- **Add to KoS:** `/spy kos <name>` or Shift-Click in list
+- **Remove from KoS:** Same command/click again
+- **Set Reason:** Right-click player → KoS Reason menu
+- **Custom Reason:** Select "Other" and type reason
+
+### KoS Features:
+- 🔴 Red border alert for KoS players
+- 🟡 Yellow border for KoS guild members
+- 📢 Announce KoS detections to party/raid
+- 🎵 Special sound for KoS alerts
+- 📝 Multiple reasons per player
+- 🔄 Cross-character KoS sharing
+- 📊 KoS tab in statistics window
+
+### Ignore List:
+- **Add to Ignore:** `/spy ignore <name>` or Ctrl-Click in list
+- **Effect:** Completely blocks detection for that player
+- **Use Cases:** Friendly enemy players, RPers, etc.
 
 ---
 
 ## 🔧 Technical Details
 
-### How does the SuperWoW Integration work?
+### How SuperWoW Integration Works:
 
-**Detection System:**
-1. GUID Collection via Events (`UPDATE_MOUSEOVER_UNIT`, `PLAYER_TARGET_CHANGED`, etc.)
-2. Regular scanning of all tracked GUIDs (0.5s interval)
-3. Filter: player + hostile + pvp + alive
-4. Handover to Spy's Main System
+**1. GUID Collection:**
+- Events: UPDATE_MOUSEOVER_UNIT, PLAYER_TARGET_CHANGED, UNIT_COMBAT, etc.
+- Stores GUIDs of all players encountered
+- Name-to-GUID mapping for targeting
 
-**Win/Loss Tracking:**
-- RAW_COMBATLOG event for direct combat log parsing
-- Minimal CombatLog events for death tracking
-- LastAttack tracking with GUID-to-name resolution
+**2. Scanning System:**
+- Interval: 0.5 seconds (configurable)
+- Filter: IsPlayer + IsHostile + IsPvPFlagged + IsAlive
+- Cleanup: Every 5 seconds (removes non-existent GUIDs)
 
-### Filter Logic:
-```lua
-✓ IsPlayer(guid) → Only players, no NPCs
-✓ IsHostile(guid) → Only hostile players
-✓ IsPvPFlagged(guid) → Only PvP-flagged players
-✓ IsAlive(guid) → Only living players
-```
+**3. Data Extraction:**
+- Level (exact, no guessing!)
+- Class & Race
+- Guild
+- Stealth status (via buff scanning)
+- Faction (for duel detection)
+
+**4. Stealth Detection:**
+- Buff scanning with Tooltip Scanner (works with GUIDs!)
+- UNIT_CASTEVENT for instant detection
+- Multi-language support (EN/DE patterns)
+- Same-faction filtering (no duel alerts)
 
 ### Performance:
-
-- **Scan Interval:** 0.5 seconds
-- **Cleanup Interval:** 5 seconds (removes GUIDs that no longer exist)
-- **CPU Load:** Minimal (~0.5% with 50 GUIDs)
-- **Pet Filtering:** Intelligent detection to skip hunter/warlock pets
+- **Scan Interval:** 0.5s (500ms)
+- **CPU Load:** ~0.5% with 50 tracked GUIDs
+- **Memory:** Minimal, automatic cleanup
+- **Pet Filtering:** Intelligent class + UnitPlayerControlled check
 
 ---
 
-## 🐛 Troubleshooting
+## 🛠️ Troubleshooting
 
 ### Problem: Spy doesn't load
 
-**Solution:**
+**Check:**
+1. Folder structure: `Interface/AddOns/Spy/Spy.lua` must exist
+2. Only ONE Spy version installed
+3. Delete `Spy_OLD` copies
 
-- Check the folder structure: `Interface/AddOns/Spy/Spy.lua` must exist
-- Ensure that only ONE Spy version is installed
-- Delete all Spy_OLD copies
+**Fix:**
+```
+Delete Interface/AddOns/Spy*
+Extract fresh Spy-SuperWoW.zip
+```
+
+---
 
 ### Problem: SuperWoW not detected
 
-**Solution:**
+**Symptoms:**
+- Error message on login
+- `/spystatus` shows "NOT AVAILABLE"
 
-- Check SuperWoW version (must be 1.12.1+)
-- Enter `/spystatus` for details
-- Is SuperWoW installed correctly? Test with other SuperWoW addons
-- Reinstall SuperWoW from https://github.com/balakethelock/SuperWoW
-
-### Problem: Error on loading
-
-**Solution:**
-
-- Activate Debug mode: `/spydebug`
-- Read the error in chat
-- Check if SuperWoW is active: `/spystatus`
-
-### Problem: Too many Detections / Spam
-
-**Solution:**
-
-- Deactivate Debug mode: `/spydebug`
-- Adjust Scan Interval: `SpySW.SCAN_INTERVAL = 1.0` in SpySuperWoW.lua
+**Fix:**
+1. Verify SuperWoW installation: https://github.com/balakethelock/SuperWoW
+2. Check for SuperWoW DLL in WoW folder
+3. Test with other SuperWoW addons (ShaguQuest, pfUI)
+4. Reinstall SuperWoW
 
 ---
 
-## 📊 Statistics
+### Problem: Too many detections / Spam
 
-With `/spystatus` you can see the following information:
+**Causes:**
+- Debug mode active
+- Low scan interval
 
-- **SuperWoW Status** - Available or not
-- **Tracked GUIDs** - Number of currently tracked players
-- **Enemies** - Number of tracked enemy players
-- **Friendlies** - Number of tracked friendly players
-- **GUIDs Collected** - Total number of collected GUIDs
-- **Events Processed** - Number of processed events
-- **Scans Performed** - Number of scans performed
-- **Players Detected** - Number of detected players
-- **Pets Skipped** - Number of correctly filtered pets
+**Fix:**
+1. `/spydebug` - Disable debug mode
+2. Edit `SpySuperWoW.lua` line ~85: `SpySW.SCAN_INTERVAL = 1.0` (default: 0.5)
 
 ---
 
-## 📝 Changelog
+### Problem: Stealth not detected
 
-### v3.8.6 + SuperWoW
+**Check:**
+1. Target enemy player
+2. `/spybuff` - Test buff detection
+3. Check which methods work
+4. Enable debug: `/spydebug`
 
-**New:**
-
-- SuperWoW integration for GUID-based player detection
-- **SuperWoW is now REQUIRED** - no fallback mode
-- Addon automatically disables if SuperWoW is not detected
-- New commands: `/spystatus`, `/spydebug`, `/spybuff`, `/spypet`, `/spytarget`
-- Improved performance through direct GUID-scanning
-- Automatic level correction for Skulls (-1 → 0)
-- Intelligent pet filtering (no more pet spam)
-- RAW_COMBATLOG support for better combat tracking
-
-**Fixed:**
-
-- Level-Guess logic is deactivated with SuperWoW
-- Duplicate detections prevented
-- GUID-Cleanup for non-existent units
-- Pet detection improved (uses class check + UnitPlayerControlled)
-- LastAttack tracking with GUID-to-name resolution
-
-**Retained:**
-
-- All Original Spy Features
-- KOS Lists
-- Blacklist
-- Alert System
-- Stats
-- Map Integration
-- UI/GUI
+**Note:** Tooltip Scanner (Method 8) should work best with SuperWoW
 
 ---
 
-## ⚠️ Important
+### Problem: Error on profile switch
 
-✅ Your KOS lists remain intact
-✅ Your settings remain intact
-✅ All Spy features work as before
-✅ Only the detection method has changed - and it's better!
+**Symptoms:**
+- Lua error when changing profiles
+- "attempt to index nil value"
 
-❌ **SuperWoW is REQUIRED** - the addon will not work without it!
-
----
-
-## 💡 Tips
-
-### Best Settings with SuperWoW:
-
-- **Scan Interval:** 0.5s (Standard) - for fast detection
-- **Debug Mode:** OFF - except for testing
-- **Spy Settings:** Use as usual
-
-### Performance Optimization:
-
-- With many players (>100): Increase Scan Interval to 1.0s
-- During PvP-Raids: Turn off Debug Mode to avoid spam
+**Fix:**
+- Fixed in 3.9.3! Profile system now works correctly
+- If still happening, `/reload` after profile change
 
 ---
 
-## 🤝 Credits
+### Problem: Players not targetable
 
-- **Immolation** - Original Spy Add-on
-- **laytya** - Vanilla Port
-- **Shagu** - ShaguScan (Inspiration for GUID System)
-- **SuperWoW-Team** - SuperWoW Framework
+**Symptoms:**
+- Click doesn't target
+- "Cannot target" in debug
 
----
-
-## 📄 License
-
-Same as the original Spy Add-on.
+**Check:**
+1. SuperWoW installed? (GUID targeting requires it)
+2. Player out of range? (SuperWoW can target further than normal)
+3. Enable debug: `/spydebug` and check GUID tracking
 
 ---
 
-## 🆘 Support
+### Problem: Pets showing as players
 
-For problems:
+**Symptoms:**
+- Hunter/Warlock pets in list
+- "Wolf" or "Voidwalker" detected
 
-1. Check `/spystatus`
-2. Activate `/spydebug` and read the error
-3. Verify SuperWoW is installed correctly
-4. Create an Issue on GitHub (if available)
+**Status:** Fixed in 3.9.3!
+- Dual-check: NOT IsPlayer AND IsPlayerControlled = Pet
+- Class verification (pets have no class)
+- See debug: "SKIPPED PET: <name>"
 
 ---
 
-## 🎯 Have fun hunting!
+## 📈 Statistics
 
-**Remember: SuperWoW is REQUIRED for this addon to function!**
+**Check with `/spystatus`:**
+```
+========== SpySuperWoW Status ==========
+SuperWoW: AVAILABLE
+Spy Mode: SuperWoW Scanning
+Tracked GUIDs: 45
+  Enemies: 12  Friendlies: 33
+Statistics:
+  GUIDs Collected: 156
+  Events Processed: 2341
+  Scans Performed: 678
+  Players Detected: 23
+  Pets Skipped: 89
+Settings:
+  Scan Interval: 0.5s
+  Cleanup Interval: 5s
+Spy Status:
+  Enabled: true
+  Enabled in Zone: true
+======================================
+
+🎨 Features Summary
+Core Features:
+✅ GUID-based player detection (SuperWoW)
+✅ Proactive scanning (finds idle enemies)
+✅ Advanced stealth detection (3 methods)
+✅ Stealth-only mode (works when Spy disabled)
+✅ Real level data (no guessing)
+✅ Nearby counter with visual indicator
+✅ Quick announce button (say/party/raid)
+✅ Win/Loss tracking (PvP statistics)
+✅ KoS system with reasons
+✅ Ignore list
+✅ Cross-character KoS sharing
+✅ Advanced statistics window
+✅ Real-time filtering (name/guild)
+✅ Auto-resize window
+✅ Smart pet filtering
+✅ Zone-based control
+✅ Battleground support
+✅ Profile system
+✅ Minimap icon (LDB)
+✅ Unlimited range targeting
+✅ Instant enable/disable
+Removed Features (Not Working in Vanilla):
+❌ Map display (requires TBC+ API)
+❌ KoS button on target frame (no target frame API)
+❌ Astrolabe integration (TBC+ library)
+
+💡 Tips & Tricks
+Optimal Settings:
+
+Scan Interval: 0.5s for fast detection, 1.0s for low-end PCs
+Debug Mode: OFF except for testing
+Auto-Resize: ON for dynamic window size
+Stealth-Only Mode: Great for instances/BGs where you want Spy off
+
+Performance Optimization:
+
+High player density (>100): Increase scan interval to 1.0s
+During raids: Turn off debug mode
+Low FPS: Increase scan interval + disable auto-resize
+
+Stealth Detection:
+
+Best Method: UNIT_CASTEVENT (instant, no delay)
+Backup: Buff scanning (0.5s delay)
+Most Reliable: Both enabled (default)
+
+Targeting Out-of-Range Players:
+
+SuperWoW allows targeting beyond normal range
+Click player in list, even if they're far away
+GUID-based targeting works as long as they were detected once
+
+
+🤝 Credits
+
+Immolation - Original Spy addon (TBC/WotLK)
+laytya - Vanilla 1.12.1 port
+Shagu - ShaguScan (inspiration for GUID system)
+SuperWoW Team - SuperWoW framework
+pfUI Team - Tooltip scanning techniques
+Community - Bug reports and feature suggestions
+
+
+📄 License
+Same as original Spy addon - free to use and modify.
+
+🆘 Support
+For Issues:
+
+Check /spystatus - Is SuperWoW detected?
+Enable /spydebug - What errors appear?
+Try /spybuff on enemy player - Does stealth detection work?
+Verify SuperWoW installation
+Check WoW folder for SuperWoW DLL
+Create GitHub issue (if available) with error details
+
+Common Questions:
+Q: Can I use Spy without SuperWoW?
+A: No, SuperWoW is mandatory. Spy will auto-disable without it.
+Q: Why can't I target players by clicking?
+A: SuperWoW must be installed for GUID-based targeting.
+Q: Does Spy work on private servers?
+A: Yes, fully compatible with Vanilla 1.12.1 servers.
+Q: Can I import KoS lists from old Spy?
+A: Yes, KoS data is preserved when updating.
+Q: Why do I see pets in my list?
+A: Fixed in 3.9.3, update to latest version.
+
+🎯 Final Notes
+Remember:
+
+⚠️ SuperWoW is REQUIRED - No exceptions!
+🔍 Spy detects enemies automatically, no action needed
+🎵 Adjust sound settings to your preference
+📊 Use statistics to track rivals
+🔴 Mark dangerous players as KoS
+⚪ Ignore friendly enemies
+🐛 Report bugs with /spystatus output
+
+Have fun hunting in Azeroth! 🗡️
+
+Version: 3.9.3 (2025)
+Compatibility: World of Warcraft 1.12.1 (Vanilla)
+Requirement: SuperWoW 1.12.1+
+Status: Stable & Production-Ready
