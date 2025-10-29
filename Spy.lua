@@ -134,6 +134,8 @@ Spy.options = {
 					end,
 					set = function(info, key, value)
 						Spy.db.profile.FilteredZones[key] = value
+						-- Update zone status immediately when settings change
+						Spy:ZoneChangedEvent()
 					end,
 					values = {
 						["Booty Bay"] = L["Booty Bay"],
