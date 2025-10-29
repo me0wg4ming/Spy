@@ -660,6 +660,19 @@ Spy.options = {
 						Spy.db.profile.WarnOnStealth = value
 					end,
 				},
+				WarnOnStealthEvenIfDisabled = {
+					name = "Warn even if Spy is disabled",
+					desc = "Continue detecting stealthed players (Rogues, Druids, Night Elves) even when Spy is disabled. Only stealth alerts will be shown, no regular player detection.",
+					type = "toggle",
+					order = 9.5,
+					width = "full",
+					get = function(info)
+						return Spy.db.profile.WarnOnStealthEvenIfDisabled
+					end,
+					set = function(info, value)
+						Spy.db.profile.WarnOnStealthEvenIfDisabled = value
+					end,
+				},
 				WarnOnKOS = {
 					name = L["WarnOnKOS"],
 					desc = L["WarnOnKOSDescription"],
@@ -719,6 +732,7 @@ Spy.options = {
 								["Dwarf"] = L["Dwarf"],
 								["Night Elf"] = L["Night Elf"],
 								["Gnome"] = L["Gnome"],
+								["High Elf"] = L["High Elf"],
 							},
 							Horde = {
 								["None"] = L["None"],
@@ -726,6 +740,7 @@ Spy.options = {
 								["Tauren"] = L["Tauren"],
 								["Troll"] = L["Troll"],
 								["Undead"] = L["Undead"],
+								["Goblin"] = L["Goblin"],
 							},
 						}
 						if Spy.EnemyFactionName == "Alliance" then
@@ -1300,6 +1315,7 @@ local Default_Profile = {
 		Announce = "None",
 		OnlyAnnounceKoS = false,
 		WarnOnStealth = true,
+		WarnOnStealthEvenIfDisabled = false,
 		WarnOnKOS = true,
 		WarnOnKOSGuild = false,
 		WarnOnRace = false,

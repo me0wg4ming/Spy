@@ -494,6 +494,15 @@ local scanTimer = 0
 local cleanupTimer = 0
 
 scanFrame:SetScript("OnUpdate", function()
+	-- Check if we should scan
+	local isEnabled = Spy.db and Spy.db.profile and Spy.db.profile.Enabled and Spy.EnabledInZone
+	local stealthOnlyMode = Spy.db and Spy.db.profile and Spy.db.profile.WarnOnStealthEvenIfDisabled and not isEnabled
+	
+	-- Don't scan if Spy is disabled AND stealth-only mode is not active
+	if not isEnabled and not stealthOnlyMode then
+		return
+	end
+	
 	scanTimer = scanTimer + arg1
 	cleanupTimer = cleanupTimer + arg1
 	
@@ -512,6 +521,24 @@ scanFrame:SetScript("OnUpdate", function()
 			if level < 0 then
 				level = 0
 			end
+			
+			-- STEALTH-ONLY MODE: Only process stealthed players
+			if stealthOnlyMode then
+				if playerData.isStealthed then
+					-- Only process stealth-capable classes (Rogue, Druid, Night Elf)
+					local class = playerData.classToken
+					local race = playerData.race
+					local isStealthCapable = (class == "ROGUE" or class == "DRUID" or race == "Night Elf")
+					
+					if isStealthCapable and Spy and Spy.AlertStealthPlayer then
+						if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+							DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[SpySW STEALTH-ONLY]|r " .. playerName .. " (" .. (playerData.stealthType or "Unknown") .. ")")
+						end
+						Spy:AlertStealthPlayer(playerName)
+					end
+				end
+			-- NORMAL MODE: Process all players
+			else
 			
 			-- Check if player was already detected by US (not by Spy)
 			if not SpySW.detectedPlayers[playerName] then
@@ -614,7 +641,8 @@ scanFrame:SetScript("OnUpdate", function()
 					end
 				end
 			end
-		end
+			end  -- end else (normal mode)
+		end  -- end for loop
 	end
 	
 	-- Cleanup old GUIDs
@@ -644,6 +672,15 @@ guidFrame:RegisterEvent("UNIT_HEALTH")
 guidFrame:RegisterEvent("UNIT_CASTEVENT")
 
 guidFrame:SetScript("OnEvent", function()
+	-- Check if we should collect GUIDs
+	local isEnabled = Spy.db and Spy.db.profile and Spy.db.profile.Enabled and Spy.EnabledInZone
+	local stealthOnlyMode = Spy.db and Spy.db.profile and Spy.db.profile.WarnOnStealthEvenIfDisabled and not isEnabled
+	
+	-- Don't collect GUIDs if Spy is disabled AND stealth-only mode is not active
+	if not isEnabled and not stealthOnlyMode then
+		return
+	end
+	
 	SpySW.Stats.eventsProcessed = SpySW.Stats.eventsProcessed + 1
 	
 	if event == "UPDATE_MOUSEOVER_UNIT" then

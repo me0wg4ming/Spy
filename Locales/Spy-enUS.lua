@@ -312,6 +312,8 @@ L["Troll"] = "Troll"
 L["Night Elf"] = "Night Elf"
 L["Undead"] = "Undead"
 L["Gnome"] = "Gnome"
+L["Goblin"] = "Goblin"
+L["High Elf"] = "High Elf"
 
 -- Stealth abilities
 L["Stealth"] = "Stealth"
