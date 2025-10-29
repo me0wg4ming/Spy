@@ -3,13 +3,8 @@
 [![Version](https://img.shields.io/badge/version-3.9.3-blue.svg)](https://github.com/me0wg4ming/Spy)
 [![WoW](https://img.shields.io/badge/WoW-1.12.1%20Vanilla-orange.svg)](#)
 [![SuperWoW](https://img.shields.io/badge/SuperWoW-Required-red.svg)](https://github.com/balakethelock/SuperWoW)
-[![License](https://img.shields.io/badge/license-Free-green.svg)](#)
 
 **Enhanced enemy detection addon for World of Warcraft 1.12.1 (Vanilla)**
-
-*Original by Immolation | Vanilla Port by laytya | SuperWoW Integration by me0wg4ming*
-
-> **Original Spy Addon:** https://github.com/me0wg4ming/Spy
 
 ---
 

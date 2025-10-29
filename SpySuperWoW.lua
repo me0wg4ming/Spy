@@ -90,7 +90,7 @@ SpySW.STEALTH_SPELL_IDS = {
 	[5215] = "Prowl",        -- Druid Prowl (Rank 1)
 	[6783] = "Prowl",        -- Druid Prowl (Rank 2)
 	[9913] = "Prowl",        -- Druid Prowl (Rank 3)
-	[20580] = "Shadowmeld",  -- Night Elf Shadowmeld
+	[20580] = "Shadowmeld (Racial)",  -- Night Elf Shadowmeld
 	[1856] = "Vanish",       -- Rogue Vanish (Rank 1)
 	[11327] = "Vanish",      -- Rogue Vanish (Rank 1)
     [1857] = "Vanish",       -- Rogue Vanish (Rank 2)
@@ -461,16 +461,21 @@ end
 
 function SpySW:CleanupOldGUIDs()
 	local removed = 0
+	local now = GetTime()
 	
 	-- ✅ Cleanup main cache
 	for guid, lastSeen in pairs(self.guids) do
 		if not UnitExists(guid) then
 			local name = UnitName(guid)
 			if name then
-				-- Remove from detectedPlayers
-				if self.detectedPlayers[name] then
+				-- ✅ IMPORTANT: Don't remove detectedPlayers immediately!
+				-- Players in stealth return UnitExists=false, but we still want to track them
+				-- Only remove after 60 seconds without updates
+				local lastDetected = self.detectedPlayers[name]
+				if lastDetected and (now - lastDetected) > 60 then
 					self.detectedPlayers[name] = nil
 				end
+				
 				-- Reset stealth state (so it can re-alert when player returns)
 				if self.lastStealthState[name] then
 					self.lastStealthState[name] = nil
@@ -539,6 +544,18 @@ scanFrame:SetScript("OnUpdate", function()
 			
 			-- STEALTH-ONLY MODE: Only process stealthed players
 			if stealthOnlyMode then
+				-- Check if we were tracking this player's stealth state
+				local wasStealthed = SpySW.lastStealthState[playerName]
+				local isNowStealthed = playerData.isStealthed
+				
+				-- If player WAS stealthed but is NO LONGER stealthed → reset state
+				if wasStealthed and not isNowStealthed then
+					SpySW.lastStealthState[playerName] = nil
+					if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+						DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW STEALTH-ONLY]|r " .. playerName .. " left stealth, state reset")
+					end
+				end
+				
 				if playerData.isStealthed then
 					-- Only process stealth-capable classes (Rogue, Druid, Night Elf)
 					local class = playerData.classToken
@@ -564,8 +581,13 @@ scanFrame:SetScript("OnUpdate", function()
 				end
 			-- NORMAL MODE: Process all players
 			else
+				-- ✅ FIX: Check stealth state at the beginning for ALL cases
+				local wasDetected = SpySW.detectedPlayers[playerName]
+				local wasStealthed = SpySW.lastStealthState[playerName]
+				local isNowStealthed = playerData.isStealthed
+				
 				-- Check if player was already detected by US (not by Spy)
-				if not SpySW.detectedPlayers[playerName] then
+				if not wasDetected then
 					-- Check if player is on Ignore list
 					if SpyPerCharDB and SpyPerCharDB.IgnoreData and SpyPerCharDB.IgnoreData[playerName] then
 						-- Player is ignored, skip detection
@@ -609,11 +631,7 @@ scanFrame:SetScript("OnUpdate", function()
 								nil     -- source
 							)
 							
-							-- Trigger stealth alert if player is stealthed (only on state change)
-							local wasStealthed = SpySW.lastStealthState[playerName]
-							local isNowStealthed = playerData.isStealthed
-							
-							-- Alert only on transition: not-stealth → stealth
+							-- ✅ Trigger stealth alert if player is stealthed (only on state change)
 							if isNowStealthed and not wasStealthed and Spy.AlertStealthPlayer then
 								-- Check battleground setting
 								local allowAlert = true
@@ -637,17 +655,64 @@ scanFrame:SetScript("OnUpdate", function()
 								
 								if allowAlert then
 									if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-										DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SpySW]|r ✓ STEALTH ALERT: " .. playerName .. " (" .. (playerData.stealthType or "Unknown") .. ")")
+										DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SpySW]|r ✔ STEALTH ALERT: " .. playerName .. " (" .. (playerData.stealthType or "Unknown") .. ")")
 									end
 									Spy:AlertStealthPlayer(playerName)
 								end
 							end
 							
-							-- Update stealth state for next scan
+							-- ✅ Update stealth state for next scan
 							SpySW.lastStealthState[playerName] = isNowStealthed
+							
+							-- ✅ Reset stealth state if player is no longer stealthed
+							if not isNowStealthed and wasStealthed then
+								if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+									DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW]|r " .. playerName .. " left stealth, state reset")
+								end
+							end
 						end
 					end
 				else
+					-- ✅ NEW: Player already detected - check for stealth state change!
+					-- WICHTIG: Auch bei bereits erkannten Spielern Stealth-Änderungen tracken!
+					if isNowStealthed and not wasStealthed then
+						-- Check if player is on Ignore list
+						if not (SpyPerCharDB and SpyPerCharDB.IgnoreData and SpyPerCharDB.IgnoreData[playerName]) then
+							-- Stealth transition detected!
+							if Spy and Spy.AlertStealthPlayer then
+								-- Check battleground setting
+								local allowAlert = true
+								
+								if Spy.InInstance and not Spy.db.profile.EnabledInBattlegrounds then
+									allowAlert = false
+									if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+										DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW]|r Stealth alert skipped: Battlegrounds disabled")
+									end
+								end
+								
+								-- Check PvP flag requirement
+								if allowAlert and Spy.db and Spy.db.profile and Spy.db.profile.DisableWhenPVPUnflagged then
+									if not UnitIsPVP("player") then
+										allowAlert = false
+										if Spy.db.profile.DebugMode then
+											DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW]|r Stealth alert skipped: Player not PvP flagged")
+										end
+									end
+								end
+								
+								if allowAlert then
+									if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+										DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SpySW SCAN]|r ✔ STEALTH ALERT (already detected): " .. playerName .. " (" .. (playerData.stealthType or "Unknown") .. ")")
+									end
+									Spy:AlertStealthPlayer(playerName)
+								end
+							end
+						end
+					end
+					
+					-- ✅ Update stealth state (wichtig!)
+					SpySW.lastStealthState[playerName] = isNowStealthed
+					
 					-- Player already detected - update timestamp to keep them in Nearby list
 					-- Check if player is on Ignore list (even for already detected players)
 					if not (SpyPerCharDB and SpyPerCharDB.IgnoreData and SpyPerCharDB.IgnoreData[playerName]) then
@@ -758,13 +823,24 @@ function SpySW:OnUnitCastEvent(casterGUID, targetGUID, eventType, spellID, castD
 	
 	-- Check if it's a Stealth spell
 	local stealthType = self.STEALTH_SPELL_IDS[spellID]
+	-- ✅ DEBUG
+	if spellID == 20580 then
+		local realSpellName, rank = SpellInfo(spellID)
+		DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[DEBUG]|r Shadowmeld detected!")
+		DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[DEBUG]|r   stealthType from table: " .. tostring(stealthType))
+		DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[DEBUG]|r   realSpellName from SpellInfo: " .. tostring(realSpellName))
+	end
 	if not stealthType then
-		return  -- Not a stealth spell
+		return
 	end
 	
-	-- ✅ FIX: Check if Spy is enabled in current zone
-	if not Spy or not Spy.EnabledInZone then
-		return  -- Spy disabled in this zone
+	-- ✅ CRITICAL: Determine operating mode FIRST
+	local isEnabled = Spy and Spy.db and Spy.db.profile and Spy.db.profile.Enabled and Spy.EnabledInZone
+	local stealthOnlyMode = Spy and Spy.db and Spy.db.profile and Spy.db.profile.WarnOnStealthEvenIfDisabled and not isEnabled
+	
+	-- If neither mode is active, return early
+	if not isEnabled and not stealthOnlyMode then
+		return  -- Spy disabled and Stealth-Only mode disabled
 	end
 	
 	-- ✅ FIX: Check battleground setting
@@ -826,6 +902,26 @@ function SpySW:OnUnitCastEvent(casterGUID, targetGUID, eventType, spellID, castD
 		return
 	end
 	
+	-- ✅ STEALTH-ONLY MODE: Only track Rogues, Druids, and Night Elves
+	if stealthOnlyMode then
+		local _, class = UnitClass(casterGUID)
+		local race, _ = UnitRace(casterGUID)
+		
+		-- Only allow ROGUE, DRUID, or Night Elf
+		local isStealthClass = (class == "ROGUE" or class == "DRUID" or race == "Night Elf")
+		
+		if not isStealthClass then
+			if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+				DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW UNIT_CASTEVENT]|r Stealth-Only Mode: Skipped " .. playerName .. " (not Rogue/Druid/NightElf)")
+			end
+			return  -- Not a stealth class, ignore in Stealth-Only mode
+		end
+		
+		if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[SpySW UNIT_CASTEVENT]|r Stealth-Only Mode: " .. playerName .. " (" .. (class or "?") .. "/" .. (race or "?") .. ") ALLOWED")
+		end
+	end
+	
 	-- Debug output
 	if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 		DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[SpySW UNIT_CASTEVENT]|r " .. playerName .. " cast " .. stealthType .. " (Spell ID: " .. spellID .. ")")
@@ -834,57 +930,70 @@ function SpySW:OnUnitCastEvent(casterGUID, targetGUID, eventType, spellID, castD
 	-- Add unit to GUID tracking (will be picked up by scanner)
 	self:AddUnit(casterGUID)
 	
-	-- ✅ NEW: Add player to Spy IMMEDIATELY (don't wait for scanner)
-	-- We already know this is an enemy (passed UnitCanAttack and Same-Faction checks)
-	if Spy and Spy.EnabledInZone then
-		-- Get player data
-		local level = UnitLevel(casterGUID) or 0
-		if level < 0 then level = 0 end  -- Convert skull to 0
-		
-		local _, class = UnitClass(casterGUID)
-		local race, _ = UnitRace(casterGUID)
-		local guild = GetGuildInfo(casterGUID)
-		
-		-- Update player data in Spy
-		local detected = Spy:UpdatePlayerData(
+	-- Get player data
+	local level = UnitLevel(casterGUID) or 0
+	if level < 0 then level = 0 end  -- Convert skull to 0
+	
+	local _, class = UnitClass(casterGUID)
+	local race, _ = UnitRace(casterGUID)
+	local guild = GetGuildInfo(casterGUID)
+	
+	-- ✅ ALWAYS update player data (needed for GUID → Name mapping)
+	local detected = Spy:UpdatePlayerData(
+		playerName,
+		class,
+		level,
+		race,
+		guild,
+		true,  -- isEnemy
+		false  -- isGuess (SuperWoW has real data!)
+	)
+	
+	-- ✅ ONLY add to Nearby list in Normal Mode
+	if isEnabled and detected then
+		Spy:AddDetected(
 			playerName,
-			class,
-			level,
-			race,
-			guild,
-			true,  -- isEnemy
-			false  -- isGuess (SuperWoW has real data!)
+			time(),
+			false,  -- learnt
+			nil     -- source
 		)
 		
-		-- Add to detected list
-		if detected then
-			Spy:AddDetected(
-				playerName,
-				time(),
-				false,  -- learnt
-				nil     -- source
-			)
-			
-			-- Mark as detected by SpySW to prevent duplicate processing
-			SpySW.detectedPlayers[playerName] = GetTime()
-			
-			if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-				DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW UNIT_CASTEVENT]|r ✓ Added to Spy: " .. playerName .. " Lvl" .. level .. " " .. (class or "?"))
-			end
+		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW UNIT_CASTEVENT]|r ✓ Added to Nearby: " .. playerName .. " Lvl" .. level .. " " .. (class or "?"))
 		end
+	elseif stealthOnlyMode and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+		DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW UNIT_CASTEVENT]|r Stealth-Only Mode: Data saved, NOT added to Nearby")
 	end
 	
-	-- ✅ IMPORTANT: Alert about stealth cast (only on state transition)
+	-- ✅ IMPORTANT: Mark as detected by SpySW to prevent duplicate processing (in BOTH modes!)
+	SpySW.detectedPlayers[playerName] = GetTime()
+	
+	-- ✅ IMPORTANT: Alert about stealth cast
+	-- If UNIT_CASTEVENT fires, player just casted stealth → ALWAYS alert!
 	if Spy and Spy.AlertStealthPlayer then
 		local wasStealthed = SpySW.lastStealthState[playerName]
 		
-		-- Only alert if player wasn't already stealthed
-		if not wasStealthed then
-			Spy:AlertStealthPlayer(playerName)
+		-- ✅ DEBUG: Log stealth state
+		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[SpySW UNIT_CASTEVENT DEBUG]|r playerName=" .. tostring(playerName))
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[SpySW UNIT_CASTEVENT DEBUG]|r wasStealthed=" .. tostring(wasStealthed))
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[SpySW UNIT_CASTEVENT DEBUG]|r stealthType=" .. tostring(stealthType))
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[SpySW UNIT_CASTEVENT DEBUG]|r isEnabled=" .. tostring(isEnabled))
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[SpySW UNIT_CASTEVENT DEBUG]|r stealthOnlyMode=" .. tostring(stealthOnlyMode))
 		end
+		
+		-- ✅ ALWAYS alert when stealth is casted (cast event = player just entered/changed stealth)
+		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SpySW UNIT_CASTEVENT]|r ✔ CALLING AlertStealthPlayer for " .. playerName)
+		end
+		Spy:AlertStealthPlayer(playerName)
 		
 		-- Update stealth state
 		SpySW.lastStealthState[playerName] = true
+	else
+		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SpySW UNIT_CASTEVENT DEBUG]|r Spy or AlertStealthPlayer is NIL!")
+		end
 	end
 end
 
@@ -1480,3 +1589,4 @@ end)
 -- Register slash command
 SLASH_SPYEVENT1 = "/spyevent"
 SlashCmdList["SPYEVENT"] = ToggleCastLogger
+

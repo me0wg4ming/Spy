@@ -1111,6 +1111,8 @@ function Spy:AddDetectedToLists(player, timestamp, learnt, source)
 			end
 		end
 	else
+		-- ✅ FIX: Update timestamps for players already in all lists
+		Spy.NearbyList[player] = timestamp
 		Spy.ActiveList[player] = timestamp
 		Spy.LastHourList[player] = timestamp
 		Spy:UpdateActiveCount()

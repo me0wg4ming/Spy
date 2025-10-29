@@ -666,7 +666,7 @@ Spy.options = {
 				},
 				WarnOnStealthEvenIfDisabled = {
 					name = "Warn even if Spy is disabled",
-					desc = "Continue detecting stealthed players (Rogues, Druids, Night Elves) even when Spy is disabled. Only stealth alerts will be shown, no regular player detection.",
+					desc = "Continue detecting stealthed players (Rogues, Druids, Night Elves using Stealth/Prowl/Shadowmeld) even when Spy is disabled. Players will be tracked in the database but NOT shown in the Nearby list. Only stealth alerts will be shown.",
 					type = "toggle",
 					order = 9.5,
 					width = "full",
@@ -1674,6 +1674,13 @@ function Spy:ShowConfig()
 end
 
 function Spy:OnEnable(first)
+	-- Safety check: ensure db is initialized before proceeding
+	if not Spy.db or not Spy.db.profile then
+		-- Schedule retry after a short delay to allow initialization to complete
+		Spy:ScheduleTimer("OnEnable", 0.5)
+		return
+	end
+	
 	-- Initialize SuperWoW module if available (loaded from SpySuperWoW.lua)
 	if not Spy.HasSuperWoW and SpyModules and SpyModules.SuperWoW then
 		-- Try to initialize SuperWoW (only once)
@@ -1771,40 +1778,55 @@ function Spy:OnDisable()
 	if not Spy.IsEnabled then
 		return
 	end
+	
+	-- ✅ FIX: Check if Stealth-Only mode should stay active
+	local stealthOnlyMode = Spy.db and Spy.db.profile and Spy.db.profile.WarnOnStealthEvenIfDisabled
+	
 	if Spy.timeid then
 		Spy:CancelTimer(Spy.timeid)
 		Spy.timeid = nil
 	end
 	
-	-- Disable SuperWoW if it was active
-	if Spy.HasSuperWoW and Spy.SuperWoW then
-		Spy.SuperWoW:Disable()
-	end
-	
-	-- ✅ FIX Bug 2: Clear detectedPlayers when disabling Spy
-	-- This prevents players from showing in Nearby list when Spy is disabled
-	if SpySW and SpySW.detectedPlayers then
-		for k in pairs(SpySW.detectedPlayers) do
-			SpySW.detectedPlayers[k] = nil
+	-- ✅ FIX: Only disable SuperWoW if Stealth-Only mode is NOT active
+	if not stealthOnlyMode then
+		if Spy.HasSuperWoW and Spy.SuperWoW then
+			Spy.SuperWoW:Disable()
 		end
+		
+		-- ✅ FIX Bug 2: Clear detectedPlayers when fully disabling Spy
+		if SpySW and SpySW.detectedPlayers then
+			for k in pairs(SpySW.detectedPlayers) do
+				SpySW.detectedPlayers[k] = nil
+			end
+			if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+				DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy]|r Cleared detectedPlayers on disable")
+			end
+		end
+		
+		Spy:UnregisterEvent("ZONE_CHANGED")
+		Spy:UnregisterEvent("ZONE_CHANGED_NEW_AREA")
+		Spy:UnregisterEvent("PLAYER_ENTERING_WORLD")
+		Spy:UnregisterEvent("UNIT_FACTION")
+		Spy:UnregisterEvent("RAW_COMBATLOG")
+		Spy:UnregisterEvent("CHAT_MSG_COMBAT_FRIENDLY_DEATH")
+		Spy:UnregisterEvent("CHAT_MSG_COMBAT_HOSTILE_DEATH")
+		Spy:UnregisterEvent("PLAYER_REGEN_ENABLED")
+		Spy:UnregisterEvent("PLAYER_DEAD")
+		Spy:UnregisterComm(Spy.Signature)
+	else
+		-- Stealth-Only mode: Keep SuperWoW active but minimal events
 		if Spy.db.profile.DebugMode then
-			DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy]|r Cleared detectedPlayers on disable")
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy]|r Stealth-Only mode: SuperWoW stays active")
 		end
+		
+		-- Unregister only non-essential events
+		Spy:UnregisterEvent("RAW_COMBATLOG")
+		Spy:UnregisterEvent("CHAT_MSG_COMBAT_FRIENDLY_DEATH")
+		Spy:UnregisterEvent("CHAT_MSG_COMBAT_HOSTILE_DEATH")
+		Spy:UnregisterEvent("PLAYER_REGEN_ENABLED")
+		Spy:UnregisterEvent("PLAYER_DEAD")
+		Spy:UnregisterComm(Spy.Signature)
 	end
-	
-	Spy:UnregisterEvent("ZONE_CHANGED")
-	Spy:UnregisterEvent("ZONE_CHANGED_NEW_AREA")
-	Spy:UnregisterEvent("PLAYER_ENTERING_WORLD")
-	Spy:UnregisterEvent("UNIT_FACTION")
-	Spy:UnregisterEvent("RAW_COMBATLOG")
-	Spy:UnregisterEvent("CHAT_MSG_COMBAT_FRIENDLY_DEATH")
-	Spy:UnregisterEvent("CHAT_MSG_COMBAT_HOSTILE_DEATH")
-	-- WORLD_MAP_UPDATE removed - map display feature removed
-	Spy:UnregisterEvent("PLAYER_REGEN_ENABLED")
-	Spy:UnregisterEvent("PLAYER_DEAD")
-	Spy:UnregisterComm(Spy.Signature)
-
-	--	self.uc.UnregisterAllCallbacks(self)
 
 	Spy.IsEnabled = false
 end
@@ -2083,6 +2105,24 @@ function Spy:RawCombatLogEvent()
 	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 		DEFAULT_CHAT_FRAME:AddMessage("|cffaaff00[Spy Debug]|r RAW_COMBATLOG: " .. tostring(eventName))
 		DEFAULT_CHAT_FRAME:AddMessage("|cffaaff00[Spy Debug]|r   text=" .. tostring(eventText))
+	end
+	
+	-- ✅ GUID Extractor for SuperWoW
+	if SpySW and eventText then
+		-- Look for GUID pattern: 0x followed by 16 hex digits
+		local guid = string.match(eventText, "(0x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x)")
+		
+		if guid and UnitExists(guid) and UnitIsPlayer(guid) then
+			-- Add GUID to tracking
+			SpySW:AddUnit(guid)
+			
+			if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+				local name = UnitName(guid)
+				if name then
+					DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[SpySW COMBATLOG]|r GUID extracted: " .. name .. " (" .. guid .. ")")
+				end
+			end
+		end
 	end
 	
 	-- Skip self-damage (Hellfire, Life Tap, etc)
