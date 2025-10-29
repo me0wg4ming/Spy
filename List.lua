@@ -1,8 +1,13 @@
 local AceLocale = LibStub("AceLocale-3.0")
 local L = AceLocale:GetLocale("Spy")
 
+-- Performance: Cache global functions as locals
 local upper, lower = string.upper, string.lower
 local format, strfind, strsub = string.format, string.find, string.sub
+local strlen = string.len
+local strgfind = string.gfind
+local tinsert = table.insert
+local tsort = table.sort
 
 function Spy:RefreshCurrentList(player, source)
 	local MainWindow = Spy.MainWindow
@@ -97,9 +102,9 @@ function Spy:ManageNearbyList()
 		local position = Spy.NearbyList[player]
 		if position ~= nil then
 			if prioritiseKoS and SpyPerCharDB.KOSData[player] then
-				table.insert(activeKoS, { player = player, time = position })
+				tinsert(activeKoS, { player = player, time = position })
 			else
-				table.insert(active, { player = player, time = position })
+				tinsert(active, { player = player, time = position })
 			end
 		end
 	end
@@ -110,32 +115,32 @@ function Spy:ManageNearbyList()
 		local position = Spy.NearbyList[player]
 		if position ~= nil then
 			if prioritiseKoS and SpyPerCharDB.KOSData[player] then
-				table.insert(inactiveKoS, { player = player, time = position })
+				tinsert(inactiveKoS, { player = player, time = position })
 			else
-				table.insert(inactive, { player = player, time = position })
+				tinsert(inactive, { player = player, time = position })
 			end
 		end
 	end
 
-	table.sort(activeKoS, function(a, b) return a.time < b.time end)
-	table.sort(inactiveKoS, function(a, b) return a.time < b.time end)
-	table.sort(active, function(a, b) return a.time < b.time end)
-	table.sort(inactive, function(a, b) return a.time < b.time end)
+	tsort(activeKoS, function(a, b) return a.time < b.time end)
+	tsort(inactiveKoS, function(a, b) return a.time < b.time end)
+	tsort(active, function(a, b) return a.time < b.time end)
+	tsort(inactive, function(a, b) return a.time < b.time end)
 
 	local list = {}
-	for player in pairs(activeKoS) do table.insert(list, activeKoS[player]) end
-	for player in pairs(inactiveKoS) do table.insert(list, inactiveKoS[player]) end
-	for player in pairs(active) do table.insert(list, active[player]) end
-	for player in pairs(inactive) do table.insert(list, inactive[player]) end
+	for player in pairs(activeKoS) do tinsert(list, activeKoS[player]) end
+	for player in pairs(inactiveKoS) do tinsert(list, inactiveKoS[player]) end
+	for player in pairs(active) do tinsert(list, active[player]) end
+	for player in pairs(inactive) do tinsert(list, inactive[player]) end
 	Spy.CurrentList = list
 end
 
 function Spy:ManageLastHourList()
 	local list = {}
 	for player in pairs(Spy.LastHourList) do
-		table.insert(list, { player = player, time = Spy.LastHourList[player] })
+		tinsert(list, { player = player, time = Spy.LastHourList[player] })
 	end
-	table.sort(list, function(a, b) return a.time > b.time end)
+	tsort(list, function(a, b) return a.time > b.time end)
 	Spy.CurrentList = list
 end
 
@@ -145,9 +150,9 @@ function Spy:ManageIgnoreList()
 		local playerData = SpyPerCharDB.PlayerData[player]
 		local position = time()
 		if playerData then position = playerData.time end
-		table.insert(list, { player = player, time = position })
+		tinsert(list, { player = player, time = position })
 	end
-	table.sort(list, function(a, b) return a.time > b.time end)
+	tsort(list, function(a, b) return a.time > b.time end)
 	Spy.CurrentList = list
 end
 
@@ -157,9 +162,9 @@ function Spy:ManageKillOnSightList()
 		local playerData = SpyPerCharDB.PlayerData[player]
 		local position = time()
 		if playerData then position = playerData.time end
-		table.insert(list, { player = player, time = position })
+		tinsert(list, { player = player, time = position })
 	end
-	table.sort(list, function(a, b) return a.time > b.time end)
+	tsort(list, function(a, b) return a.time > b.time end)
 	Spy.CurrentList = list
 end
 
@@ -895,9 +900,9 @@ end
 function Spy:ParseMinimapTooltip(tooltip)
 	local newTooltip = ""
 	local newLine = false
-	for text in string.gfind(tooltip, "[^\n]*") do
+	for text in strgfind(tooltip, "[^\n]*") do
 		local name = text
-		if string.len(text) > 0 then
+		if strlen(text) > 0 then
 			if strsub(text, 1, 2) == "|c" then
 				name = strsub(text, 11, -3)
 			end

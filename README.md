@@ -1,16 +1,31 @@
 # Spy - SuperWoW Edition
 
-[![Version](https://img.shields.io/badge/version-3.9.3-blue.svg)](https://github.com/yourusername/Spy-SuperWoW)
-[![WoW](https://img.shields.io/badge/WoW-1.12.1%20Vanilla-orange.svg)](https://github.com/yourusername/Spy-SuperWoW)
+[![Version](https://img.shields.io/badge/version-3.9.3-blue.svg)](https://github.com/me0wg4ming/Spy)
+[![WoW](https://img.shields.io/badge/WoW-1.12.1%20Vanilla-orange.svg)](#)
 [![SuperWoW](https://img.shields.io/badge/SuperWoW-Required-red.svg)](https://github.com/balakethelock/SuperWoW)
+[![License](https://img.shields.io/badge/license-Free-green.svg)](#)
 
 **Enhanced enemy detection addon for World of Warcraft 1.12.1 (Vanilla)**
 
-*Original by Immolation | Vanilla Port by laytya | SuperWoW Integration*
+*Original by Immolation | Vanilla Port by laytya | SuperWoW Integration by me0wg4ming*
+
+> **Original Spy Addon:** https://github.com/me0wg4ming/Spy
 
 ---
 
-## 🚀 What's New in Version 3.9.3
+## 📑 Quick Links
+
+- [Installation](#-installation)
+- [Commands & Usage](#-commands--usage)
+- [Detection Features](#-detection-features)
+- [Configuration Options](#️-configuration-options)
+- [KoS System](#-kos-kill-on-sight-system)
+- [Troubleshooting](#️-troubleshooting)
+- [Support](#-support)
+
+---
+
+## 🚀 What's New in Version 3.9.4
 
 ### Major Features
 
@@ -48,9 +63,15 @@
 ### Why SuperWoW is Mandatory
 
 - ❌ **Without SuperWoW** → Spy automatically DISABLES itself on login
-- ✅ **With SuperWoW** → Full GUID-based detection like ShaguScan
+- ✅ **With SuperWoW** → Full GUID-based detection similar to ShaguScan
 
-**SuperWoW Download:** [https://github.com/balakethelock/SuperWoW](https://github.com/balakethelock/SuperWoW)
+### Download SuperWoW
+
+**Official Repository:** [https://github.com/balakethelock/SuperWoW](https://github.com/balakethelock/SuperWoW)
+
+Follow the installation instructions in the SuperWoW repository to set it up correctly.
+
+> **Note:** This Spy version is specifically designed for SuperWoW and will not work with other detection methods. For the best experience, ensure SuperWoW is properly installed before using Spy.
 
 ---
 
@@ -58,27 +79,32 @@
 
 ### Prerequisites
 
-- World of Warcraft 1.12.1 (Vanilla)
-- SuperWoW 1.12.1+ (MANDATORY)
+1. **World of Warcraft 1.12.1** (Vanilla)
+2. **SuperWoW 1.12.1+** (MANDATORY) - [Download here](https://github.com/balakethelock/SuperWoW)
 
 ### Installation Steps
 
-1. **Backup/Remove old Spy:**
+1. **Backup/Remove old Spy version:**
    ```
-   Interface/AddOns/Spy → Interface/AddOns/Spy_OLD
+   Rename: Interface/AddOns/Spy → Interface/AddOns/Spy_OLD
    ```
 
-2. **Extract Spy-SuperWoW to:**
+2. **Extract this Spy version to:**
    ```
    Interface/AddOns/Spy/
    ```
+   Make sure the folder structure is: `Interface/AddOns/Spy/Spy.lua`
 
-3. **Start WoW** → Done!
+3. **Launch World of Warcraft**
 
-### First Login Check
+### Verify Installation
 
-- ✅ **[SpySW] SuperWoW DETECTED ✓** → Spy is fully functional
-- ❌ **[Spy] CRITICAL ERROR: SuperWoW NOT DETECTED!** → Spy is disabled
+After logging in, check the chat window:
+
+- ✅ **Success:** `[SpySW] SuperWoW DETECTED ✓` → Spy is fully functional
+- ❌ **Error:** `[Spy] CRITICAL ERROR: SuperWoW NOT DETECTED!` → Spy is disabled, install SuperWoW
+
+Type `/spy` to open the main window.
 
 ---
 
@@ -130,28 +156,37 @@
 
 ### 1. Proactive Scanning (SuperWoW)
 
-- Scans for nearby enemy players every 0.5 seconds
+- Scans for nearby enemy players every 0.5 seconds (this is only for already detected players - new detected players will be scanned instantly)
 - Works WITHOUT combat - finds idle/stealthed players
 - GUID-based tracking for accuracy
 
 ### 2. Stealth Detection (Multiple Methods)
 
-#### Method A: Buff Scanning
-- Scans target buffs via Tooltip Scanner
-- Detects: Stealth, Prowl, Shadowmeld, Vanish
-- Works in all languages (EN/DE patterns)
+Spy uses three complementary methods to detect stealthed enemies:
 
-#### Method B: UNIT_CASTEVENT
-- **NEW in 3.9.3!**
-- Instant detection when stealth is cast
-- Tracks spell IDs: 1784-1787 (Stealth), 5215/6783/9913 (Prowl), 20580 (Shadowmeld), 1856/1857 (Vanish)
-- Triggers alert immediately, doesn't wait for buff scan
+#### Method A: Buff Scanning (Tooltip Scanner)
+- **How it works:** Scans target's buffs using tooltip analysis
+- **Detects:** Stealth, Prowl, Shadowmeld, Vanish
+- **Languages:** English and German patterns supported
+- **Interval:** Every 0.5 seconds for detected players
+- **Advantage:** Works on any targeted enemy
+
+#### Method B: UNIT_CASTEVENT (Instant Detection)
+- **How it works:** Listens for stealth spell casts in real-time
+- **Detects:** Instant notification when stealth is activated
+- **Spell IDs tracked:**
+  - Stealth (Rogue): 1784, 1785, 1786, 1787
+  - Prowl (Druid): 5215, 6783, 9913
+  - Shadowmeld (Night Elf): 20580
+  - Vanish (Rogue): 1856, 1857
+- **Advantage:** Zero delay, immediate alert
 
 #### Method C: Stealth-Only Mode
-- Enable: `WarnOnStealthEvenIfDisabled = true`
-- Detects stealthed players even when Spy is disabled
-- Only processes Rogues, Druids, Night Elves
-- Perfect for battlegrounds/instances where you want Spy off but still want stealth alerts
+- **How it works:** Detects stealthed players even when Spy is disabled
+- **Enable:** Set `WarnOnStealthEvenIfDisabled = true` in config
+- **Classes filtered:** Only processes Rogues, Druids, and Night Elves
+- **Use case:** Perfect for battlegrounds/instances where you want main Spy off but still need stealth alerts
+- **Advantage:** Minimal resource usage while maintaining stealth awareness
 
 ### 3. Smart Filtering
 
@@ -484,15 +519,22 @@ Spy Status:
 
 ---
 
-## 🤝 Credits
+## 🤝 Credits & Acknowledgments
 
-- **Immolation** - Original Spy addon (TBC/WotLK)
-- **laytya** - Vanilla 1.12.1 port
-- **Shagu** - ShaguScan (inspiration for GUID system)
-- **SuperWoW Team** - SuperWoW framework
-- **pfUI Team** - Tooltip scanning techniques
-- **Community** - Bug reports and feature suggestions
-- **Abstr4ctz** - ModernSpellAlert scanning techniques of Cast event.
+- **Immolation** - Original Spy addon creator (TBC/WotLK)
+- **laytya** - Vanilla 1.12.1 port and maintenance
+- **me0wg4ming** - SuperWoW integration and enhancements
+- **Shagu** - ShaguScan inspiration for GUID-based detection system
+- **SuperWoW Team** - SuperWoW framework development
+- **Shagu** - pfUI tooltip scanning techniques
+- **Abstr4ctz** - ModernSpellAlert cast event scanning techniques
+- **Community** - Bug reports, feature suggestions, and testing
+
+### Special Thanks
+
+- All players who provided feedback and bug reports
+- Private server communities for testing support
+- Contributors to the Vanilla WoW addon development scene
 
 ---
 
@@ -504,14 +546,25 @@ Same as original Spy addon - free to use and modify.
 
 ## 🆘 Support
 
-### For Issues
+### Getting Help
 
-1. Check `/spystatus` - Is SuperWoW detected?
-2. Enable `/spydebug` - What errors appear?
-3. Try `/spybuff` on enemy player - Does stealth detection work?
-4. Verify SuperWoW installation
-5. Check WoW folder for SuperWoW DLL
-6. Create GitHub issue (if available) with error details
+1. **Check `/spystatus`** - Verify SuperWoW is detected
+2. **Enable `/spydebug`** - See what errors appear in chat
+3. **Test `/spybuff`** on enemy player - Verify stealth detection
+4. **Verify SuperWoW installation** - Check for DLL in WoW folder
+5. **Visit GitHub** - Check for known issues or create a new one
+   - Repository: https://github.com/me0wg4ming/Spy
+   - Issues: https://github.com/me0wg4ming/Spy/issues
+
+### Providing Useful Bug Reports
+
+When reporting issues, please include:
+- SuperWoW version
+- WoW client version (1.12.1)
+- Output of `/spystatus`
+- Error message from `/spydebug` (if any)
+- Steps to reproduce the issue
+- Screenshots (if applicable)
 
 ### Common Questions
 
@@ -548,7 +601,17 @@ A: Fixed in 3.9.3, update to latest version.
 
 ---
 
-**Version:** 3.9.3 (2025)  
+## 📌 Links
+
+- **GitHub Repository:** https://github.com/me0wg4ming/Spy
+- **SuperWoW:** https://github.com/balakethelock/SuperWoW
+- **Report Issues:** https://github.com/me0wg4ming/Spy/issues
+
+---
+
+**Version:** 3.9.3  
+**Release Date:** October 2025  
 **Compatibility:** World of Warcraft 1.12.1 (Vanilla)  
 **Requirement:** SuperWoW 1.12.1+  
-**Status:** Stable & Production-Ready
+**Status:** Stable & Production-Ready  
+**License:** Free to use and modify

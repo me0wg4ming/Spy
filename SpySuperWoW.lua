@@ -12,6 +12,14 @@ Benefits with SuperWoW:
 - More accurate player data (race, guild, etc.)
 ]]
 
+-- Performance: Cache global functions as locals
+local strfind = string.find
+local strlower = string.lower
+local strformat = string.format
+local tinsert = table.insert
+local tgetn = table.getn
+local tconcat = table.concat
+
 --[[===========================================================================
 	Tooltip Scanner (for reading buff names)
 =============================================================================]]
@@ -53,6 +61,9 @@ SpySW.Stats = {
 
 -- Track which players have already been sent to Spy
 SpySW.detectedPlayers = {}
+
+-- Track stealth state per player (to only alert on state change)
+SpySW.lastStealthState = {}
 
 -- GUID storage
 SpySW.guids = {}
@@ -391,18 +402,18 @@ local function GetPlayerData(guid)
 	for i = 1, 32 do
 		local buffName = ScanBuffName(guid, i)
 		if buffName then
-			local nameLower = string.lower(tostring(buffName))
+			local nameLower = strlower(tostring(buffName))
 			
 			-- Check for stealth buffs (multi-language)
-			if string.find(nameLower, "prowl") or string.find(nameLower, "anschleichen") then
+			if strfind(nameLower, "prowl") or strfind(nameLower, "anschleichen") then
 				data.isStealthed = true
 				data.stealthType = "Prowl"
 				break
-			elseif string.find(nameLower, "stealth") or string.find(nameLower, "schleichen") then
+			elseif strfind(nameLower, "stealth") or strfind(nameLower, "schleichen") then
 				data.isStealthed = true
 				data.stealthType = "Stealth"
 				break
-			elseif string.find(nameLower, "shadowmeld") or string.find(nameLower, "schattenhaftigkeit") then
+			elseif strfind(nameLower, "shadowmeld") or strfind(nameLower, "schattenhaftigkeit") then
 				data.isStealthed = true
 				data.stealthType = "Shadowmeld"
 				break
@@ -436,7 +447,7 @@ function SpySW:ScanNearbyPlayers()
 			
 			if playerData then
 				playerData.guid = guid  -- Store GUID for debugging
-				table.insert(foundPlayers, playerData)
+				tinsert(foundPlayers, playerData)
 			end
 		end
 	end
@@ -459,6 +470,10 @@ function SpySW:CleanupOldGUIDs()
 				-- Remove from detectedPlayers
 				if self.detectedPlayers[name] then
 					self.detectedPlayers[name] = nil
+				end
+				-- Reset stealth state (so it can re-alert when player returns)
+				if self.lastStealthState[name] then
+					self.lastStealthState[name] = nil
 				end
 				-- ✅ WICHTIG: nameToGuid NICHT löschen!
 				-- Die Map bleibt persistent für Targeting, auch wenn Spieler außer Reichweite ist
@@ -531,116 +546,132 @@ scanFrame:SetScript("OnUpdate", function()
 					local isStealthCapable = (class == "ROGUE" or class == "DRUID" or race == "Night Elf")
 					
 					if isStealthCapable and Spy and Spy.AlertStealthPlayer then
-						if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-							DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[SpySW STEALTH-ONLY]|r " .. playerName .. " (" .. (playerData.stealthType or "Unknown") .. ")")
+						-- Check stealth state transition
+						local wasStealthed = SpySW.lastStealthState[playerName]
+						local isNowStealthed = true  -- We're in the isStealthed branch
+						
+						-- Only alert on transition: not-stealth → stealth
+						if not wasStealthed then
+							if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+								DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[SpySW STEALTH-ONLY]|r " .. playerName .. " (" .. (playerData.stealthType or "Unknown") .. ")")
+							end
+							Spy:AlertStealthPlayer(playerName)
 						end
-						Spy:AlertStealthPlayer(playerName)
+						
+						-- Update stealth state
+						SpySW.lastStealthState[playerName] = isNowStealthed
 					end
 				end
 			-- NORMAL MODE: Process all players
 			else
-			
-			-- Check if player was already detected by US (not by Spy)
-			if not SpySW.detectedPlayers[playerName] then
-				-- ✅ Check if player is on Ignore list
-				if SpyPerCharDB and SpyPerCharDB.IgnoreData and SpyPerCharDB.IgnoreData[playerName] then
-					-- Player is ignored, skip detection
-					if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-						DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW]|r IGNORED: " .. playerName .. " (on Ignore list)")
-					end
-					-- Mark as detected to prevent spam, but don't add to Spy
-					SpySW.detectedPlayers[playerName] = GetTime()
-				else
-					-- Player NOT ignored - proceed with normal detection
-					-- Debug output (uses Spy's debug system)
-					if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-						local stealthStatus = playerData.isStealthed and (" [" .. (playerData.stealthType or "STEALTH") .. "]") or ""
-						DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r NEW: " .. playerName .. " Lvl" .. level .. " " .. (playerData.class or "?") .. stealthStatus)
-						DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r   Race: " .. (playerData.race or "?") .. " | PvP: " .. tostring(IsPvPFlagged(playerData.guid)) .. " | Hostile: " .. tostring(IsHostile(playerData.guid)))
-						DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r   GUID: " .. tostring(playerData.guid))
-					end
-					
-					-- Update player data (creates entry if doesn't exist)
-					local detected = Spy:UpdatePlayerData(
-						playerName,
-						playerData.classToken,
-						level,
-						playerData.race,
-						playerData.guild,
-						true,  -- isEnemy
-						false  -- isGuess (SuperWoW has real data!)
-					)
-					
-					-- Always mark as detected (even if UpdatePlayerData failed) to prevent spam
-					SpySW.detectedPlayers[playerName] = GetTime()
-					
-					-- Add to detected list if player was successfully added
-					if detected and Spy.EnabledInZone then
-						SpySW.Stats.playersDetected = SpySW.Stats.playersDetected + 1
+				-- Check if player was already detected by US (not by Spy)
+				if not SpySW.detectedPlayers[playerName] then
+					-- Check if player is on Ignore list
+					if SpyPerCharDB and SpyPerCharDB.IgnoreData and SpyPerCharDB.IgnoreData[playerName] then
+						-- Player is ignored, skip detection
+						if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+							DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW]|r IGNORED: " .. playerName .. " (on Ignore list)")
+						end
+						-- Mark as detected to prevent spam, but don't add to Spy
+						SpySW.detectedPlayers[playerName] = GetTime()
+					else
+						-- Player NOT ignored - proceed with normal detection
+						-- Debug output (uses Spy's debug system)
+						if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+							local stealthStatus = playerData.isStealthed and (" [" .. (playerData.stealthType or "STEALTH") .. "]") or ""
+							DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r NEW: " .. playerName .. " Lvl" .. level .. " " .. (playerData.class or "?") .. stealthStatus)
+							DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r   Race: " .. (playerData.race or "?") .. " | PvP: " .. tostring(IsPvPFlagged(playerData.guid)) .. " | Hostile: " .. tostring(IsHostile(playerData.guid)))
+							DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r   GUID: " .. tostring(playerData.guid))
+						end
 						
-						Spy:AddDetected(
+						-- Update player data (creates entry if doesn't exist)
+						local detected = Spy:UpdatePlayerData(
 							playerName,
-							playerData.time,
-							false,  -- learnt (not from combat log parsing)
-							nil     -- source
+							playerData.classToken,
+							level,
+							playerData.race,
+							playerData.guild,
+							true,  -- isEnemy
+							false  -- isGuess (SuperWoW has real data!)
 						)
 						
-						-- Trigger stealth alert if player is stealthed
-						if playerData.isStealthed and Spy.AlertStealthPlayer then
-							-- ✅ FIX: Check battleground setting
-							local allowAlert = true
+						-- Always mark as detected (even if UpdatePlayerData failed) to prevent spam
+						SpySW.detectedPlayers[playerName] = GetTime()
+						
+						-- Add to detected list if player was successfully added
+						if detected and Spy.EnabledInZone then
+							SpySW.Stats.playersDetected = SpySW.Stats.playersDetected + 1
 							
-							if Spy.InInstance and not Spy.db.profile.EnabledInBattlegrounds then
-								allowAlert = false
-								if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-									DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW]|r Stealth alert skipped: Battlegrounds disabled")
-								end
-							end
+							Spy:AddDetected(
+								playerName,
+								playerData.time,
+								false,  -- learnt (not from combat log parsing)
+								nil     -- source
+							)
 							
-							-- ✅ FIX: Check PvP flag requirement
-							if allowAlert and Spy.db and Spy.db.profile and Spy.db.profile.DisableWhenPVPUnflagged then
-								if not UnitIsPVP("player") then
+							-- Trigger stealth alert if player is stealthed (only on state change)
+							local wasStealthed = SpySW.lastStealthState[playerName]
+							local isNowStealthed = playerData.isStealthed
+							
+							-- Alert only on transition: not-stealth → stealth
+							if isNowStealthed and not wasStealthed and Spy.AlertStealthPlayer then
+								-- Check battleground setting
+								local allowAlert = true
+								
+								if Spy.InInstance and not Spy.db.profile.EnabledInBattlegrounds then
 									allowAlert = false
-									if Spy.db.profile.DebugMode then
-										DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW]|r Stealth alert skipped: Player not PvP flagged")
+									if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+										DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW]|r Stealth alert skipped: Battlegrounds disabled")
 									end
 								end
+								
+								-- Check PvP flag requirement
+								if allowAlert and Spy.db and Spy.db.profile and Spy.db.profile.DisableWhenPVPUnflagged then
+									if not UnitIsPVP("player") then
+										allowAlert = false
+										if Spy.db.profile.DebugMode then
+											DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW]|r Stealth alert skipped: Player not PvP flagged")
+										end
+									end
+								end
+								
+								if allowAlert then
+									if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+										DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SpySW]|r ✓ STEALTH ALERT: " .. playerName .. " (" .. (playerData.stealthType or "Unknown") .. ")")
+									end
+									Spy:AlertStealthPlayer(playerName)
+								end
 							end
 							
-							if allowAlert then
-								if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-									DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SpySW]|r ✓ STEALTH ALERT: " .. playerName .. " (" .. (playerData.stealthType or "Unknown") .. ")")
-								end
-								Spy:AlertStealthPlayer(playerName)
-							end
+							-- Update stealth state for next scan
+							SpySW.lastStealthState[playerName] = isNowStealthed
+						end
+					end
+				else
+					-- Player already detected - update timestamp to keep them in Nearby list
+					-- Check if player is on Ignore list (even for already detected players)
+					if not (SpyPerCharDB and SpyPerCharDB.IgnoreData and SpyPerCharDB.IgnoreData[playerName]) then
+						Spy:UpdatePlayerData(
+							playerName,
+							playerData.classToken,
+							level,
+							playerData.race,
+							playerData.guild,
+							true,
+							false
+						)
+						
+						-- WICHTIG: Auch AddDetected aufrufen damit Spy den Timestamp updated
+						if Spy.EnabledInZone then
+							Spy:AddDetected(
+								playerName,
+								playerData.time,
+								false,
+								nil
+							)
 						end
 					end
 				end
-			else
-				-- Player already detected - update timestamp to keep them in Nearby list
-				-- ✅ Check if player is on Ignore list (even for already detected players)
-				if not (SpyPerCharDB and SpyPerCharDB.IgnoreData and SpyPerCharDB.IgnoreData[playerName]) then
-					Spy:UpdatePlayerData(
-						playerName,
-						playerData.classToken,
-						level,
-						playerData.race,
-						playerData.guild,
-						true,
-						false
-					)
-					
-					-- WICHTIG: Auch AddDetected aufrufen damit Spy den Timestamp updated
-					if Spy.EnabledInZone then
-						Spy:AddDetected(
-							playerName,
-							playerData.time,
-							false,
-							nil
-						)
-					end
-				end
-			end
 			end  -- end else (normal mode)
 		end  -- end for loop
 	end
@@ -843,9 +874,17 @@ function SpySW:OnUnitCastEvent(casterGUID, targetGUID, eventType, spellID, castD
 		end
 	end
 	
-	-- ✅ IMPORTANT: Alert about stealth cast
+	-- ✅ IMPORTANT: Alert about stealth cast (only on state transition)
 	if Spy and Spy.AlertStealthPlayer then
-		Spy:AlertStealthPlayer(playerName)
+		local wasStealthed = SpySW.lastStealthState[playerName]
+		
+		-- Only alert if player wasn't already stealthed
+		if not wasStealthed then
+			Spy:AlertStealthPlayer(playerName)
+		end
+		
+		-- Update stealth state
+		SpySW.lastStealthState[playerName] = true
 	end
 end
 
@@ -873,7 +912,7 @@ function SpySW:GetInfo()
 		guidCount = guidCount + 1
 	end
 	
-	return string.format("SuperWoW Active | Tracking %d GUIDs", guidCount)
+	return strformat("SuperWoW Active | Tracking %d GUIDs", guidCount)
 end
 
 function SpySW:PrintStatus()
@@ -1124,8 +1163,8 @@ SlashCmdList["SPYBUFF"] = function()
 		local texture = UnitBuff("target", i)
 		if texture then
 			count1 = count1 + 1
-			local texLower = string.lower(tostring(texture))
-			local isStealthBuff = string.find(texLower, "stealth") or string.find(texLower, "prowl") or string.find(texLower, "shadowmeld")
+			local texLower = strlower(tostring(texture))
+			local isStealthBuff = strfind(texLower, "stealth") or strfind(texLower, "prowl") or strfind(texLower, "shadowmeld")
 			local marker = isStealthBuff and " |cffff0000<-- STEALTH!|r" or ""
 			DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r   " .. i .. ": " .. tostring(texture) .. marker)
 		end
@@ -1140,8 +1179,8 @@ SlashCmdList["SPYBUFF"] = function()
 			local texture = UnitBuff(targetGuid, i)
 			if texture then
 				count2 = count2 + 1
-				local texLower = string.lower(tostring(texture))
-				local isStealthBuff = string.find(texLower, "stealth") or string.find(texLower, "prowl") or string.find(texLower, "shadowmeld")
+				local texLower = strlower(tostring(texture))
+				local isStealthBuff = strfind(texLower, "stealth") or strfind(texLower, "prowl") or strfind(texLower, "shadowmeld")
 				local marker = isStealthBuff and " |cffff0000<-- STEALTH!|r" or ""
 				DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r   " .. i .. ": " .. tostring(texture) .. marker)
 			end
@@ -1156,9 +1195,9 @@ SlashCmdList["SPYBUFF"] = function()
 		local name, rank, texture, stacks, dtype, timeleft = _G.UnitBuff("target", i)
 		if texture then
 			count3 = count3 + 1
-			local nameLower = name and string.lower(tostring(name)) or ""
-			local texLower = string.lower(tostring(texture))
-			local isStealthBuff = string.find(nameLower, "stealth") or string.find(nameLower, "prowl") or string.find(nameLower, "shadowmeld") or string.find(texLower, "stealth") or string.find(texLower, "prowl") or string.find(texLower, "shadowmeld")
+			local nameLower = name and strlower(tostring(name)) or ""
+			local texLower = strlower(tostring(texture))
+			local isStealthBuff = strfind(nameLower, "stealth") or strfind(nameLower, "prowl") or strfind(nameLower, "shadowmeld") or strfind(texLower, "stealth") or strfind(texLower, "prowl") or strfind(texLower, "shadowmeld")
 			local marker = isStealthBuff and " |cffff0000<-- STEALTH!|r" or ""
 			DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r   " .. i .. ": name=" .. tostring(name) .. " texture=" .. tostring(texture) .. marker)
 		end
@@ -1175,8 +1214,8 @@ SlashCmdList["SPYBUFF"] = function()
 			local icon = getglobal("TargetFrameBuff" .. i .. "Icon")
 			if icon then
 				local texture = icon:GetTexture()
-				local texLower = string.lower(tostring(texture))
-				local isStealthBuff = string.find(texLower, "stealth") or string.find(texLower, "prowl") or string.find(texLower, "shadowmeld")
+				local texLower = strlower(tostring(texture))
+				local isStealthBuff = strfind(texLower, "stealth") or strfind(texLower, "prowl") or strfind(texLower, "shadowmeld")
 				local marker = isStealthBuff and " |cffff0000<-- STEALTH!|r" or ""
 				DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r   " .. i .. ": " .. tostring(texture) .. marker)
 			end
@@ -1209,8 +1248,8 @@ SlashCmdList["SPYBUFF"] = function()
 				count6 = count6 + 1
 				local texture = pfUI.uf.target.buffs[i].texture:GetTexture()
 				if texture then
-					local texLower = string.lower(tostring(texture))
-					local isStealthBuff = string.find(texLower, "stealth") or string.find(texLower, "prowl") or string.find(texLower, "shadowmeld")
+					local texLower = strlower(tostring(texture))
+					local isStealthBuff = strfind(texLower, "stealth") or strfind(texLower, "prowl") or strfind(texLower, "shadowmeld")
 					local marker = isStealthBuff and " |cffff0000<-- STEALTH!|r" or ""
 					DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r   " .. i .. ": " .. tostring(texture) .. marker)
 				end
@@ -1229,8 +1268,8 @@ SlashCmdList["SPYBUFF"] = function()
 			local texture, stacks = pfUI.uf:DetectBuff("target", i)
 			if texture then
 				count7 = count7 + 1
-				local texLower = string.lower(tostring(texture))
-				local isStealthBuff = string.find(texLower, "stealth") or string.find(texLower, "prowl") or string.find(texLower, "shadowmeld")
+				local texLower = strlower(tostring(texture))
+				local isStealthBuff = strfind(texLower, "stealth") or strfind(texLower, "prowl") or strfind(texLower, "shadowmeld")
 				local marker = isStealthBuff and " |cffff0000<-- STEALTH!|r" or ""
 				DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r   " .. i .. ": " .. tostring(texture) .. marker)
 			end
@@ -1248,18 +1287,18 @@ SlashCmdList["SPYBUFF"] = function()
 		local buffName = ScanBuffName("target", i)
 		if buffName then
 			count8a = count8a + 1
-			local nameLower = string.lower(tostring(buffName))
-			local isStealthBuff = string.find(nameLower, "prowl") or 
-			                      string.find(nameLower, "stealth") or 
-			                      string.find(nameLower, "shadowmeld") or
-			                      string.find(nameLower, "schleichen") or
-			                      string.find(nameLower, "anschleichen")
+			local nameLower = strlower(tostring(buffName))
+			local isStealthBuff = strfind(nameLower, "prowl") or 
+			                      strfind(nameLower, "stealth") or 
+			                      strfind(nameLower, "shadowmeld") or
+			                      strfind(nameLower, "schleichen") or
+			                      strfind(nameLower, "anschleichen")
 			
 			local marker = isStealthBuff and " |cffff0000<-- STEALTH!|r" or ""
 			DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r   " .. i .. ": " .. tostring(buffName) .. marker)
 			
 			if isStealthBuff then
-				table.insert(stealthBuffs8a, buffName)
+				tinsert(stealthBuffs8a, buffName)
 			end
 		end
 	end
@@ -1274,18 +1313,18 @@ SlashCmdList["SPYBUFF"] = function()
 			local buffName = ScanBuffName(targetGuid, i)
 			if buffName then
 				count8b = count8b + 1
-				local nameLower = string.lower(tostring(buffName))
-				local isStealthBuff = string.find(nameLower, "prowl") or 
-				                      string.find(nameLower, "stealth") or 
-				                      string.find(nameLower, "shadowmeld") or
-				                      string.find(nameLower, "schleichen") or
-				                      string.find(nameLower, "anschleichen")
+				local nameLower = strlower(tostring(buffName))
+				local isStealthBuff = strfind(nameLower, "prowl") or 
+				                      strfind(nameLower, "stealth") or 
+				                      strfind(nameLower, "shadowmeld") or
+				                      strfind(nameLower, "schleichen") or
+				                      strfind(nameLower, "anschleichen")
 				
 				local marker = isStealthBuff and " |cffff0000<-- STEALTH!|r" or ""
 				DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r   " .. i .. ": " .. tostring(buffName) .. marker)
 				
 				if isStealthBuff then
-					table.insert(stealthBuffs8b, buffName)
+					tinsert(stealthBuffs8b, buffName)
 				end
 			end
 		end
@@ -1304,18 +1343,18 @@ SlashCmdList["SPYBUFF"] = function()
 			local buffName = ScanBuffName("mouseover", i)
 			if buffName then
 				count8c = count8c + 1
-				local nameLower = string.lower(tostring(buffName))
-				local isStealthBuff = string.find(nameLower, "prowl") or 
-				                      string.find(nameLower, "stealth") or 
-				                      string.find(nameLower, "shadowmeld") or
-				                      string.find(nameLower, "schleichen") or
-				                      string.find(nameLower, "anschleichen")
+				local nameLower = strlower(tostring(buffName))
+				local isStealthBuff = strfind(nameLower, "prowl") or 
+				                      strfind(nameLower, "stealth") or 
+				                      strfind(nameLower, "shadowmeld") or
+				                      strfind(nameLower, "schleichen") or
+				                      strfind(nameLower, "anschleichen")
 				
 				local marker = isStealthBuff and " |cffff0000<-- STEALTH!|r" or ""
 				DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r   " .. i .. ": " .. tostring(buffName) .. marker)
 				
 				if isStealthBuff then
-					table.insert(stealthBuffs8c, buffName)
+					tinsert(stealthBuffs8c, buffName)
 				end
 			end
 		end
@@ -1326,12 +1365,12 @@ SlashCmdList["SPYBUFF"] = function()
 	
 	-- Summary
 	local allStealthBuffs = {}
-	for _, buff in ipairs(stealthBuffs8a) do table.insert(allStealthBuffs, "8a:" .. buff) end
-	for _, buff in ipairs(stealthBuffs8b) do table.insert(allStealthBuffs, "8b:" .. buff) end
-	for _, buff in ipairs(stealthBuffs8c) do table.insert(allStealthBuffs, "8c:" .. buff) end
+	for _, buff in ipairs(stealthBuffs8a) do tinsert(allStealthBuffs, "8a:" .. buff) end
+	for _, buff in ipairs(stealthBuffs8b) do tinsert(allStealthBuffs, "8b:" .. buff) end
+	for _, buff in ipairs(stealthBuffs8c) do tinsert(allStealthBuffs, "8c:" .. buff) end
 	
-	if table.getn(allStealthBuffs) > 0 then
-		DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SpySW]|r ✓ STEALTH DETECTED: " .. table.concat(allStealthBuffs, ", "))
+	if tgetn(allStealthBuffs) > 0 then
+		DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SpySW]|r ✓ STEALTH DETECTED: " .. tconcat(allStealthBuffs, ", "))
 	end
 	
 	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r === TEST COMPLETE ===")

@@ -2,7 +2,10 @@ SpyData = Spy:NewModule("SpyData")
 local L = LibStub("AceLocale-3.0"):GetLocale("Spy", true)
 
 local Spy = Spy
+
+-- Performance: Cache global functions as locals
 local getn = table.getn
+local tsort = table.sort
 local bor = bit.bor
 local band = bit.band
 local time = time
@@ -206,7 +209,7 @@ do -- SpyData:SortPlayersByTime()
         end
 
         for j = i, getn(cache) do cache[j] = nil end
-        table.sort(cache, sorter)
+        tsort(cache, sorter)
     end
 end
 
@@ -230,7 +233,7 @@ do -- SpyData:GetPlayers() - Iterators
         end
 
         for j = i, getn(cache) do cache[j] = nil end
-        table.sort(cache, sorters[sortBy])
+        tsort(cache, sorters[sortBy])
     end
 
     local function iterator(data, index)

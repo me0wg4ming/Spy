@@ -6,7 +6,11 @@ local wipe = AceCore.wipe
 local Spy = Spy
 local Data = SpyData
 
+-- Performance: Cache global functions as locals
 local getn = table.getn
+local tinsert = table.insert
+local strlower = string.lower
+local strfind = string.find
 local _G = getfenv()
 local GUI = {}
 local units = {
@@ -82,7 +86,7 @@ function SpyStats:OnInitialize()
     SpyStatsWinsLosesCheckboxText:SetText(L["Won/Lost"])
     SpyStatsReasonCheckboxText:SetText(L["Reason"])
 
-    table.insert(UISpecialFrames, "SpyStatsFrame")
+    tinsert(UISpecialFrames, "SpyStatsFrame")
 end
 
 function SpyStats:OnDisable()
@@ -188,14 +192,14 @@ function SpyStats:Filter()
 				nameMatch = true
 			else
 				if unit.name then
-					local lowerName = string.lower(unit.name)
-					local lowerFilter = string.lower(filter)
-					nameMatch = string.find(lowerName, lowerFilter, 1, true) == 1
+					local lowerName = strlower(unit.name)
+					local lowerFilter = strlower(filter)
+					nameMatch = strfind(lowerName, lowerFilter, 1, true) == 1
 				end
 				if unit.guild then
-					local lowerGuild = string.lower(unit.guild)
-					local lowerFilter = string.lower(filter)
-					guildMatch = string.find(lowerGuild, lowerFilter, 1, true) == 1
+					local lowerGuild = strlower(unit.guild)
+					local lowerFilter = strlower(filter)
+					guildMatch = strfind(lowerGuild, lowerFilter, 1, true) == 1
 				end
 			end
 

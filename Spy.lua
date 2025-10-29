@@ -12,7 +12,7 @@ local strsplit, strtrim = AceCore.strsplit, AceCore.strtrim
 local format, strfind, strsub, find = string.format, string.find, string.sub, string.find
 
 Spy = LibStub("AceAddon-3.0"):NewAddon("Spy", "AceConsole-3.0", "AceEvent-3.0", "AceComm-3.0", "AceTimer-3.0")
-Spy.Version = "3.9.3"
+Spy.Version = "3.9.4"
 Spy.DatabaseVersion = "1.1"
 Spy.Signature = "[Spy]"
 Spy.MaximumPlayerLevel = 60
@@ -1685,6 +1685,39 @@ function Spy:OnEnable(first)
 		end
 	end
 	
+	-- ✅ FIX Bug 1: Only initialize if Enabled OR if Stealth-Only mode is active
+	local stealthOnlyMode = Spy.db.profile.WarnOnStealthEvenIfDisabled and not Spy.db.profile.Enabled
+	
+	if not Spy.db.profile.Enabled and not stealthOnlyMode then
+		if Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy]|r OnEnable called but Enabled=false and no Stealth-Only mode, skipping")
+		end
+		return
+	end
+	
+	-- ✅ FIX Bug 2: Clear all lists on startup if in Stealth-Only mode
+	-- This prevents Nearby list from showing when Spy is disabled after reload
+	if stealthOnlyMode then
+		-- Clear SpySW detected players cache
+		if SpySW and SpySW.detectedPlayers then
+			for k in pairs(SpySW.detectedPlayers) do
+				SpySW.detectedPlayers[k] = nil
+			end
+		end
+		
+		-- Clear Spy's internal lists (these are loaded from SavedVariables!)
+		Spy.NearbyList = {}
+		Spy.ActiveList = {}
+		Spy.InactiveList = {}
+		Spy.LastHourList = {}
+		Spy.PlayerCommList = {}
+		Spy.ListAmountDisplayed = 0
+		
+		if Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy]|r Cleared all lists on startup (Stealth-Only mode)")
+		end
+	end
+	
 	Spy.timeid = Spy:ScheduleRepeatingTimer("ManageExpirations", 10, 1, true)
 	Spy:RegisterEvent("ZONE_CHANGED", "ZoneChangedEvent")
 	Spy:RegisterEvent("ZONE_CHANGED_NEW_AREA", "ZoneChangedEvent")
@@ -1719,9 +1752,18 @@ function Spy:OnEnable(first)
 	Spy.uc.RegisterCallback(self, "Hit", "CombatLogEvent")
 	Spy.uc.RegisterCallback(self, "Death", "DeathLog")
 	]]
-	Spy.IsEnabled = true
-	if not Spy:TimerStatus(Spy.initTimer) then
-		Spy:RefreshCurrentList()
+	
+	-- ✅ FIX Bug 2: Don't set IsEnabled=true in Stealth-Only mode
+	-- This prevents RefreshCurrentList from being called
+	if not stealthOnlyMode then
+		Spy.IsEnabled = true
+		if not Spy:TimerStatus(Spy.initTimer) then
+			Spy:RefreshCurrentList()
+		end
+	else
+		if Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy]|r Stealth-Only mode: IsEnabled stays false, no list refresh")
+		end
 	end
 end
 
@@ -1737,6 +1779,17 @@ function Spy:OnDisable()
 	-- Disable SuperWoW if it was active
 	if Spy.HasSuperWoW and Spy.SuperWoW then
 		Spy.SuperWoW:Disable()
+	end
+	
+	-- ✅ FIX Bug 2: Clear detectedPlayers when disabling Spy
+	-- This prevents players from showing in Nearby list when Spy is disabled
+	if SpySW and SpySW.detectedPlayers then
+		for k in pairs(SpySW.detectedPlayers) do
+			SpySW.detectedPlayers[k] = nil
+		end
+		if Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy]|r Cleared detectedPlayers on disable")
+		end
 	end
 	
 	Spy:UnregisterEvent("ZONE_CHANGED")
@@ -1883,7 +1936,11 @@ function Spy:OnInitialize()
 		Spy:SetBarTextures(Spy.db.profile.BarTexture)
 	end
 
-	Spy:RefreshCurrentList()
+	-- ✅ FIX Bug 2: Don't refresh list on init if Spy is disabled
+	-- This prevents Nearby list from being populated before OnEnable clears it
+	if Spy.db.profile.Enabled then
+		Spy:RefreshCurrentList()
+	end
 
 	Spy:LockWindows(Spy.db.profile.Locked)
 	--	ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", Spy.FilterNotInParty)
@@ -1923,9 +1980,16 @@ function Spy:ZoneChangedEvent()
 	end
 
 	if Spy.EnabledInZone then
-		if not Spy.db.profile.HideSpy then
-			Spy.MainWindow:Show()
-			Spy:RefreshCurrentList()
+		-- ✅ FIX Bug 2: Only show window and refresh if Spy is actually enabled
+		-- Don't show Nearby list in Stealth-Only mode
+		if Spy.db.profile.Enabled then
+			if not Spy.db.profile.HideSpy then
+				Spy.MainWindow:Show()
+				Spy:RefreshCurrentList()
+			end
+		else
+			-- Stealth-Only mode: Hide window even if EnabledInZone is true
+			Spy.MainWindow:Hide()
 		end
 	else
 		Spy.MainWindow:Hide()
@@ -1968,7 +2032,7 @@ function Spy:DeathLogEvent()
 	local playerName = UnitName("player")
 	
 	-- Pattern: "You have slain PlayerName!"
-	local _, _, victim = string.find(message, "You have slain (.+)!")
+	local _, _, victim = strfind(message, "You have slain (.+)!")
 	if victim then
 		local playerData = SpyPerCharDB.PlayerData[victim]
 		if playerData then
@@ -1982,7 +2046,7 @@ function Spy:DeathLogEvent()
 	end
 	
 	-- Pattern: "You are slain by PlayerName!"
-	local _, _, killer = string.find(message, "You are slain by (.+)!")
+	local _, _, killer = strfind(message, "You are slain by (.+)!")
 	if not killer and Spy.LastAttack then
 		-- Fallback: use LastAttack if no killer found in message
 		killer = Spy.LastAttack
@@ -1990,7 +2054,7 @@ function Spy:DeathLogEvent()
 	
 	if killer then
 		-- If killer is a GUID, try to resolve to name
-		if string.find(tostring(killer), "0x") and SpySW and SpySW.GetNameFromGUID then
+		if strfind(tostring(killer), "0x") and SpySW and SpySW.GetNameFromGUID then
 			local resolvedName = SpySW:GetNameFromGUID(killer)
 			if resolvedName then
 				killer = resolvedName
@@ -2022,27 +2086,27 @@ function Spy:RawCombatLogEvent()
 	end
 	
 	-- Skip self-damage (Hellfire, Life Tap, etc)
-	if eventText and (string.find(eventText, "You suffer") or string.find(eventText, "your own")) then
+	if eventText and (strfind(eventText, "You suffer") or strfind(eventText, "your own")) then
 		return
 	end
 	
 	-- Only use RAW parsing if LastAttack is not already set or is a GUID
-	if Spy.LastAttack and not string.find(tostring(Spy.LastAttack), "0x") then
+	if Spy.LastAttack and not strfind(tostring(Spy.LastAttack), "0x") then
 		return
 	end
 	
-	if eventText and (string.find(eventText, "hits you") or string.find(eventText, "damage from") or string.find(eventText, "crits you")) then
+	if eventText and (strfind(eventText, "hits you") or strfind(eventText, "damage from") or strfind(eventText, "crits you")) then
 		local attacker = nil
 		
 		-- Pattern 1: "Name's Spell hits you for X"
-		local _, _, name = string.find(eventText, "^(.+)'s .+ hits you")
+		local _, _, name = strfind(eventText, "^(.+)'s .+ hits you")
 		if name then
 			attacker = name
 		end
 		
 		-- Pattern 2: "Name hits you for X"
 		if not attacker then
-			_, _, name = string.find(eventText, "^(.+) hits you for")
+			_, _, name = strfind(eventText, "^(.+) hits you for")
 			if name then
 				attacker = name
 			end
@@ -2050,7 +2114,7 @@ function Spy:RawCombatLogEvent()
 		
 		-- Pattern 3: "You suffer X damage from Name's Spell"
 		if not attacker then
-			_, _, name = string.find(eventText, "damage from (.+)'s")
+			_, _, name = strfind(eventText, "damage from (.+)'s")
 			if name then
 				attacker = name
 			end
@@ -2058,13 +2122,13 @@ function Spy:RawCombatLogEvent()
 		
 		-- Pattern 4: "Name crits you for X"
 		if not attacker then
-			_, _, name = string.find(eventText, "^(.+) crits you")
+			_, _, name = strfind(eventText, "^(.+) crits you")
 			if name then
 				attacker = name
 			end
 		end
 		
-		if attacker and attacker ~= playerName and not string.find(attacker, "0x") then
+		if attacker and attacker ~= playerName and not strfind(attacker, "0x") then
 			Spy.LastAttack = attacker
 			if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 				DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy Debug]|r ✓ LastAttack set to: " .. tostring(attacker))

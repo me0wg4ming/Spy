@@ -16,7 +16,10 @@ local TYPE_FONT = 5
 local Cur_Branch
 local Cur_Name
 local TempColor = {}
+
+-- Performance: Cache global functions as locals
 local tgetn = table.getn
+local tinsert = table.insert
 local function Color_Change()
 	local r, g, b = ColorPickerFrame:GetColorRGB()
 
@@ -167,8 +170,8 @@ function Colors:RegisterFunction(Branch, Name, Func, Pass)
 		ColorMultiplier[Branch][Name] = {}
 	end
 
-	table.insert(ItemsToUpdate[Branch][Name], {Func, Pass})
-	table.insert(TypeToUpdate[Branch][Name], TYPE_FUNC)
+	tinsert(ItemsToUpdate[Branch][Name], {Func, Pass})
+	tinsert(TypeToUpdate[Branch][Name], TYPE_FUNC)
 end
 
 function Colors:RegisterTexture(Branch, Name, Texture, Multi)
@@ -207,8 +210,8 @@ function Colors:RegisterTexture(Branch, Name, Texture, Multi)
 	end
 
 	local entry = tgetn(ItemsToUpdate[Branch][Name])+1
-	table.insert(ItemsToUpdate[Branch][Name], Texture)
-	table.insert(TypeToUpdate[Branch][Name], TYPE_TEXTURE)
+	tinsert(ItemsToUpdate[Branch][Name], Texture)
+	tinsert(TypeToUpdate[Branch][Name], TYPE_TEXTURE)
 
 	if Multi then
 		ColorMultiplier[Branch][Name][entry] = Multi
@@ -235,8 +238,8 @@ function Colors:RegisterBorder(Branch, Name, frame)
 		ColorMultiplier[Branch][Name] = {}
 	end
 
-	table.insert(ItemsToUpdate[Branch][Name], frame)
-	table.insert(TypeToUpdate[Branch][Name], TYPE_BORDER)
+	tinsert(ItemsToUpdate[Branch][Name], frame)
+	tinsert(TypeToUpdate[Branch][Name], TYPE_BORDER)
 end
 
 function Colors:RegisterBackground(Branch, Name, frame)
@@ -259,8 +262,8 @@ function Colors:RegisterBackground(Branch, Name, frame)
 		ColorMultiplier[Branch][Name] = {}
 	end
 
-	table.insert(ItemsToUpdate[Branch][Name], frame)
-	table.insert(TypeToUpdate[Branch][Name], TYPE_BACKGROUND)
+	tinsert(ItemsToUpdate[Branch][Name], frame)
+	tinsert(TypeToUpdate[Branch][Name], TYPE_BACKGROUND)
 end
 
 function Colors:RegisterFont(Branch, Name, frame)
@@ -283,8 +286,8 @@ function Colors:RegisterFont(Branch, Name, frame)
 		ColorMultiplier[Branch][Name] = {}
 	end
 
-	table.insert(ItemsToUpdate[Branch][Name], frame)
-	table.insert(TypeToUpdate[Branch][Name], TYPE_FONT)
+	tinsert(ItemsToUpdate[Branch][Name], frame)
+	tinsert(TypeToUpdate[Branch][Name], TYPE_FONT)
 end
 
 function Colors:EditColor(Branch, Name, Attach)
