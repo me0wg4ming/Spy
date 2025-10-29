@@ -75,7 +75,7 @@
     <FontString name="SpyStatsReasonTemplate" inherits="SpyStatsStringTemplate" virtual="true">
 	<Anchors>
 			<Anchor point="LEFT" relativeTo="$parentLoses" relativePoint="RIGHT">
-                <Offset x="8" y="0" />
+                <Offset x="12" y="0" />
             </Anchor>
         </Anchors>
         <Size x="250" y="15" />
@@ -208,7 +208,7 @@
     <Button name="SpyStatsZoneSortTemplate" inherits="SpyStatsSortButtonTemplate" text="ZONE" virtual="true">
         <Anchors>
         <Anchor point="LEFT" relativeTo="SpyStatsPlayersGuildSort" relativePoint="RIGHT"> 
-                <Offset x="350" y="0" />  				
+                <Offset x="341" y="0" />  				
             </Anchor>
         </Anchors>
         <Size>

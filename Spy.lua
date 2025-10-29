@@ -809,11 +809,24 @@ Spy.options = {
 					order = 2,
 					inline = true,
 					args = {
+						Always = {
+							name = L["Always"],
+							desc = L["AlwaysDescription"],
+							type = "toggle",
+							order = 1,
+							get = function(info)
+								return Spy.db.profile.RemoveUndetected == "Always"
+							end,
+							set = function(info, value)
+								Spy.db.profile.RemoveUndetected = "Always"
+								Spy:UpdateTimeoutSettings()
+							end,
+						},
 						OneMinute = {
 							name = L["1Min"],
 							desc = L["1MinDescription"],
 							type = "toggle",
-							order = 1,
+							order = 2,
 							get = function(info)
 								return Spy.db.profile.RemoveUndetected == "OneMinute"
 							end,
@@ -826,7 +839,7 @@ Spy.options = {
 							name = L["2Min"],
 							desc = L["2MinDescription"],
 							type = "toggle",
-							order = 2,
+							order = 3,
 							get = function(info)
 								return Spy.db.profile.RemoveUndetected == "TwoMinutes"
 							end,
@@ -839,7 +852,7 @@ Spy.options = {
 							name = L["5Min"],
 							desc = L["5MinDescription"],
 							type = "toggle",
-							order = 3,
+							order = 4,
 							get = function(info)
 								return Spy.db.profile.RemoveUndetected == "FiveMinutes"
 							end,
@@ -852,7 +865,7 @@ Spy.options = {
 							name = L["10Min"],
 							desc = L["10MinDescription"],
 							type = "toggle",
-							order = 4,
+							order = 5,
 							get = function(info)
 								return Spy.db.profile.RemoveUndetected == "TenMinutes"
 							end,
@@ -865,7 +878,7 @@ Spy.options = {
 							name = L["15Min"],
 							desc = L["15MinDescription"],
 							type = "toggle",
-							order = 5,
+							order = 6,
 							get = function(info)
 								return Spy.db.profile.RemoveUndetected == "FifteenMinutes"
 							end,
@@ -878,7 +891,7 @@ Spy.options = {
 							name = L["Never"],
 							desc = L["NeverDescription"],
 							type = "toggle",
-							order = 6,
+							order = 7,
 							get = function(info)
 								return Spy.db.profile.RemoveUndetected == "Never"
 							end,
@@ -1295,7 +1308,7 @@ local Default_Profile = {
 		EnableSound = true,
 		OnlySoundKoS = false,
 		StopAlertsOnTaxi = true,
-		RemoveUndetected = "OneMinute",
+		RemoveUndetected = "Always",
 		ShowNearbyList = true,
 		PrioritiseKoS = true,
 		PurgeData = "NinetyDays",
@@ -1595,7 +1608,10 @@ function Spy:InitDBIcon()
 end
 
 function Spy:UpdateTimeoutSettings()
-	if not Spy.db.profile.RemoveUndetected or Spy.db.profile.RemoveUndetected == "OneMinute" then
+	if not Spy.db.profile.RemoveUndetected or Spy.db.profile.RemoveUndetected == "Always" then
+		Spy.ActiveTimeout = 1
+		Spy.InactiveTimeout = 0.1
+	elseif Spy.db.profile.RemoveUndetected == "OneMinute" then
 		Spy.ActiveTimeout = 5
 		Spy.InactiveTimeout = 60
 	elseif Spy.db.profile.RemoveUndetected == "TwoMinutes" then
