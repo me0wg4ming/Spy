@@ -986,7 +986,7 @@ function SpySW:Initialize()
             SLASH_SPYDEBUG1 = "/spydebug"
             SlashCmdList["SPYDEBUG"] = showDisabledMessage
 
-			-- Block debug commands
+			-- Block event commands
             SLASH_SPYEVENT1 = "/spyevent"
             SlashCmdList["SPYEVENT"] = showDisabledMessage
             
