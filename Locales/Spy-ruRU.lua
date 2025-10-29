@@ -163,6 +163,9 @@ L["OnlySoundKoSDescription"] = "Воспроизводить звуковые о
 L["StopAlertsOnTaxi"] = "отключить оповещения, когда на пути полета"
 L["StopAlertsOnTaxiDescription"] = "отключить все новые оповещения, когда на пути полета."
 
+L["SoundEnabled"] = "Звук включен"
+L["SoundDisabled"] = "Звук выключен"
+
 -- Nearby List
 L["ListOptions"] = "Nearby List"
 L["ListOptionsDescription"] = [[

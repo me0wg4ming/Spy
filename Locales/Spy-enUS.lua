@@ -171,6 +171,9 @@ L["OnlySoundKoSDescription"] = "Set this to only play audio alerts when enemy pl
 L["StopAlertsOnTaxi"] = "Turn off alerts while on a flight path"
 L["StopAlertsOnTaxiDescription"] = "Stop all new alerts and warnings while on a flight path."
 
+L["SoundEnabled"] = "Sound enabled"
+L["SoundDisabled"] = "Sound disabled"
+
 L["ListOptions"] = "Nearby List"
 L["ListOptionsDescription"] = [[
 You can configure how Spy adds and removes enemy players to and from the Nearby list.
