@@ -20,7 +20,16 @@
 
 ---
 
-## 🚀 What's New in Version 3.9.4
+## 🚀 What's New in Version 3.9.5
+
+### 🐛 Major Bugfixes (October 29, 2025)
+
+- ✅ **Fixed Stealth State Tracking** - Stealth state now resets properly when buffs fade
+- ✅ **Fixed Nearby List Timestamps** - Players no longer get grayed out/removed while actively casting
+- ✅ **Fixed Duplicate Alerts** - Consecutive stealth casts (Prowl → Shadowmeld) now trigger alerts correctly
+- ✅ **Added Combat Log GUID Extraction** - Improved player tracking even when only GUID is visible in combat log
+- ✅ **Fixed detectedPlayers Cleanup** - Now uses 60-second timeout instead of immediate removal
+- ✅ **Removed Duplicate Detection Messages** - No more spam of "NEW" messages for already-detected players
 
 ### Major Features
 
@@ -604,8 +613,8 @@ A: Fixed in 3.9.3, update to latest version.
 
 ---
 
-**Version:** 3.9.3  
-**Release Date:** October 2025  
+**Version:** 3.9.4  
+**Release Date:** October 29, 2025  
 **Compatibility:** World of Warcraft 1.12.1 (Vanilla)  
 **Requirement:** SuperWoW 1.12.1+  
 **Status:** Stable & Production-Ready  
