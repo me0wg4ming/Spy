@@ -823,13 +823,7 @@ function SpySW:OnUnitCastEvent(casterGUID, targetGUID, eventType, spellID, castD
 	
 	-- Check if it's a Stealth spell
 	local stealthType = self.STEALTH_SPELL_IDS[spellID]
-	-- ✅ DEBUG
-	if spellID == 20580 then
-		local realSpellName, rank = SpellInfo(spellID)
-		DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[DEBUG]|r Shadowmeld detected!")
-		DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[DEBUG]|r   stealthType from table: " .. tostring(stealthType))
-		DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[DEBUG]|r   realSpellName from SpellInfo: " .. tostring(realSpellName))
-	end
+	
 	if not stealthType then
 		return
 	end
