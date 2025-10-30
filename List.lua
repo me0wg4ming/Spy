@@ -501,10 +501,6 @@ function Spy:AlertPlayer(player, source)
 				PlaySoundFile("Interface\\AddOns\\Spy\\Sounds\\detected-nearby.wav")
 			end
 		end
-	elseif Spy.db.profile.EnableSound and not Spy.db.profile.OnlySoundKoS then
-		if source == nil or source == Spy.CharacterName then
-			PlaySoundFile("Interface\\AddOns\\Spy\\Sounds\\detected-nearby.wav")
-		end
 	end
 end
 
@@ -1007,39 +1003,6 @@ function Spy:ParseUnitAbility(analyseSpell, event, player, spellName) --player, 
 		return learnt, playerData
 	end
 	return learnt, nil
-end
-
-function Spy:ParseUnitDetails(player, class, level, race, zone, subZone, mapX, mapY, guild)
-	if player then
-		local playerData = SpyPerCharDB.PlayerData[player]
-		if not playerData then
-			playerData = Spy:AddPlayerData(player, class, level, race, guild, true, true)
-		else
-			if not playerData.class then playerData.class = class end
-			if level then
-				local levelNumber = tonumber(level)
-				if type(levelNumber) == "number" then
-					if playerData.level then
-						local playerLevelNumber = tonumber(playerData.level)
-						if type(playerLevelNumber) == "number" and playerLevelNumber < levelNumber then playerData.level = levelNumber end
-					else
-						playerData.level = levelNumber
-					end
-				end
-			end
-			if not playerData.race then playerData.race = race end
-			if not playerData.guild then playerData.guild = guild end
-		end
-		playerData.isEnemy = true
-		playerData.time = time()
-		playerData.zone = zone
-		playerData.subZone = subZone
-		playerData.mapX = mapX
-		playerData.mapY = mapY
-
-		return true, playerData
-	end
-	return true, nil
 end
 
 function Spy:AddDetected(player, timestamp, learnt, source)
