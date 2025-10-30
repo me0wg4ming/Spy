@@ -2110,7 +2110,7 @@ function Spy:RawCombatLogEvent()
 	-- ✅ GUID Extractor for SuperWoW
 	if SpySW and eventText then
 		-- Look for GUID pattern: 0x followed by 16 hex digits
-		local guid = string.match(eventText, "(0x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x)")
+		local _, _, guid = strfind(eventText, "(0x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x)")
 		
 		if guid and UnitExists(guid) and UnitIsPlayer(guid) then
 			-- Add GUID to tracking
