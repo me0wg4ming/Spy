@@ -1152,7 +1152,7 @@ Spy.optionsSlash = {
 			order = 7,
 			pattern = ".", -- Changed so names with special characters can be added
 			set = function(info, value)
-				if Spy_IgnoreList[value] or strmatch(value, "[%s%d]+") then
+				if Spy_IgnoreList[value] or strfind(value, "[%s%d]+") then
 					DEFAULT_CHAT_FRAME:AddMessage(value .. " - " .. L["InvalidInput"])
 				else
 					Spy:ToggleKOSPlayer(not SpyPerCharDB.KOSData[value], value)
@@ -1167,7 +1167,7 @@ Spy.optionsSlash = {
 			order = 8,
 			pattern = ".",
 			set = function(info, value)
-				if Spy_IgnoreList[value] or strmatch(value, "[%s%d]+") then
+				if Spy_IgnoreList[value] or strfind(value, "[%s%d]+") then
 					DEFAULT_CHAT_FRAME:AddMessage(value .. " - " .. L["InvalidInput"])
 				else
 					Spy:ToggleIgnorePlayer(not SpyPerCharDB.IgnoreData[value], value)
