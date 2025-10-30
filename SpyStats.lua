@@ -263,7 +263,11 @@ function SpyStats:Refresh()
                 name:SetTextColor(r, g, b)
 
                 local level = GUI.ListFrameFields[view][row]["Level"]
-                level:SetText(unit.level)
+                local levelText = unit.level
+                if levelText == 0 then
+                    levelText = "??"
+                end
+                level:SetText(levelText)
                 level:SetTextColor(r, g, b)
 
                 local class = GUI.ListFrameFields[view][row]["Class"]

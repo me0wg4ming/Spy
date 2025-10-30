@@ -2202,12 +2202,19 @@ function Spy:CommReceived(prefix, message, distribution, source)
 					else
 						class = nil
 					end
+					-- ✅ FIXED Level validation (ca. Zeile 24-33 in deinem CommReceived Code)
 					if strlen(level) > 0 then
 						level = tonumber(level)
 						if type(level) == "number" then
-							if level < 1 or level > Spy.MaximumPlayerLevel or math.floor(level) ~= level then
+							-- Accept level 0 and -1 (both mean "??")
+							if level < -1 or level > Spy.MaximumPlayerLevel or (level > 0 and math.floor(level) ~= level) then
 								return
 							end
+							-- ✅ Konvertiere negative Level zu 0 (= "??")
+							if level < 0 then
+								level = 0
+							end
+							-- ✅ Level 0 bleibt jetzt 0 (wird nicht zu nil)
 						else
 							return
 						end
@@ -2277,6 +2284,65 @@ function Spy:CommReceived(prefix, message, distribution, source)
 			end
 		end
 	end
+end
+
+function Spy:ParseUnitDetails(name, class, level, race, zone, subZone, mapX, mapY, guild)
+	if not name then return false, nil end
+	
+	-- Get or create player data
+	if not SpyPerCharDB.PlayerData[name] then
+		SpyPerCharDB.PlayerData[name] = {}
+	end
+	
+	local playerData = SpyPerCharDB.PlayerData[name]
+	local learnt = false
+	
+	-- Update class (only if new data available)
+	if class and not playerData.class then
+		playerData.class = class
+		learnt = true
+	end
+	
+	-- ✅ Update level (auch 0 akzeptieren für "??")
+	if level ~= nil and not playerData.level then
+		-- Level 0 = "??" (zu hoch/zu niedrig)
+		playerData.level = level
+		learnt = true
+	end
+	
+	-- Update race (only if new data available)
+	if race and not playerData.race then
+		playerData.race = race
+		learnt = true
+	end
+	
+	-- Update guild (only if new data available)
+	if guild and not playerData.guild then
+		playerData.guild = guild
+		learnt = true
+	end
+	
+	-- Always update location and timestamp
+	if zone then
+		playerData.zone = zone
+	end
+	if subZone then
+		playerData.subZone = subZone
+	end
+	if mapX then
+		playerData.mapX = mapX
+	end
+	if mapY then
+		playerData.mapY = mapY
+	end
+	
+	-- Set timestamp
+	playerData.time = time()
+	
+	-- Set isEnemy flag (important for filtering)
+	playerData.isEnemy = true
+	
+	return learnt, playerData
 end
 
 function Spy:VersionCheck(version1, version2)
