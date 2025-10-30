@@ -383,7 +383,11 @@ function Spy_CreateStatsDropdown(level)
         info.notCheckable = true
         UIDropDownMenu_AddButton(info, level)
     
-        if not unit.kos then
+        -- ✅ Check if player is on Ignore list
+        local isIgnored = SpyPerCharDB.IgnoreData[unit.name]
+        
+        if not unit.kos and not isIgnored then
+            -- ✅ Normal player - show both Add KOS and Add Ignore
             wipe(info)
             info.isTitle = nil
             info.notCheckable = true
@@ -391,6 +395,19 @@ function Spy_CreateStatsDropdown(level)
             info.disabled = nil
             info.text = L["AddToKOSList"]
             info.func = function() Spy:ToggleKOSPlayer(true, unit.name) end
+            info.value = nil
+            UIDropDownMenu_AddButton(info, level)
+            
+            wipe(info)
+            info.isTitle = nil
+            info.notCheckable = true
+            info.hasArrow = false
+            info.disabled = nil
+            info.text = L["AddToIgnoreList"]
+            info.func = function() 
+                Spy:ToggleIgnorePlayer(true, unit.name)
+                SpyStats:Recalulate()
+            end
             info.value = nil
             UIDropDownMenu_AddButton(info, level)
     
@@ -406,7 +423,8 @@ function Spy_CreateStatsDropdown(level)
             info.value = nil
             UIDropDownMenu_AddButton(info, level)
     
-        else
+        elseif unit.kos then
+            -- ✅ KOS player - show only KOS options, NO Ignore
             wipe(info)
             info.notCheckable = true
             info.text = L["KOSReasonDropDownMenu"]
@@ -424,7 +442,33 @@ function Spy_CreateStatsDropdown(level)
             info.func = function() Spy:ToggleKOSPlayer(false, unit.name) end
             info.value = nil
             UIDropDownMenu_AddButton(info, level)
-    
+            
+        elseif isIgnored then
+            -- ✅ Ignored player - show only Remove Ignore, NO KOS
+            wipe(info)
+            info.isTitle = nil
+            info.notCheckable = true
+            info.hasArrow = false
+            info.disabled = nil
+            info.text = L["RemoveFromIgnoreList"]
+            info.func = function() 
+                Spy:ToggleIgnorePlayer(false, unit.name)
+                SpyStats:Recalulate()
+            end
+            info.value = nil
+            UIDropDownMenu_AddButton(info, level)
+            
+            info.isTitle = nil
+            info.notCheckable = true
+            info.hasArrow = false
+            info.disabled = nil
+            info.text = L["RemoveFromStatsList"]
+            info.func = function()
+                Spy:RemovePlayerData(unit.name)
+                SpyStats:Recalulate()
+            end
+            info.value = nil
+            UIDropDownMenu_AddButton(info, level)
         end
 
     elseif level == 2 then
