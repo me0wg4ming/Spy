@@ -2289,13 +2289,31 @@ function Spy:DeathLogEvent()
 	-- ✅ CHAT_MSG_COMBAT_HOSTILE_DEATH = Enemy died
 	if event == "CHAT_MSG_COMBAT_HOSTILE_DEATH" then
 		-- Patterns for enemy death:
-		-- "PlayerName dies."
-		-- "PlayerName is slain by PlayerName!"
+		-- "PlayerName dies." - unknown killer
+		-- "PlayerName is slain by PlayerName!" - specific killer
+		-- "You have slain PlayerName!" - YOU are the killer
 		
-		local _, _, victim = strfind(message, "^(.+) dies%.")
-		if not victim then
-			_, _, victim = strfind(message, "^(.+) is slain by")
+		local playerName = UnitName("player")
+		local victim = nil
+		local killer = nil
+		
+		-- Pattern 1: "You have slain PlayerName!"
+		local _, _, v = strfind(message, "^You have slain (.+)!$")
+		if v then
+			victim = v
+			killer = playerName  -- YOU are the killer
 		end
+		
+		-- Pattern 2: "PlayerName is slain by KillerName!"
+		if not victim then
+			local _, _, v2, k = strfind(message, "^(.+) is slain by (.+)!$")
+			if v2 and k then
+				victim = v2
+				killer = k
+			end
+		end
+		
+		-- Pattern 3: "PlayerName dies." (no killer info)
 		
 		if victim then
 			-- Strip realm name if exists
@@ -2304,16 +2322,36 @@ function Spy:DeathLogEvent()
 				victim = strsub(victim, 1, realmSep - 1)
 			end
 			
-			local playerData = SpyPerCharDB.PlayerData[victim]
-			if playerData then
-				if not playerData.wins then playerData.wins = 0 end
-				playerData.wins = playerData.wins + 1
-				if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-					DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy Death]|r ✓ WIN counted for " .. victim .. " (total: " .. playerData.wins .. ")")
+			-- Only count win if YOU are the killer
+			if killer then
+				-- Strip realm from killer name
+				local killerRealmSep = strfind(killer, "-")
+				if killerRealmSep then
+					killer = strsub(killer, 1, killerRealmSep - 1)
+				end
+				
+				-- Check if YOU killed the enemy
+				if killer == playerName then
+					local playerData = SpyPerCharDB.PlayerData[victim]
+					if playerData then
+						if not playerData.wins then playerData.wins = 0 end
+						playerData.wins = playerData.wins + 1
+						if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+							DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy Death]|r ✓ WIN counted for " .. victim .. " (total: " .. playerData.wins .. ")")
+						end
+					else
+						if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+							DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy Death]|r ⚠ WIN not counted - " .. victim .. " not in database")
+						end
+					end
+				else
+					if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+						DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy Death]|r ⚠ WIN not counted - " .. victim .. " killed by " .. killer .. " (not you)")
+					end
 				end
 			else
 				if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-					DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy Death]|r ⚠ WIN not counted - " .. victim .. " not in database")
+					DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy Death]|r ⚠ WIN not counted - " .. victim .. " died (unknown killer)")
 				end
 			end
 		end
