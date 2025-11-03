@@ -816,179 +816,158 @@ end)
 =============================================================================]]
 
 function SpySW:OnUnitCastEvent(casterGUID, targetGUID, eventType, spellID, castDuration)
-	-- Only process CAST and CHANNEL events (when spell actually happens)
-	if eventType ~= "CAST" and eventType ~= "CHANNEL" then
-		return
-	end
-	
-	-- Check if it's a Stealth spell
-	local stealthType = self.STEALTH_SPELL_IDS[spellID]
-	
-	if not stealthType then
-		return
-	end
-	
-	-- ✅ CRITICAL: Determine operating mode FIRST
-	local isEnabled = Spy and Spy.db and Spy.db.profile and Spy.db.profile.Enabled and Spy.EnabledInZone
-	local stealthOnlyMode = Spy and Spy.db and Spy.db.profile and Spy.db.profile.WarnOnStealthEvenIfDisabled and not isEnabled
-	
-	-- If neither mode is active, return early
-	if not isEnabled and not stealthOnlyMode then
-		return  -- Spy disabled and Stealth-Only mode disabled
-	end
-	
-	-- ✅ FIX: Check battleground setting
-	if Spy.InInstance and not Spy.db.profile.EnabledInBattlegrounds then
-		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-			DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW UNIT_CASTEVENT]|r Stealth detection skipped: Battlegrounds disabled")
-		end
-		return  -- Battlegrounds disabled
-	end
-	
-	-- ✅ FIX: Check PvP flag requirement
-	if Spy.db and Spy.db.profile and Spy.db.profile.DisableWhenPVPUnflagged then
-		if not UnitIsPVP("player") then
-			if Spy.db.profile.DebugMode then
-				DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW UNIT_CASTEVENT]|r Stealth detection skipped: Player not PvP flagged")
-			end
-			return  -- Player not PvP flagged
-		end
-	end
-	
-	-- Get caster info
-	if not casterGUID or not UnitExists(casterGUID) then
-		return
-	end
-	
-	-- Check if caster is a player (not NPC)
-	if not UnitIsPlayer(casterGUID) then
-		return
-	end
-	
-	-- ✅ FIX: Use UnitCanAttack instead of UnitIsEnemy
-	-- UnitCanAttack is more precise for actual attackable enemies
-	-- Returns true ONLY for actual enemies (opposite faction OR same faction with PvP flag)
-	-- Returns false for friendlies AND neutrals (same faction without PvP flag)
-	if not UnitCanAttack("player", casterGUID) then
-		return  -- Cannot attack this player, ignore
-	end
-	
-	-- ✅ Additional Same-Faction Check (like in Buff-Scanner)
-	-- Ignore same-faction players (even if PvP-flagged in duel)
-	local playerFaction = UnitFactionGroup("player")
-	local casterFaction = UnitFactionGroup(casterGUID)
-	
-	if playerFaction and casterFaction and playerFaction == casterFaction then
-		return  -- Same faction, ignore (no alerts for duels)
-	end
-	
-	-- Get player name
-	local playerName = UnitName(casterGUID)
-	if not playerName then
-		return
-	end
-	
-	-- ✅ Check Ignore list
-	if SpyPerCharDB and SpyPerCharDB.IgnoreData and SpyPerCharDB.IgnoreData[playerName] then
-		if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-			DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW UNIT_CASTEVENT]|r IGNORED: " .. playerName .. " (on Ignore list)")
-		end
-		return
-	end
-	
-	-- ✅ STEALTH-ONLY MODE: Only track Rogues, Druids, and Night Elves
-	if stealthOnlyMode then
-		local _, class = UnitClass(casterGUID)
-		local race, _ = UnitRace(casterGUID)
-		
-		-- Only allow ROGUE, DRUID, or Night Elf
-		local isStealthClass = (class == "ROGUE" or class == "DRUID" or race == "Night Elf")
-		
-		if not isStealthClass then
-			if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-				DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW UNIT_CASTEVENT]|r Stealth-Only Mode: Skipped " .. playerName .. " (not Rogue/Druid/NightElf)")
-			end
-			return  -- Not a stealth class, ignore in Stealth-Only mode
-		end
-		
-		if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-			DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[SpySW UNIT_CASTEVENT]|r Stealth-Only Mode: " .. playerName .. " (" .. (class or "?") .. "/" .. (race or "?") .. ") ALLOWED")
-		end
-	end
-	
-	-- Debug output
-	if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-		DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[SpySW UNIT_CASTEVENT]|r " .. playerName .. " cast " .. stealthType .. " (Spell ID: " .. spellID .. ")")
-	end
-	
-	-- Add unit to GUID tracking (will be picked up by scanner)
-	self:AddUnit(casterGUID)
-	
-	-- Get player data
-	local level = UnitLevel(casterGUID) or 0
-	if level < 0 then level = 0 end  -- Convert skull to 0
-	
-	local _, class = UnitClass(casterGUID)
-	local race, _ = UnitRace(casterGUID)
-	local guild = GetGuildInfo(casterGUID)
-	
-	-- ✅ ALWAYS update player data (needed for GUID → Name mapping)
-	local detected = Spy:UpdatePlayerData(
-		playerName,
-		class,
-		level,
-		race,
-		guild,
-		true,  -- isEnemy
-		false  -- isGuess (SuperWoW has real data!)
-	)
-	
-	-- ✅ ONLY add to Nearby list in Normal Mode
-	if isEnabled and detected then
-		Spy:AddDetected(
-			playerName,
-			time(),
-			false,  -- learnt
-			nil     -- source
-		)
-		
-		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-			DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW UNIT_CASTEVENT]|r ✓ Added to Nearby: " .. playerName .. " Lvl" .. level .. " " .. (class or "?"))
-		end
-	elseif stealthOnlyMode and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-		DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW UNIT_CASTEVENT]|r Stealth-Only Mode: Data saved, NOT added to Nearby")
-	end
-	
-	-- ✅ IMPORTANT: Mark as detected by SpySW to prevent duplicate processing (in BOTH modes!)
-	SpySW.detectedPlayers[playerName] = GetTime()
-	
-	-- ✅ IMPORTANT: Alert about stealth cast
-	-- If UNIT_CASTEVENT fires, player just casted stealth → ALWAYS alert!
-	if Spy and Spy.AlertStealthPlayer then
-		local wasStealthed = SpySW.lastStealthState[playerName]
-		
-		-- ✅ DEBUG: Log stealth state
-		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-			DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[SpySW UNIT_CASTEVENT DEBUG]|r playerName=" .. tostring(playerName))
-			DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[SpySW UNIT_CASTEVENT DEBUG]|r wasStealthed=" .. tostring(wasStealthed))
-			DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[SpySW UNIT_CASTEVENT DEBUG]|r stealthType=" .. tostring(stealthType))
-			DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[SpySW UNIT_CASTEVENT DEBUG]|r isEnabled=" .. tostring(isEnabled))
-			DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[SpySW UNIT_CASTEVENT DEBUG]|r stealthOnlyMode=" .. tostring(stealthOnlyMode))
-		end
-		
-		-- ✅ ALWAYS alert when stealth is casted (cast event = player just entered/changed stealth)
-		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SpySW UNIT_CASTEVENT]|r ✔ CALLING AlertStealthPlayer for " .. playerName)
-		end
-		Spy:AlertStealthPlayer(playerName)
-		
-		-- Update stealth state
-		SpySW.lastStealthState[playerName] = true
-	else
-		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SpySW UNIT_CASTEVENT DEBUG]|r Spy or AlertStealthPlayer is NIL!")
-		end
-	end
+    -- Nur CAST und CHANNEL Events verarbeiten
+    if eventType ~= "CAST" and eventType ~= "CHANNEL" then
+        return
+    end
+
+    local isDebug = Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode
+    local isEnabled = Spy and Spy.db and Spy.db.profile and Spy.db.profile.Enabled and Spy.EnabledInZone
+    local stealthOnlyMode = Spy and Spy.db and Spy.db.profile and Spy.db.profile.WarnOnStealthEvenIfDisabled and not isEnabled
+
+    -- Wenn beide Modi inaktiv sind, abbrechen
+    if not isEnabled and not stealthOnlyMode then
+        return
+    end
+    
+    -- === INITIALE GUID/SPIELER-PRUEFUNG ===
+    
+    if not casterGUID or not UnitExists(casterGUID) then
+        return
+    end
+    
+    if not UnitIsPlayer(casterGUID) then
+        return
+    end
+    
+    local playerName = UnitName(casterGUID)
+    if not playerName then
+        if isDebug then
+            DEFAULT_CHAT_FRAME:AddMessage("|cffff7700[SpySW DEBUG]|r UNIT_CASTEVENT: Could not resolve name for GUID: " .. casterGUID)
+        end
+        return
+    end
+    
+    -- === ALLGEMEINE FILTER (Gelten fuer NEARBY-Hinzufuegung und Alarm) ===
+
+    -- 1. Ignorier-Liste (Hoechste Prioritaet)
+    if SpyPerCharDB and SpyPerCharDB.IgnoreData and SpyPerCharDB.IgnoreData[playerName] then
+        if isDebug then
+            DEFAULT_CHAT_FRAME:AddMessage("|cffff7700[SpySW DEBUG]|r IGNORING CAST: " .. playerName .. " is on the Ignore list.")
+        end
+        return
+    end
+    
+    -- 2. Battleground-Einstellung
+    if Spy.InInstance and not Spy.db.profile.EnabledInBattlegrounds then
+        return
+    end
+    
+    -- 3. PvP-Flag-Anforderung
+    if Spy.db and Spy.db.profile and Spy.db.profile.DisableWhenPVPUnflagged and not UnitIsPVP("player") then
+        if isDebug then
+            DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW DEBUG]|r Detection skipped: Player not PvP flagged (Option active)")
+        end
+        return
+    end
+    
+    -- 4. Gleiche Fraktion (Duell/Freundlich)
+    local playerFaction = UnitFactionGroup("player")
+    local casterFaction = UnitFactionGroup(casterGUID)
+    
+    if playerFaction and casterFaction and playerFaction == casterFaction then
+        if isDebug then
+            DEFAULT_CHAT_FRAME:AddMessage("|cffff7700[SpySW DEBUG]|r IGNORING CAST: " .. playerName .. " has same faction.")
+        end
+        return
+    end
+    
+    -- 5. KRITISCH: Angreifbarkeit (Range/Phasing/Schutzzone)
+    if not UnitCanAttack("player", casterGUID) then
+        if isDebug then
+            DEFAULT_CHAT_FRAME:AddMessage("|cffff7700[SpySW DEBUG]|r IGNORING CAST: " .. playerName .. " cast, but UnitCanAttack returned false (Check range/Protected zone).")
+        end
+        return
+    end
+    
+    -- Wenn wir diesen Punkt erreichen, ist der Spieler ein angreifbarer, feindlicher Spieler und NICHT auf der Ignorier-Liste.
+    
+    -- ✅ KRITISCHE KORREKTUR: GUID zum Cache/Scanner hinzufuegen
+    -- Dies sorgt dafuer, dass die GUID solange von SpySW ueberwacht wird, bis sie aus der Reichweite ist (Cache-Persistenz).
+    self:AddUnit(casterGUID)
+    if isDebug then
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[SpySW DEBUG]|r Added GUID to tracking cache: " .. playerName)
+    end
+    
+    -- === DATENABFRAGE UND HINZUFUEGUNG ZUR NEARBY-LISTE (GENERISCHE LOGIK) ===
+    
+    local _, class = UnitClass(casterGUID)
+    local race, _ = UnitRace(casterGUID)
+    local level = UnitLevel(casterGUID) or 0
+    if level < 0 then level = 0 end 
+    local guild = GetGuildInfo(casterGUID)
+    
+    -- Daten immer aktualisieren, unabhaengig vom Spell-Typ
+    local detected = Spy:UpdatePlayerData(playerName, class, level, race, guild, true, false)
+    
+    if not detected then
+        if isDebug then
+            DEFAULT_CHAT_FRAME:AddMessage("|cffff7700[SpySW DEBUG]|r IGNORING CAST: Failed to update player data for " .. playerName .. ".")
+        end
+        return
+    end
+
+    -- FUEGE ZUR NEARBY-LISTE HINZU, WENN SPY AKTIV ist (Generischer Cast-Event)
+    if isEnabled then
+        Spy:AddDetected(
+            playerName,
+            time(),
+            false,
+            nil
+        )
+        if isDebug then
+            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW UNIT_CASTEVENT]|r ✓ Added to Nearby (Generic Cast): " .. playerName)
+        end
+    end
+    
+    -- Markiere als erkannt (um doppelte Events zu verhindern)
+    SpySW.detectedPlayers[playerName] = GetTime()
+
+    -- === SPEZIFISCHE STEALTH-ALARM-LOGIK (LEVEL 1) ===
+    
+    local spellName, _ = SpellInfo(spellID)
+    local stealthType = self.STEALTH_SPELL_IDS[spellID]
+
+    if stealthType then
+        -- Nur Stealth-Zauber loesen den speziellen Alarm aus!
+        
+        -- Stealth-Only Modus (wenn Spy deaktiviert) darf nur Stealth-Klassen verarbeiten
+        if stealthOnlyMode then
+            local isStealthClass = (class == "ROGUE" or class == "DRUID" or race == "Night Elf" or race == "Human")
+            if not isStealthClass then
+                if isDebug then
+                    DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW DEBUG]|r Stealth-Only Mode: Skipped " .. playerName .. " (not NE/Human/Stealth Class)")
+                end
+                return
+            end
+        end
+
+        -- Debug Output fuer Stealth-Zauber
+        if isDebug then
+            DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[SpySW UNIT_CASTEVENT]|r " .. playerName .. " cast " .. (spellName or "Unknown") .. " - TRIGGERING Stealth Alert!")
+        end
+        
+        -- Wichtiger Aufruf fuer den speziellen Sound/Alarm
+        if Spy and Spy.AlertStealthPlayer then
+            Spy:AlertStealthPlayer(playerName)
+            SpySW.lastStealthState[playerName] = true
+        end
+
+        -- Nur im Stealth-Only Mode die "Nearby"-Hinzufuegung bewusst ueberspringen
+        if stealthOnlyMode and isDebug then
+            DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW UNIT_CASTEVENT]|r Stealth-Only Mode: NOT added to Nearby.")
+        end
+    end
 end
 
 --[[===========================================================================

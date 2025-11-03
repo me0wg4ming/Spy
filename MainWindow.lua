@@ -422,7 +422,7 @@ function Spy:CreateMainWindow()
 				if this:GetParent().isResizing == true then 
 					this:GetParent():StopMovingOrSizing(); 
 					Spy:SaveMainWindowPosition(); 
-					Spy:RefreshCurrentList(); 
+					--Spy:RefreshCurrentList(); 
 					this:GetParent().isResizing = false; 
 				end 
 			end)
@@ -737,6 +737,19 @@ function Spy:CreateMainWindow()
 	end
 end
 
+function Spy:UpdateRowWidths()
+	if not Spy.MainWindow or not Spy.MainWindow.Rows then return end
+	
+	for i, row in pairs(Spy.MainWindow.Rows) do
+		if row:IsShown() and row.RightText and row.LeftText then
+			local rightTextWidth = row.RightText:GetStringWidth()
+			local totalWidth = row:GetWidth()
+			local padding = 40  -- Dein Wert von oben
+			row.LeftText:SetWidth(totalWidth - rightTextWidth - padding)
+		end
+	end
+end
+
 function Spy:BarsChanged()
 	if not Spy.MainWindow then return end
 	for k, v in pairs(Spy.MainWindow.Rows) do
@@ -767,7 +780,20 @@ function Spy:SetBar(num, name, desc, value, colorgroup, colorclass, tooltipData,
 	Row.RightText:SetText(desc)
 	Row.Name = name
 	Row.TooltipData = tooltipData
-	Row.LeftText:SetWidth(Row:GetWidth() - Row.RightText:GetStringWidth() - 4)
+	
+	-- ✅ FIX: Berechne Breite dynamisch mit mehr Puffer
+	local rowWidth = Row:GetWidth()
+	local rightWidth = Row.RightText:GetStringWidth()
+	local padding = 10  -- Mindestabstand
+	local availableWidth = rowWidth - rightWidth - padding
+	
+	-- ✅ Stelle sicher, dass Breite nicht negativ wird
+	if availableWidth < 10 then
+		availableWidth = 10
+	end
+	
+	Row.LeftText:SetWidth(availableWidth)
+	
 	Row:SetFrameLevel(Spy.MainWindow:GetFrameLevel() + num + 1)
 	Row.StatusBar:SetFrameLevel(Spy.MainWindow:GetFrameLevel() + num)
 
@@ -778,8 +804,8 @@ function Spy:SetBar(num, name, desc, value, colorgroup, colorclass, tooltipData,
 		Spy.Colors:RegisterTexture(colorgroup, colorclass, Row.StatusBar, Multi)
 	end
 
-	Row.LeftText:SetTextColor(1, 1, 1, opacity)  -- Change Name Color in nearby
-	Row.RightText:SetTextColor(1, 1, 1, opacity)  -- Change Name Color in nearby
+	Row.LeftText:SetTextColor(1, 1, 1, opacity)
+	Row.RightText:SetTextColor(1, 1, 1, opacity)
 end
 
 function Spy:AutomaticallyResize()
@@ -817,7 +843,7 @@ function Spy:ManageBarsDisplayed()
 end
 
 function Spy:ResizeMainWindow()
-	if not Spy.MainWindow then return end  -- Safety check: MainWindow might not be created yet
+	if not Spy.MainWindow then return end
 	if Spy.MainWindow.Rows[0] then 
 		Spy.MainWindow.Rows[0]:Hide() 
 	end
@@ -827,6 +853,9 @@ function Spy:ResizeMainWindow()
 	for i,row in pairs(Spy.MainWindow.Rows) do
 		row:SetWidth(CurWidth)	
 	end
+
+	-- ✅ NEU: Update text widths after resize
+	Spy:UpdateRowWidths()
 
 	Spy:ManageBarsDisplayed()
 end

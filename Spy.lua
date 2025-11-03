@@ -12,7 +12,7 @@ local strsplit, strtrim = AceCore.strsplit, AceCore.strtrim
 local format, strfind, strsub, find = string.format, string.find, string.sub, string.find
 
 Spy = LibStub("AceAddon-3.0"):NewAddon("Spy", "AceConsole-3.0", "AceEvent-3.0", "AceComm-3.0", "AceTimer-3.0")
-Spy.Version = "3.9.5"
+Spy.Version = "3.9.6"
 Spy.DatabaseVersion = "1.1"
 Spy.Signature = "[Spy]"
 Spy.MaximumPlayerLevel = 60
@@ -1275,7 +1275,7 @@ local Default_Profile = {
 			Position = {
 				x = 4,
 				y = 740,
-				w = 175,
+				w = 250,
 				h = 34,
 			},
 		},
