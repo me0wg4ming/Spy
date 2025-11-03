@@ -1566,4 +1566,3 @@ end)
 -- Register slash command
 SLASH_SPYEVENT1 = "/spyevent"
 SlashCmdList["SPYEVENT"] = ToggleCastLogger
-

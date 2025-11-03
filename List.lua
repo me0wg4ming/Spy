@@ -300,29 +300,35 @@ function Spy:UpdatePlayerData(name, class, level, race, guild, isEnemy, isGuess)
 	-- ✅ FIX: Never process "Unknown" placeholder names
 	if not name or name == "Unknown" or name == "" then
 		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy DEBUG]|r UpdatePlayerData rejected: " .. tostring(name))
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy]|r Rejected Unknown/invalid name")
 		end
 		return false
 	end
 	
-	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-		DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[Spy DEBUG]|r UpdatePlayerData: " .. name .. " Lvl" .. tostring(level) .. " " .. tostring(class))
-	end
-	
 	local detected = true
 	local playerData = SpyPerCharDB.PlayerData[name]
+	
+	-- ✅ Check if this is a NEW player (never seen before)
+	local isNewPlayer = (playerData == nil)
+	
 	if Spy:PlayerIsFriend(name) then
 		if playerData then
 			Spy:RemovePlayerData(name)
 		end
 		return
 	end
+	
 	if not playerData then
 		playerData = Spy:AddPlayerData(name, class, level, race, guild, isEnemy, isGuess)
 		if not playerData then
 			return false  -- AddPlayerData rejected the name
 		end
+		-- ✅ Debug ONLY for NEW players
+		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[Spy DEBUG]|r NEW PLAYER: " .. name .. " Lvl" .. tostring(level) .. " " .. tostring(class))
+		end
 	else
+		-- ✅ Player already exists - only update changed fields (NO DEBUG)
 		if name ~= nil then playerData.name = name end 
 		if class ~= nil then playerData.class = class end
 		if type(level) == "number" then playerData.level = level end
@@ -331,6 +337,7 @@ function Spy:UpdatePlayerData(name, class, level, race, guild, isEnemy, isGuess)
 		if isEnemy ~= nil then playerData.isEnemy = isEnemy end
 		if isGuess ~= nil then playerData.isGuess = isGuess end
 	end
+	
 	if playerData then
 		playerData.time = time()
 		if not Spy.ActiveList[name] then
@@ -359,16 +366,15 @@ function Spy:UpdatePlayerData(name, class, level, race, guild, isEnemy, isGuess)
 				playerData.zone = GetZoneText()
 				playerData.subZone = GetSubZoneText()
 				
-				if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+				-- ✅ Debug ONLY if new player AND no coords (interesting case)
+				if isNewPlayer and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 					DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy DEBUG]|r No map coords for " .. name .. ", zone: " .. tostring(playerData.zone))
 				end
 			end
 		end
 	end
 	
-	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy DEBUG]|r UpdatePlayerData OK: " .. name .. ", detected=" .. tostring(detected))
-	end
+	-- ✅ NO DEBUG for routine updates - only logged once per NEW player above
 	return detected
 end
 
