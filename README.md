@@ -53,7 +53,6 @@
 **Version:** 3.9.6
 **Release Date:** November 3, 2025
 **Requirements:** SuperWoW 1.12.1+ (MANDATORY), UnitXP (OPTIONAL for Distance Display)
-**Status:** Stable & Production-Ready
 ---
 
 ## ⚠️ CRITICAL: SuperWoW is REQUIRED
