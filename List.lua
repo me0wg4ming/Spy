@@ -276,6 +276,14 @@ function Spy:ClearList()
 end
 
 function Spy:AddPlayerData(name, class, level, race, guild, isEnemy, isGuess)
+	-- ✅ FIX: Never add "Unknown" placeholder names
+	if not name or name == "Unknown" or name == "" then
+		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy]|r Rejected Unknown/invalid name")
+		end
+		return nil
+	end
+	
 	local info = {}
 	info.name = name --++ added to normalize data
 	info.class = class
@@ -289,6 +297,18 @@ function Spy:AddPlayerData(name, class, level, race, guild, isEnemy, isGuess)
 end
 
 function Spy:UpdatePlayerData(name, class, level, race, guild, isEnemy, isGuess)
+	-- ✅ FIX: Never process "Unknown" placeholder names
+	if not name or name == "Unknown" or name == "" then
+		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy DEBUG]|r UpdatePlayerData rejected: " .. tostring(name))
+		end
+		return false
+	end
+	
+	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[Spy DEBUG]|r UpdatePlayerData: " .. name .. " Lvl" .. tostring(level) .. " " .. tostring(class))
+	end
+	
 	local detected = true
 	local playerData = SpyPerCharDB.PlayerData[name]
 	if Spy:PlayerIsFriend(name) then
@@ -299,6 +319,9 @@ function Spy:UpdatePlayerData(name, class, level, race, guild, isEnemy, isGuess)
 	end
 	if not playerData then
 		playerData = Spy:AddPlayerData(name, class, level, race, guild, isEnemy, isGuess)
+		if not playerData then
+			return false  -- AddPlayerData rejected the name
+		end
 	else
 		if name ~= nil then playerData.name = name end 
 		if class ~= nil then playerData.class = class end
@@ -311,10 +334,18 @@ function Spy:UpdatePlayerData(name, class, level, race, guild, isEnemy, isGuess)
 	if playerData then
 		playerData.time = time()
 		if not Spy.ActiveList[name] then
+			-- ✅ FIX: Try to get map coordinates, but don't fail detection if unavailable
+			-- Only try SetMapToCurrentZone if WorldMap is already visible (safe)
+			local mapX, mapY = 0, 0
+			
 			if WorldMapFrame:IsVisible() then
 				SetMapToCurrentZone()
+				mapX, mapY = GetPlayerMapPosition("player")
+			else
+				-- Try to get position without showing WorldMap
+				mapX, mapY = GetPlayerMapPosition("player")
 			end
-			local mapX, mapY = GetPlayerMapPosition("player")
+			
 			if mapX ~= 0 and mapY ~= 0 then
 				mapX = math.floor(tonumber(mapX) * 100) / 100
 				mapY = math.floor(tonumber(mapY) * 100) / 100
@@ -323,9 +354,20 @@ function Spy:UpdatePlayerData(name, class, level, race, guild, isEnemy, isGuess)
 				playerData.zone = GetZoneText()
 				playerData.subZone = GetSubZoneText()
 			else
-				detected = false
+				-- ✅ Map coords not available yet - store zone info only
+				-- This is NORMAL on first login and should NOT fail detection
+				playerData.zone = GetZoneText()
+				playerData.subZone = GetSubZoneText()
+				
+				if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+					DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy DEBUG]|r No map coords for " .. name .. ", zone: " .. tostring(playerData.zone))
+				end
 			end
 		end
+	end
+	
+	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy DEBUG]|r UpdatePlayerData OK: " .. name .. ", detected=" .. tostring(detected))
 	end
 	return detected
 end

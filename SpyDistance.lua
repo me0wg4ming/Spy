@@ -43,17 +43,36 @@ local function CheckUnitXP()
     end
 end
 
--- Initialisiere
-Spy.Distance.enabled = CheckUnitXP()
+-- ✅ FIX: Verzögere Initialisierung bis PLAYER_ENTERING_WORLD
+Spy.Distance.initialized = false
 
--- Wenn nicht verfügbar, erstelle Dummy-Funktionen und beende
-if not Spy.Distance.enabled then
-    function Spy.Distance:GetDistance(playerName) return nil end
-    function Spy.Distance:GetCachedDistance(playerName) return nil end
-    function Spy.Distance:FormatDistance(distance) return "|cff888888--|r" end
-    function Spy.Distance:CleanCache() end
-    do return end
+function Spy.Distance:Initialize()
+    if self.initialized then
+        return self.enabled
+    end
+    
+    self.initialized = true
+    self.enabled = CheckUnitXP()
+    
+    if not self.enabled then
+        function Spy.Distance:GetDistance(playerName) return nil end
+        function Spy.Distance:GetCachedDistance(playerName) return nil end
+        function Spy.Distance:FormatDistance(distance) return "|cff888888--|r" end
+        function Spy.Distance:CleanCache() end
+        return false
+    end
+    
+    return true
 end
+
+-- Temporäre Dummy-Funktionen bis Initialize()
+function Spy.Distance:GetDistance(playerName) 
+    if not self.initialized then self:Initialize() end
+    return nil 
+end
+function Spy.Distance:GetCachedDistance(playerName) return nil end
+function Spy.Distance:FormatDistance(distance) return "|cff888888--|r" end
+function Spy.Distance:CleanCache() end
 
 -- ======================================================================
 -- AB HIER NUR CODE WENN UNITXP VERFÜGBAR IST

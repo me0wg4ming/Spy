@@ -33,6 +33,7 @@ Spy.AlertType = nil
 Spy.UpgradeMessageSent = false
 Spy.initTimer = ""
 Spy.Skull = -1
+Spy.WorldMapInitialized = false  -- ✅ FIX: Track if WorldMap has been initialized
 
 -- Localizations for xml
 L_STATS = "Spy " .. L["Statistics"]
@@ -1378,6 +1379,19 @@ function Spy:CheckDatabase()
 	if SpyDB.removeKOSData == nil then SpyDB.removeKOSData = {} end
 	if SpyDB.removeKOSData[Spy.RealmName] == nil then SpyDB.removeKOSData[Spy.RealmName] = {} end
 	if SpyDB.removeKOSData[Spy.RealmName][Spy.FactionName] == nil then SpyDB.removeKOSData[Spy.RealmName][Spy.FactionName] = {} end
+	
+	-- ✅ FIX: Cleanup "Unknown" placeholder entries from database
+	local cleanedCount = 0
+	for name, data in pairs(SpyPerCharDB.PlayerData) do
+		if name == "Unknown" or name == "" or not name then
+			SpyPerCharDB.PlayerData[name] = nil
+			cleanedCount = cleanedCount + 1
+		end
+	end
+	
+	if cleanedCount > 0 then
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy]|r Cleaned " .. cleanedCount .. " invalid 'Unknown' entries from database")
+	end
 end
 
 function Spy:ResetProfile()
@@ -1674,30 +1688,86 @@ function Spy:ShowConfig()
 end
 
 function Spy:OnEnable(first)
+	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+		DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy DEBUG]|r ========== OnEnable START ==========")
+	end
+	
 	-- Safety check: ensure db is initialized before proceeding
 	if not Spy.db or not Spy.db.profile then
+		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy DEBUG]|r DB not ready, scheduling retry")
+		end
 		-- Schedule retry after a short delay to allow initialization to complete
 		Spy:ScheduleTimer("OnEnable", 0.5)
 		return
 	end
 	
+	if Spy.db.profile.DebugMode then
+		DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy DEBUG]|r DB ready, Enabled=" .. tostring(Spy.db.profile.Enabled))
+	end
+	
+	-- ✅ CRITICAL FIX: Wait for SpySuperWoW.lua to load
+	-- SpySuperWoW.lua is loaded AFTER Spy.lua, but OnEnable can be called before all files are loaded
+	if not SpyModules or not SpyModules.SuperWoW then
+		if Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy DEBUG]|r SpyModules.SuperWoW not loaded yet, scheduling retry...")
+		end
+		Spy:ScheduleTimer("OnEnable", 0.1)
+		return
+	end
+	
+	if Spy.db.profile.DebugMode then
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy DEBUG]|r SpyModules.SuperWoW is loaded")
+	end
+	
 	-- Initialize SuperWoW module if available (loaded from SpySuperWoW.lua)
 	if not Spy.HasSuperWoW and SpyModules and SpyModules.SuperWoW then
+		if Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy DEBUG]|r Initializing SuperWoW...")
+		end
 		-- Try to initialize SuperWoW (only once)
 		if SpyModules.SuperWoW:Initialize() then
 			Spy.HasSuperWoW = true
 			Spy.SuperWoW = SpyModules.SuperWoW
+			if Spy.db.profile.DebugMode then
+				DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy DEBUG]|r SuperWoW initialized OK")
+			end
 		else
 			Spy.HasSuperWoW = false
+			if Spy.db.profile.DebugMode then
+				DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy DEBUG]|r SuperWoW init FAILED")
+			end
+		end
+	else
+		if Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy DEBUG]|r SuperWoW already initialized: " .. tostring(Spy.HasSuperWoW))
 		end
 	end
 	
 	-- ✅ FIX Bug 1: Only initialize if Enabled OR if Stealth-Only mode is active
 	local stealthOnlyMode = Spy.db.profile.WarnOnStealthEvenIfDisabled and not Spy.db.profile.Enabled
+	if Spy.db.profile.DebugMode then
+		DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy DEBUG]|r Stealth-Only mode: " .. tostring(stealthOnlyMode))
+		DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy DEBUG]|r Enabled: " .. tostring(Spy.db.profile.Enabled))
+		DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy DEBUG]|r WarnOnStealthEvenIfDisabled: " .. tostring(Spy.db.profile.WarnOnStealthEvenIfDisabled))
+	end
 	
+	-- ✅ FIX: Initialisiere SpyDistance nach PLAYER_ENTERING_WORLD
+	if Spy.Distance and Spy.Distance.Initialize then
+		if Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy DEBUG]|r Initializing SpyDistance...")
+		end
+		Spy.Distance:Initialize()
+		if Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy DEBUG]|r SpyDistance enabled: " .. tostring(Spy.Distance.enabled))
+		end
+	end
+	
+	-- ✅ CRITICAL: Don't return early - events must be registered even in Stealth-Only mode!
+	-- If completely disabled (no Enabled, no Stealth-Only), skip initialization
 	if not Spy.db.profile.Enabled and not stealthOnlyMode then
 		if Spy.db.profile.DebugMode then
-			DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy]|r OnEnable called but Enabled=false and no Stealth-Only mode, skipping")
+			DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy DEBUG]|r Spy completely disabled, SKIPPING OnEnable")
 		end
 		return
 	end
@@ -1763,14 +1833,29 @@ function Spy:OnEnable(first)
 	-- ✅ FIX Bug 2: Don't set IsEnabled=true in Stealth-Only mode
 	-- This prevents RefreshCurrentList from being called
 	if not stealthOnlyMode then
+		if Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy DEBUG]|r Setting IsEnabled=true, refreshing list")
+		end
 		Spy.IsEnabled = true
 		if not Spy:TimerStatus(Spy.initTimer) then
 			Spy:RefreshCurrentList()
 		end
 	else
 		if Spy.db.profile.DebugMode then
-			DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy]|r Stealth-Only mode: IsEnabled stays false, no list refresh")
+			DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy DEBUG]|r Stealth-Only mode: IsEnabled stays false")
 		end
+	end
+	
+	-- ✅ CRITICAL FIX: Manually trigger ZoneChangedEvent 
+	-- PLAYER_ENTERING_WORLD might have fired BEFORE OnEnable completed
+	-- This ensures WorldMap gets initialized and EnabledInZone is set correctly
+	if Spy.db.profile.DebugMode then
+		DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy DEBUG]|r Manually triggering ZoneChangedEvent...")
+	end
+	Spy:ZoneChangedEvent()
+	
+	if Spy.db.profile.DebugMode then
+		DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy DEBUG]|r ========== OnEnable COMPLETE ==========")
 	end
 end
 
@@ -1876,17 +1961,30 @@ function Spy:EnableSound(value)
 end
 
 function Spy:OnInitialize()
+	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[Spy DEBUG]|r OnInitialize START")
+	end
 	Spy.FactionName, _ = UnitFactionGroup("player")
 
 	if Spy.FactionName == nil then
+		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[Spy DEBUG]|r FactionName nil, scheduling retry")
+		end
 		Spy.initTimer = Spy:ScheduleTimer("OnInitialize", 1)
 		return
 	end
+	
+	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[Spy DEBUG]|r FactionName: " .. tostring(Spy.FactionName))
+	end
 
-	WorldMapFrame:Show()
-	WorldMapFrame:Hide()
+	-- ✅ WorldMap initialization moved to ZoneChangedEvent (PLAYER_ENTERING_WORLD)
+	-- This ensures it happens at the right time, not too early
 
 	Spy.RealmName = GetCVar("realmName")
+	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[Spy DEBUG]|r RealmName: " .. tostring(Spy.RealmName))
+	end
 
 	if Spy.FactionName == "Alliance" then
 		Spy.EnemyFactionName = "Horde"
@@ -1961,30 +2059,75 @@ function Spy:OnInitialize()
 	-- ✅ FIX Bug 2: Don't refresh list on init if Spy is disabled
 	-- This prevents Nearby list from being populated before OnEnable clears it
 	if Spy.db.profile.Enabled then
+		if Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[Spy DEBUG]|r Spy enabled, refreshing list")
+		end
 		Spy:RefreshCurrentList()
+	else
+		if Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[Spy DEBUG]|r Spy disabled, skipping list refresh")
+		end
 	end
 
 	Spy:LockWindows(Spy.db.profile.Locked)
 	--	ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", Spy.FilterNotInParty)
+	if Spy.db.profile.DebugMode then
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[Spy DEBUG]|r OnInitialize COMPLETE")
+	end
 	DEFAULT_CHAT_FRAME:AddMessage(L["LoadDescription"])
 end
 
 function Spy:ZoneChangedEvent()
+	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[Spy DEBUG]|r ========== ZoneChangedEvent START ==========")
+	end
 
 	if not Spy.MainWindow then
+		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy DEBUG]|r MainWindow not ready, scheduling retry")
+		end
 		Spy:ScheduleTimer("ZoneChangedEvent", 1)
 		return
+	end
+	
+	-- ✅ FIX: Initialize WorldMap on first PLAYER_ENTERING_WORLD
+	-- This ensures GetPlayerMapPosition() works correctly
+	if not Spy.WorldMapInitialized then
+		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[Spy DEBUG]|r Initializing WorldMap...")
+		end
+		WorldMapFrame:Show()
+		SetMapToCurrentZone()
+		WorldMapFrame:Hide()
+		Spy.WorldMapInitialized = true
+		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy DEBUG]|r WorldMap initialized OK")
+			
+			-- Test map position
+			local testX, testY = GetPlayerMapPosition("player")
+			DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[Spy DEBUG]|r Test map pos: " .. tostring(testX) .. ", " .. tostring(testY))
+		end
 	end
 
 	Spy.InInstance = false
 	local pvpType = GetZonePVPInfo()
 	local zone = GetZoneText()
 	local subZone = GetSubZoneText()
+	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[Spy DEBUG]|r Zone: " .. tostring(zone) .. " / " .. tostring(subZone) .. " (PvP: " .. tostring(pvpType) .. ")")
+	end
+	
 	local InFilteredZone = Spy:InFilteredZone(subZone)
 	if pvpType == "sanctuary" or zone == "" or InFilteredZone then
 		Spy.EnabledInZone = false
+		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy DEBUG]|r EnabledInZone = FALSE (sanctuary/empty/filtered)")
+		end
 	else
 		Spy.EnabledInZone = true
+		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy DEBUG]|r EnabledInZone = TRUE")
+		end
 
 		local inInstance, instanceType = IsInInstance()
 		if inInstance then
@@ -2002,19 +2145,39 @@ function Spy:ZoneChangedEvent()
 	end
 
 	if Spy.EnabledInZone then
+		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[Spy DEBUG]|r EnabledInZone=true, checking Enabled=" .. tostring(Spy.db.profile.Enabled))
+		end
 		-- ✅ FIX Bug 2: Only show window and refresh if Spy is actually enabled
 		-- Don't show Nearby list in Stealth-Only mode
 		if Spy.db.profile.Enabled then
 			if not Spy.db.profile.HideSpy then
+				if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+					DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy DEBUG]|r Showing MainWindow and refreshing list")
+				end
 				Spy.MainWindow:Show()
 				Spy:RefreshCurrentList()
+			else
+				if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+					DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy DEBUG]|r HideSpy=true, not showing window")
+				end
 			end
 		else
+			if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+				DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy DEBUG]|r Spy disabled, hiding window (Stealth-Only mode)")
+			end
 			-- Stealth-Only mode: Hide window even if EnabledInZone is true
 			Spy.MainWindow:Hide()
 		end
 	else
+		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy DEBUG]|r EnabledInZone=false, hiding window")
+		end
 		Spy.MainWindow:Hide()
+	end
+	
+	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[Spy DEBUG]|r ========== ZoneChangedEvent COMPLETE ==========")
 	end
 end
 

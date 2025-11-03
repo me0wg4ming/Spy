@@ -12,6 +12,12 @@ Benefits with SuperWoW:
 - More accurate player data (race, guild, etc.)
 ]]
 
+-- ✅ CRITICAL FIX: Register SpyModules.SuperWoW IMMEDIATELY as FIRST line of code
+-- This MUST happen before ANY other code (including CreateFrame) so Spy:OnEnable finds it
+SpyModules = SpyModules or {}
+SpyModules.SuperWoW = SpyModules.SuperWoW or {}
+local SpySW = SpyModules.SuperWoW
+
 -- Performance: Cache global functions as locals
 local strfind = string.find
 local strlower = string.lower
@@ -46,8 +52,7 @@ end
 	SuperWoW Scanning System
 =============================================================================]]
 
--- This table will be initialized by Spy.lua after it's loaded
-local SpySW = {}
+-- SpySW already defined at top of file as SpyModules.SuperWoW
 
 -- Statistics
 SpySW.Stats = {
@@ -516,7 +521,8 @@ local cleanupTimer = 0
 scanFrame:SetScript("OnUpdate", function()
 	-- Check if we should scan
 	local isEnabled = Spy.db and Spy.db.profile and Spy.db.profile.Enabled and Spy.EnabledInZone
-	local stealthOnlyMode = Spy.db and Spy.db.profile and Spy.db.profile.WarnOnStealthEvenIfDisabled and not isEnabled
+	-- ✅ FIX: Stealth-Only mode should work independently of EnabledInZone
+	local stealthOnlyMode = Spy.db and Spy.db.profile and Spy.db.profile.WarnOnStealthEvenIfDisabled and not Spy.db.profile.Enabled
 	
 	-- Don't scan if Spy is disabled AND stealth-only mode is not active
 	if not isEnabled and not stealthOnlyMode then
@@ -1202,9 +1208,7 @@ function SpySW:Initialize()
     return true
 end
 
--- Export to Spy namespace (will be set by Spy.lua)
-SpyModules = SpyModules or {}
-SpyModules.SuperWoW = SpySW
+-- SpyModules.SuperWoW already set at top of file
 
 --[[===========================================================================
 	Slash Commands - Registered AFTER export to global namespace
