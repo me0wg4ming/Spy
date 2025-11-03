@@ -686,6 +686,11 @@ scanFrame:SetScript("OnUpdate", function()
 								nil     -- source
 							)
 							
+							-- Debug: Scanner added player to Nearby
+							if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+								DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW SCAN]|r ✓ Added to Nearby (Scanner): " .. playerName)
+							end
+							
 							-- ✅ Trigger stealth alert if player is stealthed (only on state change)
 							if isNowStealthed and not wasStealthed and Spy.AlertStealthPlayer then
 								-- Check battleground setting
@@ -953,8 +958,9 @@ function SpySW:OnUnitCastEvent(casterGUID, targetGUID, eventType, spellID, castD
     
     -- ✅ KRITISCHE KORREKTUR: GUID zum Cache/Scanner hinzufuegen
     -- Dies sorgt dafuer, dass die GUID solange von SpySW ueberwacht wird, bis sie aus der Reichweite ist (Cache-Persistenz).
+    local wasNew = self.guids[casterGUID] == nil
     self:AddUnit(casterGUID)
-    if isDebug then
+    if isDebug and wasNew then
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[SpySW DEBUG]|r Added GUID to tracking cache: " .. playerName)
     end
     
@@ -978,13 +984,14 @@ function SpySW:OnUnitCastEvent(casterGUID, targetGUID, eventType, spellID, castD
 
     -- FUEGE ZUR NEARBY-LISTE HINZU, WENN SPY AKTIV ist (Generischer Cast-Event)
     if isEnabled then
+        local wasInNearby = Spy.NearbyList[playerName] ~= nil
         Spy:AddDetected(
             playerName,
             time(),
             false,
             nil
         )
-        if isDebug then
+        if isDebug and not wasInNearby then
             DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW UNIT_CASTEVENT]|r ✓ Added to Nearby (Generic Cast): " .. playerName)
         end
     end

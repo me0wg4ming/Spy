@@ -147,6 +147,70 @@ Spy.options = {
 						["Tel Co. Basecamp"] = L["Tel Co. Basecamp"],
 					},
 				},
+				NearbySortOrder = {
+					name = "Nearby Sort System",
+					type = "group",
+					order = 7,
+					inline = true,
+					args = {
+						range = {
+							name = "Range (closest first)",
+							desc = "Sort by distance to player (requires SpyDistance)",
+							type = "toggle",
+							order = 1,
+							width = "full",
+							get = function(info)
+								return Spy.db.profile.NearbySortOrder == "range"
+							end,
+							set = function(info, value)
+								Spy.db.profile.NearbySortOrder = "range"
+								Spy:RefreshCurrentList()
+							end,
+						},
+						name = {
+							name = "Names (alphabetical)",
+							desc = "Sort by player name alphabetically",
+							type = "toggle",
+							order = 2,
+							width = "full",
+							get = function(info)
+								return Spy.db.profile.NearbySortOrder == "name"
+							end,
+							set = function(info, value)
+								Spy.db.profile.NearbySortOrder = "name"
+								Spy:RefreshCurrentList()
+							end,
+						},
+						class = {
+							name = "Class (alphabetical)",
+							desc = "Sort by class alphabetically",
+							type = "toggle",
+							order = 3,
+							width = "full",
+							get = function(info)
+								return Spy.db.profile.NearbySortOrder == "class"
+							end,
+							set = function(info, value)
+								Spy.db.profile.NearbySortOrder = "class"
+								Spy:RefreshCurrentList()
+							end,
+						},
+						time = {
+							name = "Time Added (newest first)",
+							desc = "Sort by detection time (newest first)",
+							type = "toggle",
+							order = 4,
+							width = "full",
+							get = function(info)
+								return Spy.db.profile.NearbySortOrder == "time"
+							end,
+							set = function(info, value)
+								Spy.db.profile.NearbySortOrder = "time"
+								Spy:RefreshCurrentList()
+							end,
+						},
+					},
+				},
 				ShowOnDetection = {
 					name = L["ShowOnDetection"],
 					desc = L["ShowOnDetectionDescription"],
@@ -1301,6 +1365,7 @@ local Default_Profile = {
 		Enabled = true,
 		EnabledInBattlegrounds = true,
 		DisableWhenPVPUnflagged = false,
+		NearbySortOrder = "time",
 		MinimapDetection = false,
 		MinimapDetails = true,
 		-- Map display options removed (DisplayOnMap, SwitchToZone, MapDisplayLimit)

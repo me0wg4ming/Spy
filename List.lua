@@ -122,10 +122,74 @@ function Spy:ManageNearbyList()
 		end
 	end
 
-	tsort(activeKoS, function(a, b) return a.time < b.time end)
-	tsort(inactiveKoS, function(a, b) return a.time < b.time end)
-	tsort(active, function(a, b) return a.time < b.time end)
-	tsort(inactive, function(a, b) return a.time < b.time end)
+	-- Sort based on user preference
+	local sortOrder = Spy.db.profile.NearbySortOrder or "time"
+	
+	if sortOrder == "range" then
+		-- Sort by distance (closest first) - requires SpyDistance
+		if Spy.Distance and Spy.Distance.enabled and Spy.Distance.GetDistance then
+			tsort(activeKoS, function(a, b)
+				local distA = Spy.Distance:GetDistance(a.player) or 999999
+				local distB = Spy.Distance:GetDistance(b.player) or 999999
+				return distA < distB
+			end)
+			tsort(inactiveKoS, function(a, b)
+				local distA = Spy.Distance:GetDistance(a.player) or 999999
+				local distB = Spy.Distance:GetDistance(b.player) or 999999
+				return distA < distB
+			end)
+			tsort(active, function(a, b)
+				local distA = Spy.Distance:GetDistance(a.player) or 999999
+				local distB = Spy.Distance:GetDistance(b.player) or 999999
+				return distA < distB
+			end)
+			tsort(inactive, function(a, b)
+				local distA = Spy.Distance:GetDistance(a.player) or 999999
+				local distB = Spy.Distance:GetDistance(b.player) or 999999
+				return distA < distB
+			end)
+		else
+			-- Fallback to time if SpyDistance not available
+			tsort(activeKoS, function(a, b) return a.time > b.time end)
+			tsort(inactiveKoS, function(a, b) return a.time > b.time end)
+			tsort(active, function(a, b) return a.time > b.time end)
+			tsort(inactive, function(a, b) return a.time > b.time end)
+		end
+	elseif sortOrder == "name" then
+		-- Sort by name (alphabetical)
+		tsort(activeKoS, function(a, b) return a.player < b.player end)
+		tsort(inactiveKoS, function(a, b) return a.player < b.player end)
+		tsort(active, function(a, b) return a.player < b.player end)
+		tsort(inactive, function(a, b) return a.player < b.player end)
+	elseif sortOrder == "class" then
+		-- Sort by class (alphabetical)
+		tsort(activeKoS, function(a, b)
+			local classA = SpyPerCharDB.PlayerData[a.player] and SpyPerCharDB.PlayerData[a.player].class or "ZZZ"
+			local classB = SpyPerCharDB.PlayerData[b.player] and SpyPerCharDB.PlayerData[b.player].class or "ZZZ"
+			return classA < classB
+		end)
+		tsort(inactiveKoS, function(a, b)
+			local classA = SpyPerCharDB.PlayerData[a.player] and SpyPerCharDB.PlayerData[a.player].class or "ZZZ"
+			local classB = SpyPerCharDB.PlayerData[b.player] and SpyPerCharDB.PlayerData[b.player].class or "ZZZ"
+			return classA < classB
+		end)
+		tsort(active, function(a, b)
+			local classA = SpyPerCharDB.PlayerData[a.player] and SpyPerCharDB.PlayerData[a.player].class or "ZZZ"
+			local classB = SpyPerCharDB.PlayerData[b.player] and SpyPerCharDB.PlayerData[b.player].class or "ZZZ"
+			return classA < classB
+		end)
+		tsort(inactive, function(a, b)
+			local classA = SpyPerCharDB.PlayerData[a.player] and SpyPerCharDB.PlayerData[a.player].class or "ZZZ"
+			local classB = SpyPerCharDB.PlayerData[b.player] and SpyPerCharDB.PlayerData[b.player].class or "ZZZ"
+			return classA < classB
+		end)
+	else
+		-- Sort by time (newest first) - default
+		tsort(activeKoS, function(a, b) return a.time > b.time end)
+		tsort(inactiveKoS, function(a, b) return a.time > b.time end)
+		tsort(active, function(a, b) return a.time > b.time end)
+		tsort(inactive, function(a, b) return a.time > b.time end)
+	end
 
 	local list = {}
 	for player in pairs(activeKoS) do tinsert(list, activeKoS[player]) end
