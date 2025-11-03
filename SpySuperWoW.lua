@@ -271,7 +271,7 @@ function SpySW:AddUnit(unit)
 			self.nameToGuid[playerName] = guid
 		end
 		
-		-- ✅ Separate nach Faction
+		-- ✅ Separate by faction
 		local playerFaction = UnitFactionGroup("player")
 		local targetFaction = UnitFactionGroup(guid)
 		
@@ -325,8 +325,8 @@ function SpySW:GetGUIDFromName(playerName)
 	-- Check nameToGuid map first (fastest)
 	local guid = self.nameToGuid[playerName]
 	if guid then
-		-- ✅ WICHTIG: GUID zurückgeben auch wenn UnitExists false ist!
-		-- SuperWoW's TargetUnit() kann auch Spieler außer Reichweite targetieren
+		-- ✅ IMPORTANT: GUID zurückgeben auch wenn UnitExists false ist!
+		-- SuperWoW's TargetUnit() kann auch player außer Reichweite targetieren
 		return guid
 	end
 	
@@ -444,15 +444,22 @@ function SpySW:ScanNearbyPlayers()
 	self.Stats.scansPerformed = self.Stats.scansPerformed + 1
 	self.Stats.lastScanTime = currentTime
 	
-	-- ✅ Loop nur über ENEMY GUIDs (keine Freunde mehr!)
+	-- ✅ Loop only over ENEMY GUIDs (no friendlies anymore!)
 	for guid, lastSeen in pairs(self.enemyGuids) do
-		-- ✅ Simplere Filter (keine Faction-Checks mehr nötig)
-		if UnitExists(guid) and UnitIsPlayer(guid) and not UnitIsDead(guid) and UnitIsPVP(guid) then
-			local playerData = GetPlayerData(guid)
+		-- ✅ CRITICAL FIX: Update timestamp when GUID exists again!
+		-- This ensures that when a player comes back into range, the GUID doesn't get cleaned up
+		if UnitExists(guid) then
+			-- Update the timestamp (player is back in range!)
+			self.enemyGuids[guid] = currentTime
 			
-			if playerData then
-				playerData.guid = guid  -- Store GUID for debugging
-				tinsert(foundPlayers, playerData)
+			-- Now check other filters
+			if UnitIsPlayer(guid) and not UnitIsDead(guid) and UnitIsPVP(guid) then
+				local playerData = GetPlayerData(guid)
+				
+				if playerData then
+					playerData.guid = guid  -- Store GUID for debugging
+					tinsert(foundPlayers, playerData)
+				end
 			end
 		end
 	end
@@ -468,26 +475,53 @@ function SpySW:CleanupOldGUIDs()
 	local removed = 0
 	local now = GetTime()
 	
-	-- ✅ Cleanup main cache
+	-- âœ… Cleanup main cache
 	for guid, lastSeen in pairs(self.guids) do
 		if not UnitExists(guid) then
 			local name = UnitName(guid)
 			if name then
-				-- ✅ IMPORTANT: Don't remove detectedPlayers immediately!
-				-- Players in stealth return UnitExists=false, but we still want to track them
-				-- Only remove after 60 seconds without updates
+				-- âœ… Check if this was an ENEMY or FRIENDLY player
+				local wasEnemy = self.enemyGuids[guid] ~= nil
+				local wasFriendly = self.friendlyGuids[guid] ~= nil
+				
 				local lastDetected = self.detectedPlayers[name]
-				if lastDetected and (now - lastDetected) > 60 then
-					self.detectedPlayers[name] = nil
+				
+				if wasFriendly then
+					-- âœ… FRIENDLY: Remove immediately (no timeout)
+					if lastDetected then
+						self.detectedPlayers[name] = nil
+						if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+							DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW Cleanup]|r Removed friendly " .. name .. " (no timeout)")
+						end
+					end
+				elseif wasEnemy then
+					-- âœ… ENEMY: Only remove after configured timeout
+					if lastDetected then
+						local timeout = Spy.InactiveTimeout or 60
+						if timeout > 0 and (now - lastDetected) > timeout then
+							self.detectedPlayers[name] = nil
+							if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+								DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW Cleanup]|r Removed enemy " .. name .. " after " .. timeout .. "s timeout")
+							end
+						end
+					end
+				else
+					-- âœ… UNKNOWN: Remove immediately (safety fallback)
+					if lastDetected then
+						self.detectedPlayers[name] = nil
+						if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+							DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW Cleanup]|r Removed unknown " .. name .. " (no faction data)")
+						end
+					end
 				end
 				
 				-- Reset stealth state (so it can re-alert when player returns)
 				if self.lastStealthState[name] then
 					self.lastStealthState[name] = nil
 				end
-				-- ✅ WICHTIG: nameToGuid NICHT löschen!
-				-- Die Map bleibt persistent für Targeting, auch wenn Spieler außer Reichweite ist
-				-- Wird nur überschrieben wenn neuer Spieler mit gleichem Namen gesehen wird
+				-- âœ… IMPORTANT: nameToGuid NICHT lÃ¶schen!
+				-- Die Map bleibt persistent fÃ¼r Targeting, auch wenn player auÃŸer Reichweite ist
+				-- Wird nur Ã¼berschrieben wenn neuer player mit gleichem Namen gesehen wird
 			end
 			
 			self.guids[guid] = nil
@@ -495,19 +529,34 @@ function SpySW:CleanupOldGUIDs()
 		end
 	end
 	
-	-- ✅ Cleanup enemy cache
+	-- ✅ CRITICAL FIX: Keep GUIDs in enemyGuids cache longer!
+	-- Don't remove immediately when UnitExists() returns false
+	-- Only remove after the INACTIVE timeout (default 60 seconds)
+	-- This allows the scanner to continue finding the player when they come back into range
 	for guid, lastSeen in pairs(self.enemyGuids) do
 		if not UnitExists(guid) then
-			self.enemyGuids[guid] = nil
+			-- Check how long ago we last saw this GUID
+			local timeSinceLastSeen = now - lastSeen
+			local timeout = Spy.InactiveTimeout or 60
+			
+			-- Only remove after timeout (not immediately!)
+			if timeout > 0 and timeSinceLastSeen > timeout then
+				self.enemyGuids[guid] = nil
+				if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+					local name = UnitName(guid) or "Unknown"
+					DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW Cleanup]|r Removed enemy GUID " .. name .. " from cache after " .. math.floor(timeSinceLastSeen) .. "s")
+				end
+			end
 		end
 	end
 	
-	-- ✅ Cleanup friendly cache
+	-- ✅ Cleanup friendly cache (these can be removed immediately)
 	for guid, lastSeen in pairs(self.friendlyGuids) do
 		if not UnitExists(guid) then
 			self.friendlyGuids[guid] = nil
 		end
 	end
+
 end
 
 --[[===========================================================================
@@ -680,7 +729,7 @@ scanFrame:SetScript("OnUpdate", function()
 					end
 				else
 					-- ✅ NEW: Player already detected - check for stealth state change!
-					-- WICHTIG: Auch bei bereits erkannten Spielern Stealth-Änderungen tracken!
+					-- IMPORTANT: Auch bei bereits erkannten playern Stealth-Änderungen tracken!
 					if isNowStealthed and not wasStealthed then
 						-- Check if player is on Ignore list
 						if not (SpyPerCharDB and SpyPerCharDB.IgnoreData and SpyPerCharDB.IgnoreData[playerName]) then
@@ -732,7 +781,7 @@ scanFrame:SetScript("OnUpdate", function()
 							false
 						)
 						
-						-- WICHTIG: Auch AddDetected aufrufen damit Spy den Timestamp updated
+						-- IMPORTANT: Auch AddDetected aufrufen damit Spy den Timestamp updated
 						if Spy.EnabledInZone then
 							Spy:AddDetected(
 								playerName,
@@ -787,7 +836,7 @@ guidFrame:SetScript("OnEvent", function()
 	
 	if event == "UPDATE_MOUSEOVER_UNIT" then
 		local unit = "mouseover"
-		-- Nur Spieler sammeln
+		-- Nur player sammeln
 		if UnitExists(unit) and UnitIsPlayer(unit) then
 			SpySW:AddUnit(unit)
 		end
@@ -797,7 +846,7 @@ guidFrame:SetScript("OnEvent", function()
 		SpySW:AddUnit("targettarget")
 	elseif event == "PLAYER_TARGET_CHANGED" then
 		local unit = "target"
-		-- Nur Spieler sammeln
+		-- Nur player sammeln
 		if UnitExists(unit) and UnitIsPlayer(unit) then
 			SpySW:AddUnit(unit)
 		end
@@ -809,7 +858,7 @@ guidFrame:SetScript("OnEvent", function()
 		-- ✅ NEW: Handle UNIT_CASTEVENT for instant Stealth detection
 		SpySW:OnUnitCastEvent(arg1, arg2, arg3, arg4, arg5)
 	else
-		-- Für alle anderen Events (UNIT_COMBAT, etc): Nur Spieler sammeln
+		-- Für alle anderen Events (UNIT_COMBAT, etc): Nur player sammeln
 		local unit = arg1
 		if unit and UnitExists(unit) and UnitIsPlayer(unit) then
 			SpySW:AddUnit(unit)
@@ -896,7 +945,7 @@ function SpySW:OnUnitCastEvent(casterGUID, targetGUID, eventType, spellID, castD
         return
     end
     
-    -- Wenn wir diesen Punkt erreichen, ist der Spieler ein angreifbarer, feindlicher Spieler und NICHT auf der Ignorier-Liste.
+    -- Wenn wir diesen Punkt erreichen, ist der player ein angreifbarer, feindlicher player und NICHT auf der Ignorier-Liste.
     
     -- ✅ KRITISCHE KORREKTUR: GUID zum Cache/Scanner hinzufuegen
     -- Dies sorgt dafuer, dass die GUID solange von SpySW ueberwacht wird, bis sie aus der Reichweite ist (Cache-Persistenz).

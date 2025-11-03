@@ -12,10 +12,10 @@ Spy.Distance = {
     enabled = false,
 }
 
--- Speichere die funktionierende UnitXP Methode
+-- Save the working UnitXP method
 local UnitXP_GetDistance = nil
 
--- Check ob UnitXP mit "distanceBetween" funktioniert
+-- Check if UnitXP works with "distanceBetween"
 local function CheckUnitXP()
     if not UnitXP then
         DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SpyRange]|r UnitXP not found - Distance display DISABLED")
@@ -28,7 +28,7 @@ local function CheckUnitXP()
     end)
     
     if success and type(result) == "number" then
-        -- Es funktioniert! Speichere die Methode
+        -- It works! Save the method
         UnitXP_GetDistance = function(unit1, unit2)
             return UnitXP("distanceBetween", unit1, unit2)
         end
@@ -43,7 +43,7 @@ local function CheckUnitXP()
     end
 end
 
--- ✅ FIX: Verzögere Initialisierung bis PLAYER_ENTERING_WORLD
+-- ✅ FIX: Delay initialization until PLAYER_ENTERING_WORLD
 Spy.Distance.initialized = false
 
 function Spy.Distance:Initialize()
@@ -65,7 +65,7 @@ function Spy.Distance:Initialize()
     return true
 end
 
--- Temporäre Dummy-Funktionen bis Initialize()
+-- Temporary dummy functions until Initialize()
 function Spy.Distance:GetDistance(playerName) 
     if not self.initialized then self:Initialize() end
     return nil 
@@ -75,7 +75,7 @@ function Spy.Distance:FormatDistance(distance) return "|cff888888--|r" end
 function Spy.Distance:CleanCache() end
 
 -- ======================================================================
--- AB HIER NUR CODE WENN UNITXP VERFÜGBAR IST
+-- FROM HERE ONLY CODE IF UNITXP IS AVAILABLE
 -- ======================================================================
 
 -- Get distance for a player by name
@@ -255,10 +255,15 @@ local function HookSetBar()
         Row.RightText:SetJustifyH("RIGHT")
         
         if Spy.Distance.debug then
-            DEFAULT_CHAT_FRAME:AddMessage(string.format(
-                "|cff00ff00[Distance]|r SetBar(%d, %s) widths: Name=%.0f, Dist=%.0f, Detail=%.0f",
-                num, name, nameWidth, distWidth, detailWidth
-            ))
+            -- Only log if values changed
+            local debugKey = string.format("%d:%s:%.0f:%.0f:%.0f", num, name, nameWidth, distWidth, detailWidth)
+            if not Row._lastDebugKey or Row._lastDebugKey ~= debugKey then
+                Row._lastDebugKey = debugKey
+                DEFAULT_CHAT_FRAME:AddMessage(string.format(
+                    "|cff00ff00[Distance]|r SetBar(%d, %s) widths: Name=%.0f, Dist=%.0f, Detail=%.0f",
+                    num, name, nameWidth, distWidth, detailWidth
+                ))
+            end
         end
     end
 end

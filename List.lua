@@ -1094,6 +1094,10 @@ function Spy:AddDetectedToLists(player, timestamp, learnt, source)
 			end
 		end
 	elseif not Spy.ActiveList[player] then
+		-- ✅ Player is in NearbyList but NOT in ActiveList (was inactive/grayed out)
+		-- This happens when player was out of range for >10s (inactive) but still in Nearby
+		-- Now they're back in range, so we move them from inactive to active
+		
 		if Spy.db.profile.ShowOnDetection and not Spy.db.profile.MainWindowVis then
 			Spy:SetCurrentList(1)
 			Spy:EnableSpy(true, true, true)
@@ -1107,27 +1111,42 @@ function Spy:AddDetectedToLists(player, timestamp, learnt, source)
 		Spy.InactiveList[player] = nil
 		Spy:UpdateActiveCount()
 
-		if Spy.PlayerCommList[player] ~= nil then
-			if Spy.db.profile.CurrentList == 1 then
+		-- ✅ ALWAYS refresh the UI to update opacity (grayed out -> active)
+		if Spy.db.profile.CurrentList == 1 then
+			-- Check if we got this from comm system (needs alert/announce)
+			if Spy.PlayerCommList[player] ~= nil then
 				Spy:RefreshCurrentList(player, source)
 			else
+				-- Got it from direct detection (SuperWoW) - just refresh without alert
+				Spy:RefreshCurrentList()
+			end
+		else
+			-- We're not in Nearby list view, but still need to alert if from comm
+			if Spy.PlayerCommList[player] ~= nil then
 				if not source or source ~= Spy.CharacterName then
 					Spy:AlertPlayer(player, source)
 					if not source then Spy:AnnouncePlayer(player) end
 				end
 			end
-		else
-			if Spy.db.profile.CurrentList == 1 then
-				Spy:RefreshCurrentList()
-			end
 		end
 	else
 		-- ✅ FIX: Update timestamps for players already in all lists
+		-- Player is ALREADY in ActiveList AND in NearbyList
+		-- This happens when:
+		-- 1. Player was detected, went out of range (stayed in Nearby due to timeout)
+		-- 2. Player came back into range and was detected again
+		-- 3. SuperWoW scans them continuously while in range
+		
 		Spy.NearbyList[player] = timestamp
 		Spy.ActiveList[player] = timestamp
 		Spy.LastHourList[player] = timestamp
 		Spy:UpdateActiveCount()
-		if learnt and Spy.db.profile.CurrentList == 1 then
+		
+		-- ✅ CRITICAL FIX: Always refresh the UI when in Nearby list mode
+		-- Even if no new information was learned (learnt == false)
+		-- This ensures the player shows as "active" (not grayed out) immediately
+		-- when they come back into range
+		if Spy.db.profile.CurrentList == 1 then
 			Spy:RefreshCurrentList()
 		end
 	end

@@ -2436,11 +2436,11 @@ function Spy:CommReceived(prefix, message, distribution, source)
 							if level < -1 or level > Spy.MaximumPlayerLevel or (level > 0 and math.floor(level) ~= level) then
 								return
 							end
-							-- ✅ Konvertiere negative Level zu 0 (= "??")
+							-- ✅ Convert negative levels to 0 (= "??")
 							if level < 0 then
 								level = 0
 							end
-							-- ✅ Level 0 bleibt jetzt 0 (wird nicht zu nil)
+							-- ✅ Level 0 now stays 0 (not converted to nil)
 						else
 							return
 						end
@@ -2529,9 +2529,9 @@ function Spy:ParseUnitDetails(name, class, level, race, zone, subZone, mapX, map
 		learnt = true
 	end
 	
-	-- ✅ Update level (auch 0 akzeptieren für "??")
+	-- ✅ Update level (also accept 0 for "??")
 	if level ~= nil and not playerData.level then
-		-- Level 0 = "??" (zu hoch/zu niedrig)
+		-- Level 0 = "??" (too high/too low)
 		playerData.level = level
 		learnt = true
 	end
