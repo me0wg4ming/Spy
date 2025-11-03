@@ -1798,6 +1798,7 @@ function Spy:OnEnable(first)
 	Spy.timeid = Spy:ScheduleRepeatingTimer("ManageExpirations", 10, 1, true)
 	Spy:RegisterEvent("ZONE_CHANGED", "ZoneChangedEvent")
 	Spy:RegisterEvent("ZONE_CHANGED_NEW_AREA", "ZoneChangedEvent")
+	Spy:RegisterEvent("ZONE_CHANGED_INDOORS", "ZoneChangedEvent")
 	Spy:RegisterEvent("PLAYER_ENTERING_WORLD", "ZoneChangedEvent")
 	Spy:RegisterEvent("UNIT_FACTION", "ZoneChangedEvent")
 	

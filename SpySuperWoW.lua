@@ -771,6 +771,10 @@ scanFrame:SetScript("OnUpdate", function()
 					-- Player already detected - update timestamp to keep them in Nearby list
 					-- Check if player is on Ignore list (even for already detected players)
 					if not (SpyPerCharDB and SpyPerCharDB.IgnoreData and SpyPerCharDB.IgnoreData[playerName]) then
+			-- ✅ CRITICAL FIX: Update detectedPlayers timestamp!
+			-- This prevents the 60s cleanup timer from removing players who are still in range
+			SpySW.detectedPlayers[playerName] = GetTime()
+
 						Spy:UpdatePlayerData(
 							playerName,
 							playerData.classToken,
