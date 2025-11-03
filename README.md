@@ -20,44 +20,40 @@
 
 ---
 
-## 🚀 What's New in Version 3.9.5
+## 🚀 What's New in Version 3.9.6
 
-### 🐛 Major Bugfixes (October 29, 2025)
+### 🆕 Major Features (November 3, 2025)
 
-- ✅ **Fixed Stealth State Tracking** - Stealth state now resets properly when buffs fade
-- ✅ **Fixed Nearby List Timestamps** - Players no longer get grayed out/removed while actively casting
-- ✅ **Fixed Duplicate Alerts** - Consecutive stealth casts (Prowl → Shadowmeld) now trigger alerts correctly
-- ✅ **Added Combat Log GUID Extraction** - Improved player tracking even when only GUID is visible in combat log
-- ✅ **Fixed detectedPlayers Cleanup** - Now uses 60-second timeout instead of immediate removal
-- ✅ **Removed Duplicate Detection Messages** - No more spam of "NEW" messages for already-detected players
+- ✅ **Win/Loss Statistics Fixed** - Death events now correctly tracked with GUID resolution
+- ✅ **Distance Display** - Shows range to every player in real-time (requires UnitXP)
+- ✅ **Responsive Layout** - Distance column automatically adjusts to window width
+- ✅ **Optimized Column Widths** - Name: 55%, Distance: 15%, Details: 30%
+- ✅ **Color-Coded Ranges** - Blue (Melee) to Red (Out of Range)
 
-### Major Features
+### 📊 Distance Display Features
 
-- ✅ **SuperWoW Integration** - GUID-based player detection (REQUIRED)
-- ✅ **Proactive Detection** - Finds enemies BEFORE they attack you
-- ✅ **Advanced Stealth Detection** - Multiple methods including UNIT_CASTEVENT
-- ✅ **Stealth-Only Mode** - Detect stealthed players even when Spy is disabled
-- ✅ **Real Level Data** - No more guessing, SuperWoW provides exact values
-- ✅ **Nearby Counter** - Visual display of active enemies
-- ✅ **Announce Button** - Quick announce to party/raid/say
-- ✅ **Statistics Overhaul** - Redesigned stats window with improved filtering
-- ✅ **Window Size Optimization** - Better scaling and auto-resize options
-- ✅ **Unlimited Range Detection** - As far as you can see enemies
-- ✅ **Instant Enable/Disable** - No reload required
-- ✅ **Goblin & High Elf Support** - Added missing races for custom servers
-- ✅ **Profile System** - Proper profile loading without errors
-- ✅ **Advanced Filter System** - Search by name/guild in Statistics
-- ✅ **Always Clear Option** - Automatic nearby list cleanup
-- ✅ **Ignore List Protection** - Ignored players won't trigger detection
+- **Real-Time Updates** - Distance is updated every 0.1s
+- **GUID-Based Tracking** - Works with SpySW Integration
+- **Color Coding:**
+  - 🔵 Blue: < 5m (Melee Range)
+  - 🔵 Light Blue: 5-8m
+  - 🔵 Cyan: 8-20m
+  - 🟢 Green: 20-30m
+  - 🟡 Yellow: 30-41m
+  - 🔴 Red: > 41m (Out of Range)
+- **Commands:** `/spydist` - Shows status and current distances
 
-### Performance Improvements
+### 🐛 Critical Bugfixes
 
-- 🔧 Cleaned up unused TBC/WotLK features
-- 🔧 Removed non-functional Vanilla features (map notes, KoS button on target frame)
-- 🔧 Optimized GUID scanning (0.5s interval)
-- 🔧 Better pet filtering to prevent false detections
-- 🔧 Efficient memory usage with automatic cleanup
+- ✅ **Death Event Parsing** - Vanilla "X dies." pattern is now correctly recognized
+- ✅ **GUID Resolution** - `UnitName(guid)` for direct GUID-to-Name resolution
+- ✅ **LastAttack Tracking** - GUIDs are automatically resolved to names
+- ✅ **Win/Loss Logic** - Statistics now show correct values (Win = I won, Loss = I lost)
 
+**Version:** 3.9.6
+**Release Date:** November 3, 2025
+**Requirements:** SuperWoW 1.12.1+ (MANDATORY), UnitXP (OPTIONAL for Distance Display)
+**Status:** Stable & Production-Ready
 ---
 
 ## ⚠️ CRITICAL: SuperWoW is REQUIRED
