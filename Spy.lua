@@ -2336,8 +2336,18 @@ function Spy:DeathLogEvent()
 					if playerData then
 						if not playerData.wins then playerData.wins = 0 end
 						playerData.wins = playerData.wins + 1
+						
+						-- ✅ Try to get and store GUID for victim
+						if SpySW and SpySW.nameToGuid then
+							local victimGuid = SpySW.nameToGuid[victim]
+							if victimGuid and not playerData.guid then
+								playerData.guid = victimGuid
+							end
+						end
+						
 						if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-							DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy Death]|r ✓ WIN counted for " .. victim .. " (total: " .. playerData.wins .. ")")
+							local guidInfo = playerData.guid and (" [GUID: " .. playerData.guid .. "]") or ""
+							DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy Death]|r ✓ WIN counted for " .. victim .. guidInfo .. " (total: " .. playerData.wins .. ")")
 						end
 					else
 						if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
@@ -2360,44 +2370,80 @@ function Spy:DeathLogEvent()
 	elseif event == "CHAT_MSG_COMBAT_FRIENDLY_DEATH" then
 		-- Check if YOU died
 		if strfind(message, "^You die") or strfind(message, "^You have died") then
-			-- YOU died - use LastAttack to find killer
-			local killer = Spy.LastAttack
+			-- ✅ DELAY death processing by 0.5s to catch late damage events
+			-- Combat log events sometimes arrive out of order!
+			if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+				DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy Death]|r Delaying death processing 0.5s to catch late hits...")
+			end
 			
-			if killer then
-				-- Strip realm name if exists
-				local realmSep = strfind(killer, "-")
-				if realmSep then
-					killer = strsub(killer, 1, realmSep - 1)
+			-- Schedule delayed processing
+			Spy:ScheduleTimer("ProcessPlayerDeath", 0.5)
+		end
+	end
+end
+
+-- ✅ NEW: Process player death with delay (called by timer)
+function Spy:ProcessPlayerDeath()
+	local playerName = UnitName("player")
+	
+	-- YOU died - use LastAttack to find killer
+	local killer = Spy.LastAttack
+	local killerGuid = Spy.LastAttackGuid
+	
+	if killer then
+		-- Strip realm name if exists
+		local realmSep = strfind(killer, "%-")
+		if realmSep then
+			killer = strsub(killer, 1, realmSep - 1)
+		end
+		
+		-- ✅ Try to get GUID if we only have name
+		if not killerGuid and SpySW and SpySW.nameToGuid then
+			killerGuid = SpySW.nameToGuid[killer]
+		end
+		
+		-- If killer is a GUID string, try to resolve to name
+		if strfind(tostring(killer), "^0x") then
+			if SpySW and SpySW.GetNameFromGUID then
+				local resolvedName = SpySW:GetNameFromGUID(killer)
+				if resolvedName then
+					killer = resolvedName
 				end
-				
-				-- If killer is a GUID, try to resolve to name
-				if strfind(tostring(killer), "0x") and SpySW and SpySW.GetNameFromGUID then
-					local resolvedName = SpySW:GetNameFromGUID(killer)
-					if resolvedName then
-						killer = resolvedName
-					end
-				end
-				
-				local playerData = SpyPerCharDB.PlayerData[killer]
-				if playerData then
-					if not playerData.loses then playerData.loses = 0 end
-					playerData.loses = playerData.loses + 1
-					if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-						DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Death]|r ✓ LOSS counted for " .. killer .. " (total: " .. playerData.loses .. ")")
-					end
-				else
-					if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-						DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy Death]|r ⚠ LOSS not counted - " .. killer .. " not in database")
-					end
-				end
-				
-				-- Reset LastAttack after processing death
-				Spy.LastAttack = nil
-			else
-				if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-					DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Death]|r ✗ YOU died but no LastAttack found")
+			elseif UnitExists(killer) then
+				local resolvedName = UnitName(killer)
+				if resolvedName then
+					killerGuid = killer
+					killer = resolvedName
 				end
 			end
+		end
+		
+		local playerData = SpyPerCharDB.PlayerData[killer]
+		if playerData then
+			if not playerData.loses then playerData.loses = 0 end
+			playerData.loses = playerData.loses + 1
+			
+			-- ✅ Store GUID if available
+			if killerGuid and not playerData.guid then
+				playerData.guid = killerGuid
+			end
+			
+			if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+				local guidInfo = killerGuid and (" [GUID: " .. killerGuid .. "]") or ""
+				DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Death]|r ✓ LOSS counted for " .. killer .. guidInfo .. " (total: " .. playerData.loses .. ")")
+			end
+		else
+			if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+				DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy Death]|r ⚠ LOSS not counted - " .. killer .. " not in database")
+			end
+		end
+		
+		-- Reset LastAttack after processing death
+		Spy.LastAttack = nil
+		Spy.LastAttackGuid = nil
+	else
+		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Death]|r ✗ YOU died but no LastAttack found")
 		end
 	end
 end
@@ -2433,74 +2479,136 @@ function Spy:RawCombatLogEvent()
 		end
 	end
 	
-	-- ✅ NEW: Track LastAttack from damage messages
+	-- ✅ IMPROVED: Track LastAttack from damage messages with comprehensive patterns
 	local playerName = UnitName("player")
 	
 	-- Skip self-damage (Hellfire, Life Tap, etc)
-	if eventText and (strfind(eventText, "You suffer") or strfind(eventText, "your own")) then
+	if eventText and (strfind(eventText, "your own") or strfind(eventText, "You lose")) then
 		return
 	end
 	
-	-- ✅ Track attacker from various damage patterns
-	if eventText and (strfind(eventText, "hits you") or strfind(eventText, "crits you") or strfind(eventText, "damage%.")) then
-		local attacker = nil
-		
-		-- Pattern 1: "GUID's Spell hits you for X"
-		local _, _, guid = strfind(eventText, "^(0x%x+)'s .+ hits you")
-		if guid then
+	if not eventText then return end
+	
+	-- ✅ Track attacker from COMPREHENSIVE damage patterns
+	local attacker = nil
+	local attackerGuid = nil
+	
+	-- === GUID-based patterns (SuperWoW) ===
+	-- Pattern: "GUID hits you"
+	if not attacker then
+		local _, _, guid = strfind(eventText, "^(0x%x+) hits you")
+		if guid and UnitExists(guid) then
+			attackerGuid = guid
+			attacker = UnitName(guid)
+		end
+	end
+	
+	-- Pattern: "GUID crits you"
+	if not attacker then
+		local _, _, guid = strfind(eventText, "^(0x%x+) crits you")
+		if guid and UnitExists(guid) then
+			attackerGuid = guid
+			attacker = UnitName(guid)
+		end
+	end
+	
+	-- Pattern: "GUID's Spell hits/crits you"
+	if not attacker then
+		local _, _, guid = strfind(eventText, "^(0x%x+)'s .+ (%a+) you")
+		if guid and UnitExists(guid) then
+			attackerGuid = guid
+			attacker = UnitName(guid)
+		end
+	end
+	
+	-- === Name-based patterns ===
+	-- Pattern: "Name hits you"
+	if not attacker then
+		_, _, attacker = strfind(eventText, "^(.+) hits you")
+	end
+	
+	-- Pattern: "Name crits you"
+	if not attacker then
+		_, _, attacker = strfind(eventText, "^(.+) crits you")
+	end
+	
+	-- Pattern: "Name's Spell hits you"
+	if not attacker then
+		_, _, attacker = strfind(eventText, "^(.+)'s .+ hits you")
+	end
+	
+	-- Pattern: "Name's Spell crits you"
+	if not attacker then
+		_, _, attacker = strfind(eventText, "^(.+)'s .+ crits you")
+	end
+	
+	-- === DoT patterns (Moonfire, etc) ===
+	-- Pattern: "You suffer X damage from Name's Spell"
+	if not attacker then
+		_, _, attacker = strfind(eventText, "damage from (.+)'s")
+	end
+	
+	-- Pattern: "Name's Spell hits you for X Y damage"
+	if not attacker then
+		_, _, attacker = strfind(eventText, "^(.+)'s .+ hits you for %d+")
+	end
+	
+	-- === Afflict/Absorb patterns ===
+	-- Pattern: "You are afflicted by Name's Spell"
+	if not attacker then
+		_, _, attacker = strfind(eventText, "afflicted by (.+)'s")
+	end
+	
+	-- Pattern: "Name's Spell was absorbed"
+	if not attacker then
+		_, _, attacker = strfind(eventText, "^(.+)'s .+ was absorbed")
+	end
+	
+	-- === Special cases ===
+	-- Pattern: "Name gains X from Spell" (life drain, etc)
+	if not attacker then
+		_, _, attacker = strfind(eventText, "^(.+) gains %d+ .- from")
+	end
+	
+	-- Process attacker if found
+	if attacker then
+		-- ✅ If attacker is a GUID string, resolve to name
+		if strfind(tostring(attacker), "^0x") then
+			local guid = attacker
+			attackerGuid = guid
+			
+			-- Try to resolve GUID to name
 			if UnitExists(guid) then
 				attacker = UnitName(guid)
+			elseif SpySW and SpySW.GetNameFromGUID then
+				attacker = SpySW:GetNameFromGUID(guid)
 			end
-		end
-		
-		-- Pattern 2: "Name's Spell hits you for X"
-		if not attacker then
-			_, _, attacker = strfind(eventText, "^(.+)'s .+ hits you")
-		end
-		
-		-- Pattern 3: "GUID hits you for X"
-		if not attacker then
-			_, _, guid = strfind(eventText, "^(0x%x+) hits you")
-			if guid and UnitExists(guid) then
-				attacker = UnitName(guid)
+			
+			-- If we still can't resolve, skip this attacker
+			if not attacker or strfind(tostring(attacker), "^0x") then
+				if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+					DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy LastAttack]|r Could not resolve GUID: " .. tostring(guid))
+				end
+				attacker = nil
 			end
-		end
-		
-		-- Pattern 4: "Name hits you for X"
-		if not attacker then
-			_, _, attacker = strfind(eventText, "^(.+) hits you for")
-		end
-		
-		-- Pattern 5: "GUID crits you for X"
-		if not attacker then
-			_, _, guid = strfind(eventText, "^(0x%x+) crits you")
-			if guid and UnitExists(guid) then
-				attacker = UnitName(guid)
-			end
-		end
-		
-		-- Pattern 6: "Name crits you for X"
-		if not attacker then
-			_, _, attacker = strfind(eventText, "^(.+) crits you")
-		end
-		
-		-- Pattern 7: "You suffer X damage from Name's Spell"
-		if not attacker then
-			_, _, attacker = strfind(eventText, "damage from (.+)'s")
 		end
 		
 		-- Strip realm name if exists
 		if attacker then
-			local realmSep = strfind(attacker, "-")
+			local realmSep = strfind(attacker, "%-")
 			if realmSep then
 				attacker = strsub(attacker, 1, realmSep - 1)
 			end
 			
-			-- Only set if it's not yourself and not a GUID
-			if attacker ~= playerName and not strfind(attacker, "0x") then
+			-- Only set if it's not yourself
+			if attacker ~= playerName then
+				-- Store both name and GUID if available
 				Spy.LastAttack = attacker
+				Spy.LastAttackGuid = attackerGuid
+				
 				if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-					DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy LastAttack]|r Set to: " .. tostring(attacker))
+					local guidInfo = attackerGuid and (" [GUID: " .. attackerGuid .. "]") or ""
+					DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy LastAttack]|r Set to: " .. tostring(attacker) .. guidInfo)
 				end
 			end
 		end
@@ -2509,6 +2617,7 @@ end
 
 function Spy:LeftCombatEvent()
 	Spy.LastAttack = nil
+	Spy.LastAttackGuid = nil
 	Spy:RefreshCurrentList()
 end
 
