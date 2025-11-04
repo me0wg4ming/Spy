@@ -2376,6 +2376,9 @@ function Spy:DeathLogEvent()
 				DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy Death]|r Delaying death processing 0.5s to catch late hits...")
 			end
 			
+			-- ✅ FIX: Set flag to prevent LeftCombatEvent from clearing LastAttack
+			Spy.ProcessingDeath = true
+			
 			-- Schedule delayed processing
 			Spy:ScheduleTimer("ProcessPlayerDeath", 0.5)
 		end
@@ -2419,32 +2422,45 @@ function Spy:ProcessPlayerDeath()
 		end
 		
 		local playerData = SpyPerCharDB.PlayerData[killer]
-		if playerData then
-			if not playerData.loses then playerData.loses = 0 end
-			playerData.loses = playerData.loses + 1
+		
+		-- ✅ FIX: Create player entry if not exists (timing issue with scanner)
+		if not playerData then
+			SpyPerCharDB.PlayerData[killer] = {}
+			playerData = SpyPerCharDB.PlayerData[killer]
 			
-			-- ✅ Store GUID if available
-			if killerGuid and not playerData.guid then
+			-- Store GUID if available
+			if killerGuid then
 				playerData.guid = killerGuid
 			end
 			
 			if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-				local guidInfo = killerGuid and (" [GUID: " .. killerGuid .. "]") or ""
-				DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Death]|r ✓ LOSS counted for " .. killer .. guidInfo .. " (total: " .. playerData.loses .. ")")
+				DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy Death]|r ⚠ Created new entry for " .. killer)
 			end
-		else
-			if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-				DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy Death]|r ⚠ LOSS not counted - " .. killer .. " not in database")
-			end
+		end
+		
+		-- Count the loss
+		if not playerData.loses then playerData.loses = 0 end
+		playerData.loses = playerData.loses + 1
+		
+		-- ✅ Store GUID if available
+		if killerGuid and not playerData.guid then
+			playerData.guid = killerGuid
+		end
+		
+		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+			local guidInfo = killerGuid and (" [GUID: " .. killerGuid .. "]") or ""
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Death]|r ✓ LOSS counted for " .. killer .. guidInfo .. " (total: " .. playerData.loses .. ")")
 		end
 		
 		-- Reset LastAttack after processing death
 		Spy.LastAttack = nil
 		Spy.LastAttackGuid = nil
+		Spy.ProcessingDeath = false  -- ✅ FIX: Reset processing flag
 	else
 		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Death]|r ✗ YOU died but no LastAttack found")
 		end
+		Spy.ProcessingDeath = false  -- ✅ FIX: Reset processing flag even if no attacker found
 	end
 end
 
@@ -2529,46 +2545,48 @@ function Spy:RawCombatLogEvent()
 	end
 	
 	-- === Name-based patterns ===
-	-- Pattern: "Name hits you"
-	if not attacker then
-		_, _, attacker = strfind(eventText, "^(.+) hits you")
-	end
-	
-	-- Pattern: "Name crits you"
-	if not attacker then
-		_, _, attacker = strfind(eventText, "^(.+) crits you")
-	end
+	-- ✅ WICHTIG: Spezifische Patterns mit "'s" ZUERST, sonst matched "Name crits you" zu viel!
 	
 	-- Pattern: "Name's Spell hits you"
 	if not attacker then
-		_, _, attacker = strfind(eventText, "^(.+)'s .+ hits you")
+		_, _, attacker = strfind(eventText, "^([^']+)'s .+ hits you")
 	end
 	
 	-- Pattern: "Name's Spell crits you"
 	if not attacker then
-		_, _, attacker = strfind(eventText, "^(.+)'s .+ crits you")
+		_, _, attacker = strfind(eventText, "^([^']+)'s .+ crits you")
+	end
+	
+	-- Pattern: "Name hits you" (generisch, kommt NACH den spezifischen)
+	if not attacker then
+		_, _, attacker = strfind(eventText, "^(.+) hits you")
+	end
+	
+	-- Pattern: "Name crits you" (generisch, kommt NACH den spezifischen)
+	if not attacker then
+		_, _, attacker = strfind(eventText, "^(.+) crits you")
 	end
 	
 	-- === DoT patterns (Moonfire, etc) ===
 	-- Pattern: "You suffer X damage from Name's Spell"
 	if not attacker then
-		_, _, attacker = strfind(eventText, "damage from (.+)'s")
+		_, _, attacker = strfind(eventText, "damage from ([^']+)'s")
 	end
 	
 	-- Pattern: "Name's Spell hits you for X Y damage"
 	if not attacker then
-		_, _, attacker = strfind(eventText, "^(.+)'s .+ hits you for %d+")
+		_, _, attacker = strfind(eventText, "^([^']+)'s .+ hits you for %d+")
 	end
 	
 	-- === Afflict/Absorb patterns ===
 	-- Pattern: "You are afflicted by Name's Spell"
 	if not attacker then
-		_, _, attacker = strfind(eventText, "afflicted by (.+)'s")
+		_, _, attacker = strfind(eventText, "afflicted by ([^']+)'s")
 	end
 	
 	-- Pattern: "Name's Spell was absorbed"
 	if not attacker then
-		_, _, attacker = strfind(eventText, "^(.+)'s .+ was absorbed")
+		_, _, attacker = strfind(eventText, "^([^']+)'s .+ was absorbed")
 	end
 	
 	-- === Reflect/Thorns patterns ===
@@ -2638,8 +2656,13 @@ function Spy:RawCombatLogEvent()
 end
 
 function Spy:LeftCombatEvent()
-	Spy.LastAttack = nil
-	Spy.LastAttackGuid = nil
+	-- ✅ FIX: Don't clear LastAttack if we're processing a death
+	-- This prevents the combat-exit event from clearing the killer info
+	-- before the delayed death processing (0.5s timer) completes
+	if not Spy.ProcessingDeath then
+		Spy.LastAttack = nil
+		Spy.LastAttackGuid = nil
+	end
 	Spy:RefreshCurrentList()
 end
 
