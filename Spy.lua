@@ -2489,6 +2489,13 @@ function Spy:RawCombatLogEvent()
 	
 	if not eventText then return end
 	
+	-- ✅ DEBUG: Show all hits/crits to check for pet names
+	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+		if strfind(eventText, " hits you") or strfind(eventText, " crits you") then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy Pet Debug]|r HIT TEXT: " .. tostring(eventText))
+		end
+	end
+	
 	-- ✅ Track attacker from COMPREHENSIVE damage patterns
 	local attacker = nil
 	local attackerGuid = nil
@@ -2564,8 +2571,23 @@ function Spy:RawCombatLogEvent()
 		_, _, attacker = strfind(eventText, "^(.+)'s .+ was absorbed")
 	end
 	
-	-- === Special cases ===
-	-- Pattern: "Name gains X from Spell" (life drain, etc)
+	-- === Reflect/Thorns patterns ===
+	-- Pattern: "GUID reflects X damage to you" (Thorns, Fire Shield, etc)
+	if not attacker then
+		local _, _, guid = strfind(eventText, "^(0x%x+) reflects %d+ .+ damage to you")
+		if guid and UnitExists(guid) then
+			attackerGuid = guid
+			attacker = UnitName(guid)
+		end
+	end
+	
+	-- Pattern: "Name reflects X damage to you"
+	if not attacker then
+		_, _, attacker = strfind(eventText, "^(.+) reflects %d+ .+ damage to you")
+	end
+	
+	-- === Drain/Leech patterns ===
+	-- Pattern: "Name gains X from Spell" (Life Drain, Mana Drain that damages you)
 	if not attacker then
 		_, _, attacker = strfind(eventText, "^(.+) gains %d+ .- from")
 	end
