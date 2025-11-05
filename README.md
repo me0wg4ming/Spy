@@ -26,7 +26,6 @@
 
 - ✅ **Complete Rework of Frame System** - Individual persistent frames for each player instead of reusable row pool
 - ✅ **Live HP Bars** - Real-time health percentage display with class-colored bars
-- ✅ **Combat Feedback Integration** - Damage numbers appear on player frames (UNIT_COMBAT events)
 - ✅ **Improved Click Detection** - Frames no longer hide/show on every refresh, fixing click reliability issues
 - ✅ **Frame Persistence** - Each player maintains their own frame, eliminating visual flickering
 - ✅ **Sorting Stability** - Uses millisecond-precision DetectionTimestamp instead of second-precision time()
