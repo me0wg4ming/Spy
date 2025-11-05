@@ -120,17 +120,17 @@ function Spy:SetupBar(row)
 	end)
 end
 
--- NEU: Erstelle permanenten Frame für einen Spieler (wie ShaguScan)
+-- NEW: Create permanent frame for a player (like ShaguScan)
 function Spy:CreatePlayerFrame(playerName)
 	-- Prüfe ob Frame bereits existiert
 	if Spy.MainWindow.PlayerFrames[playerName] then
 		return Spy.MainWindow.PlayerFrames[playerName]
 	end
 	
-	-- Sanitize playerName für Frame-Namen (entferne Sonderzeichen)
+	-- Sanitize playerName for frame name (remove special characters)
 	local safeName = string.gsub(playerName, "[^%w]", "_")
 	
-	-- Frame erstellen (wie ShaguScan)
+	-- Create frame (like ShaguScan)
 	local frame = CreateFrame("Button", nil, Spy.MainWindow)
 	frame:EnableMouse(true)  -- ✅ CRITICAL für Klicks
 	frame:RegisterForClicks("LeftButtonUp", "RightButtonUp")  -- ✅ CRITICAL für Klicks
@@ -172,11 +172,11 @@ function Spy:CreatePlayerFrame(playerName)
 	-- Setup Bar (wie bei normalen Rows)
 	Spy:SetupBar(frame)
 	
-	-- ✅ CRITICAL: SetFrameLevel damit Frame über anderen UI-Elementen liegt
+	-- ✅ CRITICAL: SetFrameLevel so frame appears above other UI elements
 	frame:SetFrameLevel(Spy.MainWindow:GetFrameLevel() + 5)
 	frame.StatusBar:SetFrameLevel(Spy.MainWindow:GetFrameLevel() + 4)
 	
-	-- Combat feedback text für CombatFeedback_OnCombatEvent
+	-- Combat feedback text for CombatFeedback_OnCombatEvent
 	local feedback = frame.StatusBar:CreateFontString(nil, "OVERLAY", "NumberFontNormalHuge")
 	feedback:SetAlpha(.8)
 	feedback:SetFont(DAMAGE_TEXT_FONT, 12, "OUTLINE")
@@ -195,7 +195,7 @@ function Spy:CreatePlayerFrame(playerName)
 		end
 	end)
 	
-	-- OnEnter/OnLeave für Tooltip
+	-- OnEnter/OnLeave for tooltip
 	frame:SetScript("OnEnter", function()
 		Spy:ShowTooltip(true)
 	end)
@@ -203,7 +203,7 @@ function Spy:CreatePlayerFrame(playerName)
 		Spy:ShowTooltip(false)
 	end)
 	
-	-- OnUpdate für HP
+	-- OnUpdate for HP
 	frame:SetScript("OnUpdate", function()
 		if not this:IsShown() then return end
 		if (this.hpTick or 0) > GetTime() then return end
@@ -226,7 +226,7 @@ function Spy:CreatePlayerFrame(playerName)
 		end
 	end)
 	
-	-- ✅ OnClick NUR EINMAL setzen beim Erstellen
+	-- ✅ OnClick ONLY SET ONCE during creation
 	frame:SetScript("OnClick", function()
 		-- RightButton: Dropdown
 		if arg1 == "RightButton" then
@@ -267,7 +267,7 @@ function Spy:CreatePlayerFrame(playerName)
 	end)
 	
 	
-	-- Frame in Tabelle speichern
+	-- Store frame in table
 	Spy.MainWindow.PlayerFrames[playerName] = frame
 	frame:Hide()
 	
@@ -1200,7 +1200,7 @@ local anchors = {["ANCHOR_TOP"] = {"TOP", "BOTTOM"},
 
 function Spy:ShowTooltip(show, id)
 	if show then
-		-- NEU: Hole Name direkt vom Frame anstatt über ButtonName
+		-- NEW: Get name directly from frame instead of ButtonName table
 		local name = this.PlayerName or (this.id and Spy.ButtonName and Spy.ButtonName[this.id])
 		if name and name ~= "" then
 			local titleText = Spy.db.profile.Colors.Tooltip["Title Text"]

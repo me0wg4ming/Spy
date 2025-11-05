@@ -9,7 +9,7 @@ local strgfind = string.gfind
 local tinsert = table.insert
 local tsort = table.sort
 
--- ✅ FIX 1: In RefreshCurrentList() - GUID direkt im Frame speichern
+-- ✅ FIX 1: In RefreshCurrentList() - Store GUID directly in frame
 function Spy:RefreshCurrentList(player, source)
 	local MainWindow = Spy.MainWindow
 	if not MainWindow then return end

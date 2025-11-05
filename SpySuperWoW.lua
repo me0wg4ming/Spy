@@ -325,8 +325,8 @@ function SpySW:GetGUIDFromName(playerName)
 	-- Check nameToGuid map first (fastest)
 	local guid = self.nameToGuid[playerName]
 	if guid then
-		-- ✅ IMPORTANT: GUID zurückgeben auch wenn UnitExists false ist!
-		-- SuperWoW's TargetUnit() kann auch player außer Reichweite targetieren
+		-- ✅ IMPORTANT: Return GUID even if UnitExists is false!
+		-- SuperWoW's TargetUnit() can target players out of range
 		return guid
 	end
 	
@@ -867,7 +867,7 @@ guidFrame:SetScript("OnEvent", function()
 		-- ✅ NEW: Handle UNIT_CASTEVENT for instant Stealth detection
 		SpySW:OnUnitCastEvent(arg1, arg2, arg3, arg4, arg5)
 	else
-		-- Für alle anderen Events (UNIT_COMBAT, etc): Nur player sammeln
+		-- For all other events (UNIT_COMBAT, etc): Only collect players
 		local unit = arg1
 		if unit and UnitExists(unit) and UnitIsPlayer(unit) then
 			SpySW:AddUnit(unit)
@@ -956,15 +956,15 @@ function SpySW:OnUnitCastEvent(casterGUID, targetGUID, eventType, spellID, castD
     
     -- Wenn wir diesen Punkt erreichen, ist der player ein angreifbarer, feindlicher player und NICHT auf der Ignorier-Liste.
     
-    -- ✅ KRITISCHE KORREKTUR: GUID zum Cache/Scanner hinzufuegen
-    -- Dies sorgt dafuer, dass die GUID solange von SpySW ueberwacht wird, bis sie aus der Reichweite ist (Cache-Persistenz).
+    -- ✅ CRITICAL FIX: Add GUID to cache/scanner
+    -- This ensures the GUID is monitored by SpySW until out of range (cache persistence).
     local wasNew = self.guids[casterGUID] == nil
     self:AddUnit(casterGUID)
     if isDebug and wasNew then
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[SpySW DEBUG]|r Added GUID to tracking cache: " .. playerName)
     end
     
-    -- === DATENABFRAGE UND HINZUFUEGUNG ZUR NEARBY-LISTE (GENERISCHE LOGIK) ===
+    -- === DATA QUERY AND ADDITION TO NEARBY LIST (GENERIC LOGIC) ===
     
     local _, class = UnitClass(casterGUID)
     local race, _ = UnitRace(casterGUID)
@@ -972,7 +972,7 @@ function SpySW:OnUnitCastEvent(casterGUID, targetGUID, eventType, spellID, castD
     if level < 0 then level = 0 end 
     local guild = GetGuildInfo(casterGUID)
     
-    -- Daten immer aktualisieren, unabhaengig vom Spell-Typ
+    -- Always update data, regardless of spell type
     local detected = Spy:UpdatePlayerData(playerName, class, level, race, guild, true, false)
     
     if not detected then
@@ -982,7 +982,7 @@ function SpySW:OnUnitCastEvent(casterGUID, targetGUID, eventType, spellID, castD
         return
     end
 
-    -- FUEGE ZUR NEARBY-LISTE HINZU, WENN SPY AKTIV ist (Generischer Cast-Event)
+    -- ADD TO NEARBY LIST IF SPY IS ACTIVE (Generic cast event)
     if isEnabled then
         local wasInNearby = Spy.NearbyList[playerName] ~= nil
         Spy:AddDetected(
