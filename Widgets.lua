@@ -96,9 +96,9 @@ function Spy:CreateFrame(Name, Title, Height, Width, ShowFunc, HideFunc)
 
 	theFrame.Title = theFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	if not Spy.db.profile.InvertSpy then 	
-	theFrame.Title:SetPoint("TOPLEFT", theFrame, "TOPLEFT", 8, -16)
+	theFrame.Title:SetPoint("TOPLEFT", theFrame, "TOPLEFT", 8, -18.25)
 	else
-		theFrame.Title:SetPoint("BOTTOMLEFT", theFrame, "BOTTOMLEFT", 8, -15)
+		theFrame.Title:SetPoint("BOTTOMLEFT", theFrame, "BOTTOMLEFT", 8, -21)
 	end	
 	theFrame.Title:SetJustifyH("LEFT")
 	theFrame.Title:SetTextColor(1.0, 1.0, 1.0, 1.0)
