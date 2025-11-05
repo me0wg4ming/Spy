@@ -48,7 +48,6 @@
 
 - ✅ **PlayerFrames Table** - New persistent frame storage: `Spy.MainWindow.PlayerFrames[playerName]`
 - ✅ **OnUpdate HP System** - 0.2s throttled HP updates per frame (similar to ShaguScan)
-- ✅ **Combat Feedback Text** - Each frame has its own feedbackText FontString for damage display
 - ✅ **Smart Frame Hiding** - Only hides frames not in current list, not all frames on every refresh
 - ✅ **Removed Legacy Code** - Cleaned up ButtonClicked() function and /spyclick debug command
 
