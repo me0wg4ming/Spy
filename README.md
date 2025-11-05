@@ -20,39 +20,64 @@
 
 ---
 
-## 🚀 What's New in Version 3.9.6
+🚀 What's New in Version 4.0.0
+🆕 Major Features (November 5, 2025)
 
-### 🆕 Major Features (November 3, 2025)
+✅ Complete Rework of Frame System - Individual persistent frames for each player instead of reusable row pool
+✅ Live HP Bars - Real-time health percentage display with class-colored bars
+✅ Combat Feedback Integration - Damage numbers appear on player frames (UNIT_COMBAT events)
+✅ Improved Click Detection - Frames no longer hide/show on every refresh, fixing click reliability issues
+✅ Frame Persistence - Each player maintains their own frame, eliminating visual flickering
+✅ Sorting Stability - Uses millisecond-precision DetectionTimestamp instead of second-precision time()
 
-- ✅ **Win/Loss Statistics Fixed** - Death events now correctly tracked with GUID resolution
-- ✅ **Distance Display** - Shows range to every player in real-time (requires UnitXP)
-- ✅ **Responsive Layout** - Distance column automatically adjusts to window width
-- ✅ **Optimized Column Widths** - Name: 55%, Distance: 15%, Details: 30%
-- ✅ **Color-Coded Ranges** - Blue (Melee) to Red (Out of Range)
+🎨 UI Improvements
 
-### 📊 Distance Display Features
+✅ Minimum Window Width - Set to 190 pixels (matches default configuration)
+✅ Frame Clamping - Window cannot be dragged outside screen boundaries
+✅ Position-Only Updates - Frames only update position during sorting, not entire frame recreation
+✅ Reduced Flickering - Frames remain visible when player stays in list, only hidden when actually removed
 
-- **Real-Time Updates** - Distance is updated every 0.1s
-- **GUID-Based Tracking** - Works with SpySW Integration
-- **Color Coding:**
-  - 🔵 Blue: < 5m (Melee Range)
-  - 🔵 Light Blue: 5-8m
-  - 🔵 Cyan: 8-20m
-  - 🟢 Green: 20-30m
-  - 🟡 Yellow: 30-41m
-  - 🔴 Red: > 41m (Out of Range)
-- **Commands:** `/spydist` - Shows status and current distances
+🐛 Critical Bugfixes
 
-### 🐛 Critical Bugfixes
+✅ Click Detection Fixed - Removed frame hide/show on every refresh that was blocking clicks
+✅ OnClick Stability - OnClick handler set only once during frame creation, not on every refresh
+✅ GUID Updates - PlayerGUID updated intelligently only when invalid or missing
+✅ Frame Level Management - Proper SetFrameLevel to ensure frames are clickable above other UI elements
 
-- ✅ **Death Event Parsing** - Vanilla "X dies." pattern is now correctly recognized
-- ✅ **GUID Resolution** - `UnitName(guid)` for direct GUID-to-Name resolution
-- ✅ **LastAttack Tracking** - GUIDs are automatically resolved to names
-- ✅ **Win/Loss Logic** - Statistics now show correct values (Win = I won, Loss = I lost)
+🔧 Technical Changes
 
-**Version:** 3.9.6
-**Release Date:** November 3, 2025
-**Requirements:** SuperWoW 1.12.1+ (MANDATORY), UnitXP (OPTIONAL for Distance Display)
+✅ PlayerFrames Table - New persistent frame storage: Spy.MainWindow.PlayerFrames[playerName]
+✅ OnUpdate HP System - 0.2s throttled HP updates per frame (similar to ShaguScan)
+✅ Combat Feedback Text - Each frame has its own feedbackText FontString for damage display
+✅ Smart Frame Hiding - Only hides frames not in current list, not all frames on every refresh
+✅ Removed Legacy Code - Cleaned up ButtonClicked() function and /spyclick debug command
+
+📊 Architecture Changes
+Old System (Row Pool):
+
+Fixed number of reusable rows
+Rows constantly reassigned to different players
+RefreshCurrentList() rebuilt entire list 15-35 times/second
+Caused visual flickering and click detection issues
+
+New System (Persistent Frames):
+
+One frame per player, created once
+Frames persist until player leaves list
+Only position updates during sorting
+No flickering, reliable click detection
+
+🎯 Performance Optimizations
+
+✅ Reduced Refresh Overhead - Frames only created once per player, not on every refresh
+✅ Throttled HP Updates - 0.2s update interval prevents excessive processing
+✅ Smart GUID Caching - GUID stored on frame, only refreshed when invalid
+✅ Position Caching - Frame position only updated when actually changed
+
+Version: 4.0.0
+Release Date: November 5, 2025
+Requirements: SuperWoW 1.12.1+ (MANDATORY), UnitXP (OPTIONAL for Distance Display)
+⚠️ BREAKING CHANGE: This version completely rebuilds the frame system. If upgrading from 3.9.6, a /reload is recommended after installation.
 ---
 
 ## ⚠️ CRITICAL: SuperWoW is REQUIRED

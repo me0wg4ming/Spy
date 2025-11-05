@@ -12,7 +12,7 @@ local strsplit, strtrim = AceCore.strsplit, AceCore.strtrim
 local format, strfind, strsub, find = string.format, string.find, string.sub, string.find
 
 Spy = LibStub("AceAddon-3.0"):NewAddon("Spy", "AceConsole-3.0", "AceEvent-3.0", "AceComm-3.0", "AceTimer-3.0")
-Spy.Version = "3.9.6"
+Spy.Version = "4.0.0"
 Spy.DatabaseVersion = "1.1"
 Spy.Signature = "[Spy]"
 Spy.MaximumPlayerLevel = 60
@@ -395,25 +395,6 @@ Spy.options = {
 							Spy:ResizeMainWindow()
 							Spy:RefreshCurrentList()
 						end
-					end,
-				},
-				DisplayListData = {
-					name = L["DisplayListData"],
-					type = 'select',
-					order = 12,
-					values = {
-						["NameLevelClass"] = L["Name"] .. " / " .. L["Level"] .. " / " .. L["Class"],
-						["NameLevelGuild"] = L["Name"] .. " / " .. L["Level"] .. " / " .. L["Guild"],
-						["NameLevelOnly"] = L["Name"] .. " / " .. L["Level"],
-						["NameGuild"] = L["Name"] .. " / " .. L["Guild"],
-						["NameOnly"] = L["Name"],
-					},
-					get = function()
-						return Spy.db.profile.DisplayListData
-					end,
-					set = function(info, value)
-						Spy.db.profile.DisplayListData = value
-						Spy:RefreshCurrentList()
 					end,
 				},
 				SelectFont = {
@@ -1327,9 +1308,9 @@ local Default_Profile = {
 				LeftButton = true,
 				RightButton = true,
 			},
-			RowHeight = 14,
+			RowHeight = 15,
 			RowSpacing = 2,
-			TextHeight = 12,
+			TextHeight = 5,
 			AutoHide = true,
 			BarText = {
 				RankNum = true,
@@ -1340,7 +1321,7 @@ local Default_Profile = {
 			Position = {
 				x = 4,
 				y = 740,
-				w = 225,
+				w = 190,
 				h = 34,
 			},
 		},
@@ -1374,7 +1355,6 @@ local Default_Profile = {
 		DisplayWinLossStatistics = true,
 		DisplayKOSReason = true,
 		DisplayLastSeen = true,
-		DisplayListData = "NameLevelClass",
 		ShowOnDetection = true,
 		HideSpy = false,
 		ShowKoSButton = false,
@@ -1636,6 +1616,31 @@ function SlashCmdList.SPYCOUNTDEBUG()
 	DEFAULT_CHAT_FRAME:AddMessage("=== END DEBUG ===")
 end
 
+-- ✅ HP-Bar Debug Command
+SLASH_SPYTESTHPDEBUG1 = '/spytesthp'
+SLASH_SPYTESTHPDEBUG2 = '/spyhp'
+function SlashCmdList.SPYTESTHPDEBUG()
+	if not Spy.HPBarDebug then
+		Spy.HPBarDebug = true
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy HP]|r HP-Bar Debug |cff00ff00ENABLED|r")
+	else
+		Spy.HPBarDebug = false
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy HP]|r HP-Bar Debug |cffff0000DISABLED|r")
+	end
+end
+
+-- ✅ List Sort Debug Command
+SLASH_SPYLISTDEBUG1 = '/spylist'
+function SlashCmdList.SPYLISTDEBUG()
+	if not Spy.SortDebug then
+		Spy.SortDebug = true
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy List]|r Sort Debug |cff00ff00ENABLED|r - Will show detection order in chat")
+	else
+		Spy.SortDebug = false
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy List]|r Sort Debug |cffff0000DISABLED|r")
+	end
+end
+
 local hintString = "|cffffffff%s:|r %s"
 local hintText = {
 	"Spy",
@@ -1713,25 +1718,25 @@ function Spy:UpdateTimeoutSettings()
 		Spy.ActiveTimeout = 1
 		Spy.InactiveTimeout = 0.1
 	elseif Spy.db.profile.RemoveUndetected == "OneMinute" then
-		Spy.ActiveTimeout = 5
+		Spy.ActiveTimeout = 1
 		Spy.InactiveTimeout = 60
 	elseif Spy.db.profile.RemoveUndetected == "TwoMinutes" then
-		Spy.ActiveTimeout = 5
+		Spy.ActiveTimeout = 1
 		Spy.InactiveTimeout = 120
 	elseif Spy.db.profile.RemoveUndetected == "FiveMinutes" then
-		Spy.ActiveTimeout = 5
+		Spy.ActiveTimeout = 1
 		Spy.InactiveTimeout = 300
 	elseif Spy.db.profile.RemoveUndetected == "TenMinutes" then
-		Spy.ActiveTimeout = 5
+		Spy.ActiveTimeout = 1
 		Spy.InactiveTimeout = 600
 	elseif Spy.db.profile.RemoveUndetected == "FifteenMinutes" then
-		Spy.ActiveTimeout = 5
+		Spy.ActiveTimeout = 1
 		Spy.InactiveTimeout = 900
 	elseif Spy.db.profile.RemoveUndetected == "Never" then
-		Spy.ActiveTimeout = 5
+		Spy.ActiveTimeout = 1
 		Spy.InactiveTimeout = -1
 	else
-		Spy.ActiveTimeout = 5
+		Spy.ActiveTimeout = 1
 		Spy.InactiveTimeout = 300
 	end
 end
@@ -1860,7 +1865,7 @@ function Spy:OnEnable(first)
 		end
 	end
 	
-	Spy.timeid = Spy:ScheduleRepeatingTimer("ManageExpirations", 10, 1, true)
+	Spy.timeid = Spy:ScheduleRepeatingTimer("ManageExpirations", 1, 1, true)
 	Spy:RegisterEvent("ZONE_CHANGED", "ZoneChangedEvent")
 	Spy:RegisterEvent("ZONE_CHANGED_NEW_AREA", "ZoneChangedEvent")
 	Spy:RegisterEvent("ZONE_CHANGED_INDOORS", "ZoneChangedEvent")
@@ -2918,7 +2923,45 @@ function Spy:FormatTime(timestamp)
 	return strtrim(text)
 end
 
+-- ✅ HP-Bar Feature: Get class color for health bar display
+function Spy:GetClassColor(class)
+	-- Default to gray if class unknown
+	if not class or class == "UNKNOWN" then
+		return 0.5, 0.5, 0.5
+	end
+	
+	-- Use WoW's built-in class colors
+	local classColor = RAID_CLASS_COLORS[class]
+	if classColor then
+		return classColor.r, classColor.g, classColor.b
+	end
+	
+	-- Fallback to gray
+	return 0.5, 0.5, 0.5
+end
+
 -- recieves pointer to SpyData db
 function Spy:SetDataDb(val)
 	Spy_db = val
+end
+
+-- Stub functions for KOS functionality
+function Spy:RemoveLocalKOSPlayers()
+	-- Placeholder
+end
+
+function Spy:RegenerateKOSCentralList()
+	-- Placeholder
+end
+
+function Spy:RegenerateKOSListFromCentral()
+	-- Placeholder
+end
+
+function Spy:RegenerateKOSGuildList()
+	-- Placeholder
+end
+
+function Spy:PurgeUndetectedData()
+	-- Placeholder
 end

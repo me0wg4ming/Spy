@@ -6,7 +6,7 @@ FIXED VERSION - Hooks SetBar directly to prevent width conflicts
 -- Distance tracking module
 Spy.Distance = {
     cache = {},
-    updateInterval = 0.1,
+    updateInterval = 0.1,  -- ✅ Zurück zu 0.1 wie im Original
     lastUpdate = 0,
     debug = false,
     enabled = false,
@@ -301,15 +301,23 @@ distanceUpdateFrame:SetScript("OnUpdate", function()
     end
     
     -- Only update distance TEXT, not layout
-    for i = 1, maxButtons do
-        local button = Spy.MainWindow.Rows[i]
-        if button and button:IsVisible() and button.playerName and button.DistanceText then
-            local distance = Spy.Distance:GetDistance(button.playerName)
+    -- ✅ OPTIMIERT: Nur sichtbare PlayerFrames updaten (wie im Original nur 1-maxButtons)
+    if not Spy.MainWindow.PlayerFrames then return end
+    
+    for playerName, frame in pairs(Spy.MainWindow.PlayerFrames) do
+        if frame.visible and frame:IsVisible() and frame.PlayerName and frame.RightText then
+            local distance = Spy.Distance:GetDistance(frame.PlayerName)
             if not distance then
-                distance = Spy.Distance:GetCachedDistance(button.playerName)
+                distance = Spy.Distance:GetCachedDistance(frame.PlayerName)
             end
-            local distanceText = Spy.Distance:FormatDistance(distance)
-            button.DistanceText:SetText(distanceText)
+            
+            -- Wenn immer noch keine Distance verfügbar, zeige "--"
+            local distanceText = "--"
+            if distance then
+                distanceText = Spy.Distance:FormatDistance(distance)
+            end
+            
+            frame.RightText:SetText(distanceText)
         end
     end
     

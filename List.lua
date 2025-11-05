@@ -9,9 +9,10 @@ local strgfind = string.gfind
 local tinsert = table.insert
 local tsort = table.sort
 
+-- ✅ FIX 1: In RefreshCurrentList() - GUID direkt im Frame speichern
 function Spy:RefreshCurrentList(player, source)
 	local MainWindow = Spy.MainWindow
-	if not MainWindow then return end  -- Safety check: MainWindow might not be created yet
+	if not MainWindow then return end
 	if not MainWindow:IsShown() then
 		return
 	end
@@ -20,16 +21,92 @@ function Spy:RefreshCurrentList(player, source)
 	local manageFunction = Spy.ListTypes[mode][2]
 	if manageFunction then manageFunction() end
 
-	local button = 1
+	-- âœ… Build list of players currently in CurrentList
+	local playersInList = {}
 	for index, data in pairs(Spy.CurrentList) do
-		if button <= Spy.db.profile.ResizeSpyLimit then
+		playersInList[data.player] = true
+	end
+	
+	-- âœ… Hide only frames NOT in current list
+	for playerName, frame in pairs(Spy.MainWindow.PlayerFrames) do
+		if not playersInList[playerName] then
+			frame:Hide()
+			frame.visible = false
+			frame.displayIndex = nil
+		end
+	end
+
+	-- âœ… Also hide old row-based frames if any exist
+	if Spy.MainWindow.Rows then
+		for i, row in pairs(Spy.MainWindow.Rows) do
+			row:Hide()
+		end
+	end
+
+	-- Now iterate through CurrentList and show frames
+	local yOffset = 34
+	local displayCount = 0
+	
+	for index, data in pairs(Spy.CurrentList) do
+		if displayCount < Spy.db.profile.ResizeSpyLimit then
+			local playerName = data.player
+			
+			-- Get or create frame for this player
+			local frame = Spy:CreatePlayerFrame(playerName)
+			
+			-- âœ… CRITICAL FIX: Always update GUID before showing frame
+			-- This ensures targeting works even if GUID was missing during creation
+			if not frame.PlayerGUID or not UnitExists(frame.PlayerGUID) then
+				local guid = nil
+				local playerData = SpyPerCharDB.PlayerData[playerName]
+				
+				-- Priority 1: GUID from PlayerData
+				if playerData and playerData.guid then
+					guid = playerData.guid
+				end
+				
+				-- Priority 2: GUID from SpySW Cache (nameToGuid map)
+				if not guid and SpySW and SpySW.nameToGuid then
+					guid = SpySW.nameToGuid[playerName]
+				end
+				
+				-- Priority 3: GUID from SpySW.guids table
+				if not guid and SpySW and SpySW.guids then
+					for cachedGuid, timestamp in pairs(SpySW.guids) do
+						if UnitExists(cachedGuid) then
+							local name = UnitName(cachedGuid)
+							if name == playerName then
+								guid = cachedGuid
+								break
+							end
+						end
+					end
+				end
+				
+				-- Update frame GUID if found
+				if guid then
+					frame.PlayerGUID = guid
+					frame.PlayerName = playerName
+				end
+			end
+			
+			-- âœ… CRITICAL FIX: Store name in ButtonName table for backwards compatibility
+			-- This ensures OnClick handlers can always find the player name
+			if not frame.id then
+				-- Assign a stable ID to this frame
+				frame.id = displayCount + 1
+			end
+			Spy.ButtonName = Spy.ButtonName or {}
+			Spy.ButtonName[frame.id] = playerName
+			
+			-- Prepare data for display
 			local description = ""
 			local level = "??"
 			local class = "UNKNOWN"
 			local guild = "??"
 			local opacity = 1
 
-			local playerData = SpyPerCharDB.PlayerData[data.player]
+			local playerData = SpyPerCharDB.PlayerData[playerName]
 			if playerData then
 				if playerData.level then
 					level = (playerData.level == 0) and "??" or playerData.level
@@ -44,23 +121,121 @@ function Spy:RefreshCurrentList(player, source)
 					guild = playerData.guild
 				end
 			end
-			if Spy.db.profile.DisplayListData == "NameLevelClass" then
-				description = level .. " "
-				if L[class] and type(L[class]) == "string" then 
-					description = description .. L[class] 
-				end
-			elseif  Spy.db.profile.DisplayListData == "NameLevelGuild" then
-				description = level.." "..guild
-			elseif Spy.db.profile.DisplayListData == "NameLevelOnly" then
-				description = level.." "
-			elseif Spy.db.profile.DisplayListData == "NameGuild" then
-				description = guild
-			end
 			
-			if mode == 1 and Spy.InactiveList[data.player] then
+			if mode == 1 and Spy.InactiveList[playerName] then
 				opacity = 0.5
 			end
-			if player == data.player then
+			
+			-- HP-Bar: Try to get initial HP value
+			local currentBarValue = 100
+			
+			-- Try to get HP immediately if GUID available
+			local guid = frame.PlayerGUID
+			if guid and UnitExists(guid) then
+				local currentHP = UnitHealth(guid)
+				local maxHP = UnitHealthMax(guid)
+				if maxHP > 0 then
+					currentBarValue = (currentHP / maxHP) * 100
+				end
+			end
+			
+			frame.StatusBar:SetValue(currentBarValue)
+			
+			-- Set level text (left)
+			frame.LeftText:SetText(level)
+			
+			-- Create MiddleText if not exists
+			if not frame.MiddleText then
+				frame.MiddleText = frame.StatusBar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+				frame.MiddleText:SetJustifyH("LEFT")
+				local fontName = "Fonts\\FRIZQT__.TTF"
+				local fontSize = math.max(Spy.db.profile.MainWindow.RowHeight * 0.85, Spy.db.profile.MainWindow.RowHeight - 1)
+				if Spy.db.profile.Font and SM and SM.Fetch then
+					fontName = SM:Fetch("font", Spy.db.profile.Font) or fontName
+				end
+				frame.MiddleText:SetFont(fontName, fontSize, "THINOUTLINE")
+				Spy.Colors:RegisterFont("Bar", "Bar Text", frame.MiddleText)
+			end
+			frame.MiddleText:SetText(playerName)  -- Name in center
+			
+			-- Calculate available widths to avoid overlap
+			local frameWidth = frame:GetWidth()
+			local levelWidth = frame.LeftText:GetStringWidth() + 4  -- Level + Spacing
+			local rightWidth = 30  -- Reserve for Distance (-- or numbers)
+			local nameWidth = frameWidth - levelWidth - rightWidth - 8  -- 8px total padding
+			
+			-- Limit MiddleText Width
+			frame.MiddleText:SetWidth(nameWidth)
+			frame.MiddleText:ClearAllPoints()
+			frame.MiddleText:SetPoint("LEFT", frame.LeftText, "RIGHT", 4, 0)
+			
+			-- Distance on right (without separate DistanceText)
+			local distanceText = ""
+			if Spy.Distance and Spy.Distance.enabled then
+				local distance = Spy.Distance:GetDistance(playerName)
+				if not distance then
+					distance = Spy.Distance:GetCachedDistance(playerName)
+				end
+				if distance then
+					distanceText = Spy.Distance:FormatDistance(distance)
+				else
+					distanceText = "--"
+				end
+			end
+			frame.RightText:SetText(distanceText)
+			
+			-- HP-Bar: Store class for OnUpdate HP feature
+			frame.playerClass = class
+			
+			-- âœ… CRITICAL FIX: Set frame level RELATIVE to MainWindow
+			frame:SetFrameLevel(Spy.MainWindow:GetFrameLevel() + displayCount + 2)
+			frame.StatusBar:SetFrameLevel(Spy.MainWindow:GetFrameLevel() + displayCount + 1)
+			
+			-- Set class color
+			local r, g, b = Spy:GetClassColor(class)
+			frame.StatusBar:SetStatusBarColor(r, g, b, opacity)
+			
+			-- Level color system (WoW PvP Style)
+			local levelR, levelG, levelB = 1, 1, 1  -- Default: White
+
+			local playerLevel = UnitLevel("player")
+			local enemyLevel = tonumber(level)
+
+			if level == "??" then
+				levelR, levelG, levelB = 1.0, 0.0, 0.0
+			elseif playerLevel and enemyLevel and enemyLevel > 0 then
+				local levelDiff = enemyLevel - playerLevel
+				
+				if levelDiff >= 5 then
+					levelR, levelG, levelB = 1.0, 0.0, 0.0
+				elseif levelDiff >= 3 then
+					levelR, levelG, levelB = 1.0, 0.5, 0.0
+				elseif levelDiff >= -2 then
+					levelR, levelG, levelB = 1.0, 1.0, 0.0
+				elseif levelDiff >= -9 then
+					levelR, levelG, levelB = 0.25, 1.0, 0.25
+				else
+					levelR, levelG, levelB = 0.5, 0.5, 0.5
+				end
+			end
+
+			frame.LeftText:SetTextColor(levelR, levelG, levelB, opacity)
+			frame.MiddleText:SetTextColor(1, 1, 1, opacity)
+			frame.RightText:SetTextColor(1, 1, 1, opacity)
+			
+			-- Position frame
+			frame:ClearAllPoints()
+			frame:SetPoint("TOPLEFT", MainWindow, "TOPLEFT", 2, -yOffset)
+			yOffset = yOffset + Spy.db.profile.MainWindow.RowHeight + Spy.db.profile.MainWindow.RowSpacing
+			
+			-- ✅ Show frame and mark as visible
+			frame:Show()
+			frame.visible = true
+			frame.displayIndex = displayCount + 1
+			displayCount = displayCount + 1
+			
+			-- Alert if needed
+			if player == playerName then
 				if not source or source ~= Spy.CharacterName then
 					Spy:AlertPlayer(player, source)
 					if not source then 
@@ -68,23 +243,21 @@ function Spy:RefreshCurrentList(player, source)
 					end
 				end
 			end
-
-			Spy:SetBar(button, data.player, description, 100, "Class", class, nil, opacity)
-			Spy.ButtonName[button] = data.player
-			button = button + 1
 		end
 	end
-	Spy.ListAmountDisplayed = button - 1
+	
+	Spy.ListAmountDisplayed = displayCount
 
+	-- Auto-resize if enabled
 	if Spy.db.profile.ResizeSpy then
 		Spy:AutomaticallyResize()
 	else
 		if not Spy.db.profile.InvertSpy then
-			if Spy.MainWindow:GetHeight()< 34 then
+			if Spy.MainWindow:GetHeight() < 34 then
 				Spy:RestoreMainWindowPosition(Spy.MainWindow:GetLeft(), Spy.MainWindow:GetTop(), Spy.MainWindow:GetWidth(), 34)
 			end
 		else
-			if Spy.MainWindow:GetHeight()< 34 then 
+			if Spy.MainWindow:GetHeight() < 34 then 
 				Spy:RestoreMainWindowPosition(Spy.MainWindow:GetLeft(), Spy.MainWindow:GetBottom(), Spy.MainWindow:GetWidth(), 34)
 			end
 		end	
@@ -93,31 +266,147 @@ function Spy:RefreshCurrentList(player, source)
 	Spy:ManageBarsDisplayed()
 end
 
+-- ✅ NEW: /spyguid command - Show GUID info for all visible players
+SLASH_SPYGUID1 = "/spyguid"
+SlashCmdList["SPYGUID"] = function()
+	if not Spy.MainWindow or not Spy.MainWindow.PlayerFrames then
+		DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SpyGUID]|r Main window not initialized!")
+		return
+	end
+	
+	-- Toggle GUID debug mode
+	Spy.GuidDebug = not Spy.GuidDebug
+	
+	if Spy.GuidDebug then
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpyGUID]|r GUID Debug Mode: |cff00ff00ENABLED|r")
+		DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00Click on player frames to see targeting info|r")
+	else
+		DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SpyGUID]|r GUID Debug Mode: |cffff0000DISABLED|r")
+		return
+	end
+	
+	-- Show GUID info for all visible frames
+	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00========== Visible Player GUIDs ==========|r")
+	
+	local visibleCount = 0
+	for playerName, frame in pairs(Spy.MainWindow.PlayerFrames) do
+		if frame.visible and frame:IsShown() then
+			visibleCount = visibleCount + 1
+			
+			local guid = frame.PlayerGUID
+			local guidStatus = guid and "|cff00ff00STORED|r" or "|cffff0000MISSING|r"
+			local existsStatus = ""
+			
+			if guid then
+				if UnitExists(guid) then
+					existsStatus = " |cff00ff00(in range)|r"
+				else
+					existsStatus = " |cffffcc00(out of range)|r"
+				end
+			end
+			
+			DEFAULT_CHAT_FRAME:AddMessage(string.format(
+				"|cff00ffff%d.|r %s - GUID: %s%s",
+				visibleCount,
+				playerName,
+				guidStatus,
+				existsStatus
+			))
+			
+			if guid then
+				DEFAULT_CHAT_FRAME:AddMessage("    |cffaaaaaa" .. tostring(guid) .. "|r")
+			end
+		end
+	end
+	
+	if visibleCount == 0 then
+		DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00No visible players in list|r")
+	else
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00Total: " .. visibleCount .. " players|r")
+	end
+	
+	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00========================================|r")
+end
+
+-- ✅ STABLE SORT: Track insertion order
+Spy.DetectionOrder = Spy.DetectionOrder or {}
+Spy.DetectionOrderCounter = Spy.DetectionOrderCounter or 0
+
 function Spy:ManageNearbyList()
+	-- ✅ SAFETY: Ensure tables exist (defensive programming)
+	Spy.DetectionOrder = Spy.DetectionOrder or {}
+	Spy.DetectionTimestamp = Spy.DetectionTimestamp or {}
+	
 	local prioritiseKoS = Spy.db.profile.PrioritiseKoS
 
 	local activeKoS = {}
 	local active = {}
+	
+	-- ✅ FIX: Create sorted list from ActiveList first (by high-precision timestamp)
+	-- This ensures stable iteration order before sorting by time
+	local activePlayers = {}
 	for player in pairs(Spy.ActiveList) do
+		tinsert(activePlayers, player)
+	end
+	-- Pre-sort by high-precision timestamp with DetectionOrder as tiebreaker for stability
+	tsort(activePlayers, function(a, b)
+		local timeA = Spy.DetectionTimestamp[a] or 0
+		local timeB = Spy.DetectionTimestamp[b] or 0
+		if timeA == timeB then
+			-- Same timestamp → use DetectionOrder for stable sort
+			local orderA = Spy.DetectionOrder[a] or 0
+			local orderB = Spy.DetectionOrder[b] or 0
+			return orderA < orderB  -- Lower order (earlier detection) first
+		end
+		return timeA > timeB  -- Newer first
+	end)
+	
+	for _, player in ipairs(activePlayers) do
 		local position = Spy.NearbyList[player]
 		if position ~= nil then
+			-- ✅ Use DetectionTimestamp for sorting (millisecond precision) instead of position (second precision)
+			local preciseTime = Spy.DetectionTimestamp[player] or position
+			local order = Spy.DetectionOrder[player] or 0
+			
 			if prioritiseKoS and SpyPerCharDB.KOSData[player] then
-				tinsert(activeKoS, { player = player, time = position })
+				tinsert(activeKoS, { player = player, time = preciseTime, order = order })
 			else
-				tinsert(active, { player = player, time = position })
+				tinsert(active, { player = player, time = preciseTime, order = order })
 			end
 		end
 	end
 
 	local inactiveKoS = {}
 	local inactive = {}
+	
+	-- ✅ Same fix for InactiveList
+	local inactivePlayers = {}
 	for player in pairs(Spy.InactiveList) do
+		tinsert(inactivePlayers, player)
+	end
+	tsort(inactivePlayers, function(a, b)
+		local timeA = Spy.DetectionTimestamp[a] or 0
+		local timeB = Spy.DetectionTimestamp[b] or 0
+		if timeA == timeB then
+			-- Same timestamp → use DetectionOrder for stable sort
+			local orderA = Spy.DetectionOrder[a] or 0
+			local orderB = Spy.DetectionOrder[b] or 0
+			return orderA < orderB  -- Lower order (earlier detection) first
+		end
+		return timeA > timeB  -- Newer first
+	end)
+	
+	for _, player in ipairs(inactivePlayers) do
 		local position = Spy.NearbyList[player]
 		if position ~= nil then
+			-- ✅ Use DetectionTimestamp for sorting (millisecond precision) instead of position (second precision)
+			local preciseTime = Spy.DetectionTimestamp[player] or position
+			local order = Spy.DetectionOrder[player] or 0
+			
 			if prioritiseKoS and SpyPerCharDB.KOSData[player] then
-				tinsert(inactiveKoS, { player = player, time = position })
+				tinsert(inactiveKoS, { player = player, time = preciseTime, order = order })
 			else
-				tinsert(inactive, { player = player, time = position })
+				tinsert(inactive, { player = player, time = preciseTime, order = order })
 			end
 		end
 	end
@@ -128,74 +417,163 @@ function Spy:ManageNearbyList()
 	if sortOrder == "range" then
 		-- Sort by distance (closest first) - requires SpyDistance
 		if Spy.Distance and Spy.Distance.enabled and Spy.Distance.GetDistance then
+			-- ✅ STABLE SORT: Use order as tiebreaker
 			tsort(activeKoS, function(a, b)
 				local distA = Spy.Distance:GetDistance(a.player) or 999999
 				local distB = Spy.Distance:GetDistance(b.player) or 999999
+				if distA == distB then
+					return a.order < b.order  -- Same distance → use insertion order
+				end
 				return distA < distB
 			end)
 			tsort(inactiveKoS, function(a, b)
 				local distA = Spy.Distance:GetDistance(a.player) or 999999
 				local distB = Spy.Distance:GetDistance(b.player) or 999999
+				if distA == distB then
+					return a.order < b.order
+				end
 				return distA < distB
 			end)
 			tsort(active, function(a, b)
 				local distA = Spy.Distance:GetDistance(a.player) or 999999
 				local distB = Spy.Distance:GetDistance(b.player) or 999999
+				if distA == distB then
+					return a.order < b.order
+				end
 				return distA < distB
 			end)
 			tsort(inactive, function(a, b)
 				local distA = Spy.Distance:GetDistance(a.player) or 999999
 				local distB = Spy.Distance:GetDistance(b.player) or 999999
+				if distA == distB then
+					return a.order < b.order
+				end
 				return distA < distB
 			end)
 		else
 			-- Fallback to time if SpyDistance not available
-			tsort(activeKoS, function(a, b) return a.time > b.time end)
-			tsort(inactiveKoS, function(a, b) return a.time > b.time end)
-			tsort(active, function(a, b) return a.time > b.time end)
-			tsort(inactive, function(a, b) return a.time > b.time end)
+			-- ✅ STABLE SORT: Use order as tiebreaker
+			tsort(activeKoS, function(a, b)
+				if a.time == b.time then
+					return a.order < b.order
+				end
+				return a.time > b.time
+			end)
+			tsort(inactiveKoS, function(a, b)
+				if a.time == b.time then
+					return a.order < b.order
+				end
+				return a.time > b.time
+			end)
+			tsort(active, function(a, b)
+				if a.time == b.time then
+					return a.order < b.order
+				end
+				return a.time > b.time
+			end)
+			tsort(inactive, function(a, b)
+				if a.time == b.time then
+					return a.order < b.order
+				end
+				return a.time > b.time
+			end)
 		end
 	elseif sortOrder == "name" then
 		-- Sort by name (alphabetical)
-		tsort(activeKoS, function(a, b) return a.player < b.player end)
-		tsort(inactiveKoS, function(a, b) return a.player < b.player end)
-		tsort(active, function(a, b) return a.player < b.player end)
-		tsort(inactive, function(a, b) return a.player < b.player end)
+		-- ✅ STABLE SORT: Use order as tiebreaker (edge case: same name shouldn't happen)
+		tsort(activeKoS, function(a, b)
+			if a.player == b.player then
+				return a.order < b.order
+			end
+			return a.player < b.player
+		end)
+		tsort(inactiveKoS, function(a, b)
+			if a.player == b.player then
+				return a.order < b.order
+			end
+			return a.player < b.player
+		end)
+		tsort(active, function(a, b)
+			if a.player == b.player then
+				return a.order < b.order
+			end
+			return a.player < b.player
+		end)
+		tsort(inactive, function(a, b)
+			if a.player == b.player then
+				return a.order < b.order
+			end
+			return a.player < b.player
+		end)
 	elseif sortOrder == "class" then
 		-- Sort by class (alphabetical)
+		-- ✅ STABLE SORT: Use order as tiebreaker
 		tsort(activeKoS, function(a, b)
 			local classA = SpyPerCharDB.PlayerData[a.player] and SpyPerCharDB.PlayerData[a.player].class or "ZZZ"
 			local classB = SpyPerCharDB.PlayerData[b.player] and SpyPerCharDB.PlayerData[b.player].class or "ZZZ"
+			if classA == classB then
+				return a.order < b.order
+			end
 			return classA < classB
 		end)
 		tsort(inactiveKoS, function(a, b)
 			local classA = SpyPerCharDB.PlayerData[a.player] and SpyPerCharDB.PlayerData[a.player].class or "ZZZ"
 			local classB = SpyPerCharDB.PlayerData[b.player] and SpyPerCharDB.PlayerData[b.player].class or "ZZZ"
+			if classA == classB then
+				return a.order < b.order
+			end
 			return classA < classB
 		end)
 		tsort(active, function(a, b)
 			local classA = SpyPerCharDB.PlayerData[a.player] and SpyPerCharDB.PlayerData[a.player].class or "ZZZ"
 			local classB = SpyPerCharDB.PlayerData[b.player] and SpyPerCharDB.PlayerData[b.player].class or "ZZZ"
+			if classA == classB then
+				return a.order < b.order
+			end
 			return classA < classB
 		end)
 		tsort(inactive, function(a, b)
 			local classA = SpyPerCharDB.PlayerData[a.player] and SpyPerCharDB.PlayerData[a.player].class or "ZZZ"
 			local classB = SpyPerCharDB.PlayerData[b.player] and SpyPerCharDB.PlayerData[b.player].class or "ZZZ"
+			if classA == classB then
+				return a.order < b.order
+			end
 			return classA < classB
 		end)
 	else
 		-- Sort by time (newest first) - default
-		tsort(activeKoS, function(a, b) return a.time > b.time end)
-		tsort(inactiveKoS, function(a, b) return a.time > b.time end)
-		tsort(active, function(a, b) return a.time > b.time end)
-		tsort(inactive, function(a, b) return a.time > b.time end)
+		-- ✅ STABLE SORT: Newer detections on top, same time = EARLIER detection (lower order) stays on top
+		tsort(activeKoS, function(a, b)
+			if a.time == b.time then
+				return a.order < b.order  -- Same time → earlier detection (lower order) stays on top
+			end
+			return a.time > b.time
+		end)
+		tsort(inactiveKoS, function(a, b)
+			if a.time == b.time then
+				return a.order < b.order
+			end
+			return a.time > b.time
+		end)
+		tsort(active, function(a, b)
+			if a.time == b.time then
+				return a.order < b.order
+			end
+			return a.time > b.time
+		end)
+		tsort(inactive, function(a, b)
+			if a.time == b.time then
+				return a.order < b.order
+			end
+			return a.time > b.time
+		end)
 	end
 
 	local list = {}
-	for player in pairs(activeKoS) do tinsert(list, activeKoS[player]) end
-	for player in pairs(inactiveKoS) do tinsert(list, inactiveKoS[player]) end
-	for player in pairs(active) do tinsert(list, active[player]) end
-	for player in pairs(inactive) do tinsert(list, inactive[player]) end
+	for _, data in ipairs(activeKoS) do tinsert(list, data) end
+	for _, data in ipairs(inactiveKoS) do tinsert(list, data) end
+	for _, data in ipairs(active) do tinsert(list, data) end
+	for _, data in ipairs(inactive) do tinsert(list, data) end
 	Spy.CurrentList = list
 end
 
@@ -966,45 +1344,6 @@ function Spy:RegenerateKOSListFromCentral()
 	end
 end
 
-function Spy:ButtonClicked()
-	local name = Spy.ButtonName[this.id]
-	if name and name ~= "" then
-		if arg1 == "LeftButton" then
-			if IsShiftKeyDown() then
-				if SpyPerCharDB.KOSData[name] then
-					Spy:ToggleKOSPlayer(false, name)
-				else
-					Spy:ToggleKOSPlayer(true, name)
-				end
-			elseif IsControlKeyDown() then
-				if SpyPerCharDB.IgnoreData[name] then
-					Spy:ToggleIgnorePlayer(false, name)
-				else
-					Spy:ToggleIgnorePlayer(true, name)
-				end
-			else
-				-- ✅ SuperWoW: GUID-based targeting only (no fallback to TargetByName!)
-				if Spy.HasSuperWoW and SpySW and SpySW.GetGUIDFromName then
-					local guid = SpySW:GetGUIDFromName(name)
-					
-					if guid then
-						TargetUnit(guid)  -- Target by GUID
-					else
-						-- No GUID found - player was never seen or data is outdated
-						if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-							DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy]|r Cannot target " .. name .. " - no GUID found (player not in range?)")
-						end
-					end
-				end
-			end
-		elseif arg1 == "RightButton" then
-			Spy:BarDropDownOpen(this)
-			CloseDropDownMenus(1)
-			ToggleDropDownMenu(1, nil, Spy_BarDropDownMenu)
-		end
-	end
-end
-
 function Spy:ParseMinimapTooltip(tooltip)
 	local newTooltip = ""
 	local newLine = false
@@ -1137,6 +1476,19 @@ function Spy:AddDetectedToLists(player, timestamp, learnt, source)
 			Spy:SetCurrentList(1)
 		end
 
+		-- ✅ CRITICAL: Store high-precision timestamp AND detection order for stable sorting
+		Spy.DetectionTimestamp[player] = GetTime()
+		
+		-- ✅ CRITICAL: Set detection order immediately when player is first detected
+		if not Spy.DetectionOrder[player] then
+			Spy.DetectionOrderCounter = Spy.DetectionOrderCounter + 1
+			Spy.DetectionOrder[player] = Spy.DetectionOrderCounter
+		end
+		
+		if Spy.SortDebug then
+			DEFAULT_CHAT_FRAME:AddMessage(string.format("|cffff00ff[AddDetected]|r NEW: %s at %.3f (order: %d)", player, Spy.DetectionTimestamp[player], Spy.DetectionOrder[player]))
+		end
+		
 		if source and source ~= Spy.CharacterName and not Spy.ActiveList[player] then
 			Spy.NearbyList[player] = timestamp
 			Spy.LastHourList[player] = timestamp
@@ -1170,6 +1522,10 @@ function Spy:AddDetectedToLists(player, timestamp, learnt, source)
 			Spy:SetCurrentList(1)
 		end
 
+		-- ✅ FIX: DON'T update DetectionTimestamp on reactivation
+		-- Keep original detection time so player maintains position in list
+		-- DetectionTimestamp should only be set on BRAND NEW detection
+		
 		Spy.LastHourList[player] = timestamp
 		Spy.ActiveList[player] = timestamp
 		Spy.InactiveList[player] = nil
@@ -1200,6 +1556,9 @@ function Spy:AddDetectedToLists(player, timestamp, learnt, source)
 		-- 1. Player was detected, went out of range (stayed in Nearby due to timeout)
 		-- 2. Player came back into range and was detected again
 		-- 3. SuperWoW scans them continuously while in range
+		
+		-- ✅ FIX: DON'T update DetectionTimestamp here - it should only be set on NEW detection
+		-- Updating it here causes players to "jump around" in the list on HP updates
 		
 		Spy.NearbyList[player] = timestamp
 		Spy.ActiveList[player] = timestamp

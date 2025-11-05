@@ -36,6 +36,7 @@ end
 function Spy:SetupBar(row)
 	row.StatusBar = CreateFrame("StatusBar", nil, row)
 	row.StatusBar:SetAllPoints(row)
+	row.StatusBar:EnableMouse(false)  -- ✅ Blockiere keine Klicks
 
 	local BarTexture
 	if not BarTexture then
@@ -58,7 +59,12 @@ function Spy:SetupBar(row)
 	row.LeftText:SetJustifyH("LEFT")
 	row.LeftText:SetHeight(Spy.db.profile.MainWindow.TextHeight)
 	row.LeftText:SetTextColor(1, 1, 1, 1)
-	Spy:SetFontSize(row.LeftText, math.max(Spy.db.profile.MainWindow.RowHeight * 0.85, Spy.db.profile.MainWindow.RowHeight - 1))
+	local fontSize = math.max(Spy.db.profile.MainWindow.RowHeight * 0.85, Spy.db.profile.MainWindow.RowHeight - 1)
+	local fontName = "Fonts\\FRIZQT__.TTF"
+	if Spy.db.profile.Font and SM and SM.Fetch then
+		fontName = SM:Fetch("font", Spy.db.profile.Font) or fontName
+	end
+	row.LeftText:SetFont(fontName, fontSize, "THINOUTLINE")
 	Spy:AddFontString(row.LeftText)
 
 	row.RightText = row.StatusBar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -70,12 +76,218 @@ function Spy:SetupBar(row)
 
 	Spy.Colors:RegisterFont("Bar", "Bar Text", row.LeftText)
 	Spy.Colors:RegisterFont("Bar", "Bar Text", row.RightText)
+	
+	-- ✅ HP-Bar Feature: Live HP updates
+	row:SetScript("OnUpdate", function()
+		if not this:IsShown() then return end
+		if (this.hpTick or 0) > GetTime() then return end
+		this.hpTick = GetTime() + 0.2
+		
+		local playerName = this.PlayerName or (this.id and Spy.ButtonName and Spy.ButtonName[this.id])
+		if not playerName then return end
+		
+		-- ✅ NEVER modify PlayerGUID (like ShaguScan!)
+		local guid = this.PlayerGUID
+		
+		-- If GUID invalid, get fresh one for THIS update only
+		if not guid or not UnitExists(guid) then
+			local playerData = SpyPerCharDB.PlayerData[playerName]
+			if playerData and playerData.guid then
+				guid = playerData.guid
+			elseif SpySW and SpySW.nameToGuid then
+				guid = SpySW.nameToGuid[playerName]
+			end
+		end
+		
+		if not guid or not UnitExists(guid) then return end
+		
+		local currentHP = UnitHealth(guid)
+		local maxHP = UnitHealthMax(guid)
+		
+		if maxHP > 0 then
+			local healthPercent = currentHP / maxHP
+			local barValue = healthPercent * 100
+			
+			local currentValue = this.StatusBar:GetValue()
+			if math.abs(currentValue - barValue) > 1 then
+				this.StatusBar:SetValue(barValue)
+				
+				local class = this.playerClass or "UNKNOWN"
+				local r, g, b = Spy:GetClassColor(class)
+				this.StatusBar:SetStatusBarColor(r, g, b, 1)
+			end
+		end
+	end)
+end
+
+-- NEU: Erstelle permanenten Frame für einen Spieler (wie ShaguScan)
+function Spy:CreatePlayerFrame(playerName)
+	-- Prüfe ob Frame bereits existiert
+	if Spy.MainWindow.PlayerFrames[playerName] then
+		return Spy.MainWindow.PlayerFrames[playerName]
+	end
+	
+	-- Sanitize playerName für Frame-Namen (entferne Sonderzeichen)
+	local safeName = string.gsub(playerName, "[^%w]", "_")
+	
+	-- Frame erstellen (wie ShaguScan)
+	local frame = CreateFrame("Button", nil, Spy.MainWindow)
+	frame:EnableMouse(true)  -- ✅ CRITICAL für Klicks
+	frame:RegisterForClicks("LeftButtonUp", "RightButtonUp")  -- ✅ CRITICAL für Klicks
+	frame.PlayerName = playerName
+	frame:SetHeight(Spy.db.profile.MainWindow.RowHeight)
+	frame:SetWidth(Spy.MainWindow:GetWidth() - 4)
+	
+	-- ✅ CRITICAL FIX: Set GUID IMMEDIATELY on frame creation
+	-- Try multiple sources in order of reliability
+	local guid = nil
+	
+	-- Priority 1: GUID from PlayerData
+	local playerData = SpyPerCharDB.PlayerData[playerName]
+	if playerData and playerData.guid then
+		guid = playerData.guid
+	end
+	
+	-- Priority 2: GUID from SpySW nameToGuid cache
+	if not guid and SpySW and SpySW.nameToGuid then
+		guid = SpySW.nameToGuid[playerName]
+	end
+	
+	-- Priority 3: GUID from SpySW.guids table (search all GUIDs)
+	if not guid and SpySW and SpySW.guids then
+		for cachedGuid, timestamp in pairs(SpySW.guids) do
+			if UnitExists(cachedGuid) then
+				local name = UnitName(cachedGuid)
+				if name == playerName then
+					guid = cachedGuid
+					break
+				end
+			end
+		end
+	end
+	
+	-- Set GUID on frame IMMEDIATELY
+	frame.PlayerGUID = guid
+	
+	-- Setup Bar (wie bei normalen Rows)
+	Spy:SetupBar(frame)
+	
+	-- ✅ CRITICAL: SetFrameLevel damit Frame über anderen UI-Elementen liegt
+	frame:SetFrameLevel(Spy.MainWindow:GetFrameLevel() + 5)
+	frame.StatusBar:SetFrameLevel(Spy.MainWindow:GetFrameLevel() + 4)
+	
+	-- Combat feedback text für CombatFeedback_OnCombatEvent
+	local feedback = frame.StatusBar:CreateFontString(nil, "OVERLAY", "NumberFontNormalHuge")
+	feedback:SetAlpha(.8)
+	feedback:SetFont(DAMAGE_TEXT_FONT, 12, "OUTLINE")
+	feedback:SetParent(frame.StatusBar)
+	feedback:ClearAllPoints()
+	feedback:SetPoint("CENTER", frame.StatusBar, "CENTER", 0, 0)
+	frame.feedbackFontHeight = 14
+	frame.feedbackStartTime = GetTime()
+	frame.feedbackText = feedback
+	
+	-- Events wie ShaguScan
+	frame:RegisterEvent("UNIT_COMBAT")
+	frame:SetScript("OnEvent", function()
+		if event == "UNIT_COMBAT" and arg1 == this.PlayerGUID then
+			CombatFeedback_OnCombatEvent(arg2, arg3, arg4, arg5)
+		end
+	end)
+	
+	-- OnEnter/OnLeave für Tooltip
+	frame:SetScript("OnEnter", function()
+		Spy:ShowTooltip(true)
+	end)
+	frame:SetScript("OnLeave", function()
+		Spy:ShowTooltip(false)
+	end)
+	
+	-- OnUpdate für HP
+	frame:SetScript("OnUpdate", function()
+		if not this:IsShown() then return end
+		if (this.hpTick or 0) > GetTime() then return end
+		this.hpTick = GetTime() + 0.2
+		
+		local guid = this.PlayerGUID
+		if not guid or not UnitExists(guid) then return end
+		
+		local currentHP = UnitHealth(guid)
+		local maxHP = UnitHealthMax(guid)
+		
+		if maxHP > 0 then
+			local healthPercent = currentHP / maxHP
+			local barValue = healthPercent * 100
+			
+			local currentValue = this.StatusBar:GetValue()
+			if math.abs(currentValue - barValue) > 1 then
+				this.StatusBar:SetValue(barValue)
+			end
+		end
+	end)
+	
+	-- ✅ OnClick NUR EINMAL setzen beim Erstellen
+	frame:SetScript("OnClick", function()
+		-- RightButton: Dropdown
+		if arg1 == "RightButton" then
+			Spy:BarDropDownOpen(this)
+			CloseDropDownMenus(1)
+			ToggleDropDownMenu(1, nil, Spy_BarDropDownMenu)
+			return
+		end
+		
+		-- Shift+Klick: KOS Toggle
+		if IsShiftKeyDown() then
+			local name = this.PlayerName
+			if name then
+				if SpyPerCharDB.KOSData[name] then
+					Spy:ToggleKOSPlayer(false, name)
+				else
+					Spy:ToggleKOSPlayer(true, name)
+				end
+			end
+			return
+		end
+		
+		-- Ctrl+Klick: Ignore Toggle
+		if IsControlKeyDown() then
+			local name = this.PlayerName
+			if name then
+				if SpyPerCharDB.IgnoreData[name] then
+					Spy:ToggleIgnorePlayer(false, name)
+				else
+					Spy:ToggleIgnorePlayer(true, name)
+				end
+			end
+			return
+		end
+		
+		-- Normal Klick: Target
+		TargetUnit(this.PlayerGUID)
+	end)
+	
+	
+	-- Frame in Tabelle speichern
+	Spy.MainWindow.PlayerFrames[playerName] = frame
+	frame:Hide()
+	
+	return frame
 end
 
 function Spy:UpdateBarTextures(event, media, key)
 	if media == SM.MediaType.STATUSBAR or not media then
+		-- Update alte Rows
 		for _, v in pairs(Spy.MainWindow.Rows) do
 			v.StatusBar:SetStatusBarTexture(SM:Fetch(SM.MediaType.STATUSBAR, key))
+		end
+		
+		-- NEU: Update PlayerFrames
+		if Spy.MainWindow.PlayerFrames then
+			for _, frame in pairs(Spy.MainWindow.PlayerFrames) do
+				if frame.StatusBar then
+					frame.StatusBar:SetStatusBarTexture(SM:Fetch(SM.MediaType.STATUSBAR, key))
+				end
+			end
 		end
 	end
 
@@ -87,8 +299,19 @@ end
 function Spy:SetBarTextures(handle)
 	local Texture = SM:Fetch(SM.MediaType.STATUSBAR, handle)
 	Spy.db.profile.BarTexture = handle
+	
+	-- Update alte Rows
 	for _, v in pairs(Spy.MainWindow.Rows) do
 		v.StatusBar:SetStatusBarTexture(Texture)
+	end
+	
+	-- NEU: Update PlayerFrames
+	if Spy.MainWindow.PlayerFrames then
+		for _, frame in pairs(Spy.MainWindow.PlayerFrames) do
+			if frame.StatusBar then
+				frame.StatusBar:SetStatusBarTexture(Texture)
+			end
+		end
 	end
 end
 
@@ -345,8 +568,9 @@ function Spy:CreateMainWindow()
 			end)
 
 		local theFrame = Spy.MainWindow
+		theFrame:SetClampedToScreen(true)  -- ✅ Frame kann nicht außerhalb des Bildschirms gezogen werden
 		theFrame:SetResizable(true)
-		theFrame:SetMinResize(90, 44)
+		theFrame:SetMinResize(190, 44)
 		theFrame:SetMaxResize(300, 264)
 
 		theFrame:SetScript("OnSizeChanged",
@@ -663,6 +887,7 @@ function Spy:CreateMainWindow()
 		theFrame.CloseButton:SetFrameLevel(theFrame.CountButton:GetFrameLevel() + 1)
 
 		Spy.MainWindow.Rows = {}
+		Spy.MainWindow.PlayerFrames = {}  -- NEU: Tabelle für permanente Player-Frames
 		Spy.MainWindow.CurRows = 0
 
 		for i = 1, Spy.db.profile.ResizeSpyLimit do
@@ -759,12 +984,35 @@ function Spy:BarsChanged()
 		Spy:SetFontSize(v.RightText, math.max(Spy.db.profile.MainWindow.RowHeight * 0.75, Spy.db.profile.MainWindow.RowHeight - 8))
 	end
 	
+	-- NEU: Update PlayerFrames
+	if Spy.MainWindow.PlayerFrames then
+		local fontSize = math.max(Spy.db.profile.MainWindow.RowHeight * 0.85, Spy.db.profile.MainWindow.RowHeight - 1)
+		local fontName = "Fonts\\FRIZQT__.TTF"
+		if Spy.db.profile.Font and SM and SM.Fetch then
+			fontName = SM:Fetch("font", Spy.db.profile.Font) or fontName
+		end
+		
+		for playerName, frame in pairs(Spy.MainWindow.PlayerFrames) do
+			frame:SetHeight(Spy.db.profile.MainWindow.RowHeight)
+			if frame.LeftText then
+				frame.LeftText:SetFont(fontName, fontSize, "THINOUTLINE")
+			end
+			if frame.MiddleText then
+				frame.MiddleText:SetFont(fontName, fontSize, "THINOUTLINE")
+			end
+			if frame.RightText then
+				Spy:SetFontSize(frame.RightText, math.max(Spy.db.profile.MainWindow.RowHeight * 0.75, Spy.db.profile.MainWindow.RowHeight - 8))
+			end
+		end
+	end
+	
 	-- Update CountFrame height
 	if Spy.MainWindow.CountFrame then
 		Spy.MainWindow.CountFrame:SetHeight(Spy.db.profile.MainWindow.RowHeight)
 	end
 	
 	Spy:ResizeMainWindow()
+	Spy:RefreshCurrentList()
 end
 
 function Spy:SetBar(num, name, desc, value, colorgroup, colorclass, tooltipData, opacity)
@@ -850,8 +1098,15 @@ function Spy:ResizeMainWindow()
 
 	local CurWidth = Spy.MainWindow:GetWidth() - 4
 	Spy.MainWindow.Title:SetWidth(CurWidth - 75)
+	
+	-- Update alte Rows
 	for i,row in pairs(Spy.MainWindow.Rows) do
 		row:SetWidth(CurWidth)	
+	end
+	
+	-- NEU: Update PlayerFrames
+	for playerName, frame in pairs(Spy.MainWindow.PlayerFrames) do
+		frame:SetWidth(CurWidth)
 	end
 
 	-- ✅ NEU: Update text widths after resize
@@ -945,7 +1200,8 @@ local anchors = {["ANCHOR_TOP"] = {"TOP", "BOTTOM"},
 
 function Spy:ShowTooltip(show, id)
 	if show then
-		local name = Spy.ButtonName[this.id]
+		-- NEU: Hole Name direkt vom Frame anstatt über ButtonName
+		local name = this.PlayerName or (this.id and Spy.ButtonName and Spy.ButtonName[this.id])
 		if name and name ~= "" then
 			local titleText = Spy.db.profile.Colors.Tooltip["Title Text"]
 			if not Spy.db.profile.DisplayTooltipNearSpyWindow then
