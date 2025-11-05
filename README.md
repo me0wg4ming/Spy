@@ -20,64 +20,67 @@
 
 ---
 
-🚀 What's New in Version 4.0.0
-🆕 Major Features (November 5, 2025)
+## 🚀 What's New in Version 4.0.0
 
-✅ Complete Rework of Frame System - Individual persistent frames for each player instead of reusable row pool
-✅ Live HP Bars - Real-time health percentage display with class-colored bars
-✅ Combat Feedback Integration - Damage numbers appear on player frames (UNIT_COMBAT events)
-✅ Improved Click Detection - Frames no longer hide/show on every refresh, fixing click reliability issues
-✅ Frame Persistence - Each player maintains their own frame, eliminating visual flickering
-✅ Sorting Stability - Uses millisecond-precision DetectionTimestamp instead of second-precision time()
+### 🆕 Major Features (November 5, 2025)
 
-🎨 UI Improvements
+- ✅ **Complete Rework of Frame System** - Individual persistent frames for each player instead of reusable row pool
+- ✅ **Live HP Bars** - Real-time health percentage display with class-colored bars
+- ✅ **Combat Feedback Integration** - Damage numbers appear on player frames (UNIT_COMBAT events)
+- ✅ **Improved Click Detection** - Frames no longer hide/show on every refresh, fixing click reliability issues
+- ✅ **Frame Persistence** - Each player maintains their own frame, eliminating visual flickering
+- ✅ **Sorting Stability** - Uses millisecond-precision DetectionTimestamp instead of second-precision time()
 
-✅ Minimum Window Width - Set to 190 pixels (matches default configuration)
-✅ Frame Clamping - Window cannot be dragged outside screen boundaries
-✅ Position-Only Updates - Frames only update position during sorting, not entire frame recreation
-✅ Reduced Flickering - Frames remain visible when player stays in list, only hidden when actually removed
+### 🎨 UI Improvements
 
-🐛 Critical Bugfixes
+- ✅ **Minimum Window Width** - Set to 190 pixels (matches default configuration)
+- ✅ **Frame Clamping** - Window cannot be dragged outside screen boundaries
+- ✅ **Position-Only Updates** - Frames only update position during sorting, not entire frame recreation
+- ✅ **Reduced Flickering** - Frames remain visible when player stays in list, only hidden when actually removed
 
-✅ Click Detection Fixed - Removed frame hide/show on every refresh that was blocking clicks
-✅ OnClick Stability - OnClick handler set only once during frame creation, not on every refresh
-✅ GUID Updates - PlayerGUID updated intelligently only when invalid or missing
-✅ Frame Level Management - Proper SetFrameLevel to ensure frames are clickable above other UI elements
+### 🐛 Critical Bugfixes
 
-🔧 Technical Changes
+- ✅ **Click Detection Fixed** - Removed frame hide/show on every refresh that was blocking clicks
+- ✅ **OnClick Stability** - OnClick handler set only once during frame creation, not on every refresh
+- ✅ **GUID Updates** - PlayerGUID updated intelligently only when invalid or missing
+- ✅ **Frame Level Management** - Proper SetFrameLevel to ensure frames are clickable above other UI elements
 
-✅ PlayerFrames Table - New persistent frame storage: Spy.MainWindow.PlayerFrames[playerName]
-✅ OnUpdate HP System - 0.2s throttled HP updates per frame (similar to ShaguScan)
-✅ Combat Feedback Text - Each frame has its own feedbackText FontString for damage display
-✅ Smart Frame Hiding - Only hides frames not in current list, not all frames on every refresh
-✅ Removed Legacy Code - Cleaned up ButtonClicked() function and /spyclick debug command
+### 🔧 Technical Changes
 
-📊 Architecture Changes
-Old System (Row Pool):
+- ✅ **PlayerFrames Table** - New persistent frame storage: `Spy.MainWindow.PlayerFrames[playerName]`
+- ✅ **OnUpdate HP System** - 0.2s throttled HP updates per frame (similar to ShaguScan)
+- ✅ **Combat Feedback Text** - Each frame has its own feedbackText FontString for damage display
+- ✅ **Smart Frame Hiding** - Only hides frames not in current list, not all frames on every refresh
+- ✅ **Removed Legacy Code** - Cleaned up ButtonClicked() function and /spyclick debug command
 
-Fixed number of reusable rows
-Rows constantly reassigned to different players
-RefreshCurrentList() rebuilt entire list 15-35 times/second
-Caused visual flickering and click detection issues
+### 📊 Architecture Changes
 
-New System (Persistent Frames):
+**Old System (Row Pool):**
+- Fixed number of reusable rows
+- Rows constantly reassigned to different players
+- RefreshCurrentList() rebuilt entire list 15-35 times/second
+- Caused visual flickering and click detection issues
 
-One frame per player, created once
-Frames persist until player leaves list
-Only position updates during sorting
-No flickering, reliable click detection
+**New System (Persistent Frames):**
+- One frame per player, created once
+- Frames persist until player leaves list
+- Only position updates during sorting
+- No flickering, reliable click detection
 
-🎯 Performance Optimizations
+### 🎯 Performance Optimizations
 
-✅ Reduced Refresh Overhead - Frames only created once per player, not on every refresh
-✅ Throttled HP Updates - 0.2s update interval prevents excessive processing
-✅ Smart GUID Caching - GUID stored on frame, only refreshed when invalid
-✅ Position Caching - Frame position only updated when actually changed
+- ✅ **Reduced Refresh Overhead** - Frames only created once per player, not on every refresh
+- ✅ **Throttled HP Updates** - 0.2s update interval prevents excessive processing
+- ✅ **Smart GUID Caching** - GUID stored on frame, only refreshed when invalid
+- ✅ **Position Caching** - Frame position only updated when actually changed
 
-Version: 4.0.0
-Release Date: November 5, 2025
-Requirements: SuperWoW 1.12.1+ (MANDATORY), UnitXP (OPTIONAL for Distance Display)
-⚠️ BREAKING CHANGE: This version completely rebuilds the frame system. If upgrading from 3.9.6, a /reload is recommended after installation.
+---
+
+**Version:** 4.0.0  
+**Release Date:** November 5, 2025  
+**Requirements:** SuperWoW 1.12.1+ (MANDATORY), UnitXP (OPTIONAL for Distance Display)
+
+**⚠️ BREAKING CHANGE:** This version completely rebuilds the frame system. If upgrading from 3.9.6, a `/reload` is recommended after installation.
 ---
 
 ## ⚠️ CRITICAL: SuperWoW is REQUIRED
