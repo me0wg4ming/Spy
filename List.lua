@@ -47,7 +47,7 @@ function Spy:RefreshCurrentList(player, source)
 	local yOffset = 34
 	local displayCount = 0
 	
-	for index, data in pairs(Spy.CurrentList) do
+	for index, data in ipairs(Spy.CurrentList) do
 		if displayCount < Spy.db.profile.ResizeSpyLimit then
 			local playerName = data.player
 			
@@ -242,6 +242,13 @@ function Spy:RefreshCurrentList(player, source)
 						Spy:AnnouncePlayer(player) 
 					end
 				end
+			end
+		else
+			-- Hide frames beyond the limit
+			local frame = Spy.MainWindow.PlayerFrames[data.player]
+			if frame then
+				frame:Hide()
+				frame.visible = false
 			end
 		end
 	end
