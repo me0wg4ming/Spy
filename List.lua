@@ -171,6 +171,9 @@ function Spy:RefreshCurrentList(player, source)
 			
 			-- Distance on right (without separate DistanceText)
 			local distanceText = ""
+			local distanceR, distanceG, distanceB = 1, 1, 1  -- Default: White
+			
+			-- ✅ Only use distance features if Spy.Distance is enabled (SP3 available)
 			if Spy.Distance and Spy.Distance.enabled then
 				local distance = Spy.Distance:GetDistance(playerName)
 				if not distance then
@@ -181,31 +184,19 @@ function Spy:RefreshCurrentList(player, source)
 				else
 					distanceText = "--"
 				end
-			end
-			frame.RightText:SetText(distanceText)
-			
-			-- ✅ NEW: Line of Sight color with safety check for UnitXP
-			local distanceR, distanceG, distanceB = 1, 1, 1  -- Default: White for "--"
-			
-			-- Check if UnitXP is available and supports "inSight" before using it
-			if distanceText ~= "--" and frame.PlayerGUID and UnitExists(frame.PlayerGUID) then
-				-- ✅ Safety check: Only call UnitXP if it exists
-				if UnitXP then
-					-- Try to call UnitXP with pcall to catch any errors
-					local success, los = pcall(function()
-						return UnitXP("inSight", "player", frame.PlayerGUID)
-					end)
-					
-					if success and los ~= nil then
-						if los == true then
-							distanceR, distanceG, distanceB = 0, 1, 0  -- Green: Line of sight clear (attackable)
-						else
-							distanceR, distanceG, distanceB = 1, 0, 0  -- Red: Line of sight blocked (not attackable)
-						end
+				
+				-- Line of Sight color (only if SP3 is enabled and we have distance)
+				if distanceText ~= "--" and frame.PlayerGUID and UnitExists(frame.PlayerGUID) then
+					local los = UnitXP("inSight", "player", frame.PlayerGUID)
+					if los == true then
+						distanceR, distanceG, distanceB = 0, 1, 0  -- Green: Line of sight clear (attackable)
+					else
+						distanceR, distanceG, distanceB = 1, 0, 0  -- Red: Line of sight blocked (not attackable)
 					end
-					-- If pcall fails or returns nil, keep white color (default)
 				end
 			end
+			
+			frame.RightText:SetText(distanceText)
 			
 			-- HP-Bar: Store class for OnUpdate HP feature
 			frame.playerClass = class
