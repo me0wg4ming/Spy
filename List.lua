@@ -169,34 +169,40 @@ function Spy:RefreshCurrentList(player, source)
 			frame.MiddleText:ClearAllPoints()
 			frame.MiddleText:SetPoint("LEFT", frame.LeftText, "RIGHT", 4, 0)
 			
-			-- Distance on right (without separate DistanceText)
-			local distanceText = ""
-			local distanceR, distanceG, distanceB = 1, 1, 1  -- Default: White
-			
-			-- ✅ Only use distance features if Spy.Distance is enabled (SP3 available)
+			-- Distance on right (only if SP3 is available)
 			if Spy.Distance and Spy.Distance.enabled then
 				local distance = Spy.Distance:GetDistance(playerName)
 				if not distance then
 					distance = Spy.Distance:GetCachedDistance(playerName)
 				end
+				
+				local distanceText = ""
 				if distance then
 					distanceText = Spy.Distance:FormatDistance(distance)
 				else
 					distanceText = "--"
 				end
 				
-				-- Line of Sight color (only if SP3 is enabled and we have distance)
+				frame.RightText:SetText(distanceText)
+				frame.RightText:Show()
+				
+				-- Line of Sight color (only if we have actual distance)
+				local distanceR, distanceG, distanceB = 1, 1, 1  -- Default: White
 				if distanceText ~= "--" and frame.PlayerGUID and UnitExists(frame.PlayerGUID) then
 					local los = UnitXP("inSight", "player", frame.PlayerGUID)
 					if los == true then
-						distanceR, distanceG, distanceB = 0, 1, 0  -- Green: Line of sight clear (attackable)
+						distanceR, distanceG, distanceB = 0, 1, 0  -- Green: Line of sight clear
 					else
-						distanceR, distanceG, distanceB = 1, 0, 0  -- Red: Line of sight blocked (not attackable)
+						distanceR, distanceG, distanceB = 1, 0, 0  -- Red: Line of sight blocked
 					end
 				end
+				
+				frame.RightText:SetTextColor(distanceR, distanceG, distanceB, opacity)
+			else
+				-- SP3 not available - hide RightText completely
+				frame.RightText:SetText("")
+				frame.RightText:Hide()
 			end
-			
-			frame.RightText:SetText(distanceText)
 			
 			-- HP-Bar: Store class for OnUpdate HP feature
 			frame.playerClass = class
@@ -235,7 +241,6 @@ function Spy:RefreshCurrentList(player, source)
 
 			frame.LeftText:SetTextColor(levelR, levelG, levelB, opacity)
 			frame.MiddleText:SetTextColor(1, 1, 1, opacity)
-			frame.RightText:SetTextColor(distanceR, distanceG, distanceB, opacity)
 			
 			-- Position frame
 			frame:ClearAllPoints()
