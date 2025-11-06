@@ -20,7 +20,7 @@
 
 ---
 
-## 🚀 What's New in Version 4.0.1
+## 🚀 What's New in Version 4.0.1 (November 6, 2025)
 - ✅ LOS Check on Range indicator/numbers:
 - 🟢 Green = Line of Sight free → Player can be attacked
 - 🔴 Red = Line of Sight blocked → Player can't be attacked
