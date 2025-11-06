@@ -90,6 +90,10 @@
 - ❌ **Without SuperWoW** → Spy automatically DISABLES itself on login
 - ✅ **With SuperWoW** → Full GUID-based detection similar to ShaguScan
 
+### Download UnitXP_SP3
+
+**Official Repository:** [https://codeberg.org/konaka/UnitXP_SP3/releases)
+
 ### Download SuperWoW
 
 **Official Repository:** [https://github.com/balakethelock/SuperWoW](https://github.com/balakethelock/SuperWoW)
