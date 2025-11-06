@@ -184,6 +184,17 @@ function Spy:RefreshCurrentList(player, source)
 			end
 			frame.RightText:SetText(distanceText)
 			
+			-- Line of Sight color (Service Pack 3 integration)
+			local distanceR, distanceG, distanceB = 1, 1, 1  -- Default: White for "--"
+			if distanceText ~= "--" and frame.PlayerGUID and UnitExists(frame.PlayerGUID) then
+				local los = UnitXP("inSight", "player", frame.PlayerGUID)
+				if los == true then
+					distanceR, distanceG, distanceB = 0, 1, 0  -- Green: Line of sight clear (attackable)
+				else
+					distanceR, distanceG, distanceB = 1, 0, 0  -- Red: Line of sight blocked (not attackable)
+				end
+			end
+			
 			-- HP-Bar: Store class for OnUpdate HP feature
 			frame.playerClass = class
 			
@@ -221,7 +232,7 @@ function Spy:RefreshCurrentList(player, source)
 
 			frame.LeftText:SetTextColor(levelR, levelG, levelB, opacity)
 			frame.MiddleText:SetTextColor(1, 1, 1, opacity)
-			frame.RightText:SetTextColor(1, 1, 1, opacity)
+			frame.RightText:SetTextColor(distanceR, distanceG, distanceB, opacity)
 			
 			-- Position frame
 			frame:ClearAllPoints()

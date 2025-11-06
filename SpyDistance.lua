@@ -135,30 +135,13 @@ function Spy.Distance:GetCachedDistance(playerName)
     return nil
 end
 
--- Format distance text with color
+-- Format distance text (no colors - colors now set by Line of Sight in List.lua)
 function Spy.Distance:FormatDistance(distance)
     if not distance then
-        return "|cff888888--|r"
+        return "--"
     end
     
-    local color
-    if distance < 5 then
-        color = "|cff0000ff" -- Blue (melee range)
-    elseif distance < 8 then
-        color = "|cff3380ff" -- Light blue
-    elseif distance < 20 then
-        color = "|cff57b3ff" -- Cyan
-    elseif distance < 30 then
-        color = "|cff00dc00" -- Green
-    elseif distance < 35 then
-        color = "|cffb3dc00" -- Yellow-green
-    elseif distance < 41 then
-        color = "|cffffff00" -- Yellow
-    else
-        color = "|cffff0000" -- Red (out of range)
-    end
-    
-    return string.format("%s%.0f|r", color, distance)
+    return string.format("%.0f", distance)
 end
 
 -- Clean up old cache entries
