@@ -1,6 +1,6 @@
 # Spy - SuperWoW Edition
 
-[![Version](https://img.shields.io/badge/version-3.9.3-blue.svg)](https://github.com/me0wg4ming/Spy)
+[![Version](https://img.shields.io/badge/version-4.0.0-blue.svg)](https://github.com/me0wg4ming/Spy)
 [![WoW](https://img.shields.io/badge/WoW-1.12.1%20Vanilla-orange.svg)](#)
 [![SuperWoW](https://img.shields.io/badge/SuperWoW-Required-red.svg)](https://github.com/balakethelock/SuperWoW)
 
