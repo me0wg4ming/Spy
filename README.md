@@ -20,6 +20,14 @@
 
 ---
 
+## 🚀 What's New in Version 4.0.1
+✅ LOS Check on Range indicator/numbers:
+🟢 Green = Line of Sight free → Player can be attacked
+🔴 Red = Line of Sight blocked → Player can't be attacked
+⚪ White = Out of range/not found "--" (NO GUID/No available
+
+- ✅ Fixed Player Frames Overlapping when more then 15 Players are in range.)
+
 ## 🚀 What's New in Version 4.0.0
 
 ### 🆕 Major Features (November 5, 2025)
