@@ -92,7 +92,7 @@
 
 ### Download UnitXP_SP3
 
-**Official Repository:** [https://codeberg.org/konaka/UnitXP_SP3/releases)
+**Official Repository:** [https://codeberg.org/konaka/UnitXP_SP3/releases](https://codeberg.org/konaka/UnitXP_SP3/releases)
 
 ### Download SuperWoW
 
