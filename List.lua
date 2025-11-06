@@ -21,13 +21,13 @@ function Spy:RefreshCurrentList(player, source)
 	local manageFunction = Spy.ListTypes[mode][2]
 	if manageFunction then manageFunction() end
 
-	-- âœ… Build list of players currently in CurrentList
+	-- ✅ Build list of players currently in CurrentList
 	local playersInList = {}
 	for index, data in pairs(Spy.CurrentList) do
 		playersInList[data.player] = true
 	end
 	
-	-- âœ… Hide only frames NOT in current list
+	-- ✅ Hide only frames NOT in current list
 	for playerName, frame in pairs(Spy.MainWindow.PlayerFrames) do
 		if not playersInList[playerName] then
 			frame:Hide()
@@ -36,7 +36,7 @@ function Spy:RefreshCurrentList(player, source)
 		end
 	end
 
-	-- âœ… Also hide old row-based frames if any exist
+	-- ✅ Also hide old row-based frames if any exist
 	if Spy.MainWindow.Rows then
 		for i, row in pairs(Spy.MainWindow.Rows) do
 			row:Hide()
@@ -54,7 +54,7 @@ function Spy:RefreshCurrentList(player, source)
 			-- Get or create frame for this player
 			local frame = Spy:CreatePlayerFrame(playerName)
 			
-			-- âœ… CRITICAL FIX: Always update GUID before showing frame
+			-- ✅ CRITICAL FIX: Always update GUID before showing frame
 			-- This ensures targeting works even if GUID was missing during creation
 			if not frame.PlayerGUID or not UnitExists(frame.PlayerGUID) then
 				local guid = nil
@@ -90,7 +90,7 @@ function Spy:RefreshCurrentList(player, source)
 				end
 			end
 			
-			-- âœ… CRITICAL FIX: Store name in ButtonName table for backwards compatibility
+			-- ✅ CRITICAL FIX: Store name in ButtonName table for backwards compatibility
 			-- This ensures OnClick handlers can always find the player name
 			if not frame.id then
 				-- Assign a stable ID to this frame
@@ -184,21 +184,33 @@ function Spy:RefreshCurrentList(player, source)
 			end
 			frame.RightText:SetText(distanceText)
 			
-			-- Line of Sight color (Service Pack 3 integration)
+			-- ✅ NEW: Line of Sight color with safety check for UnitXP
 			local distanceR, distanceG, distanceB = 1, 1, 1  -- Default: White for "--"
+			
+			-- Check if UnitXP is available and supports "inSight" before using it
 			if distanceText ~= "--" and frame.PlayerGUID and UnitExists(frame.PlayerGUID) then
-				local los = UnitXP("inSight", "player", frame.PlayerGUID)
-				if los == true then
-					distanceR, distanceG, distanceB = 0, 1, 0  -- Green: Line of sight clear (attackable)
-				else
-					distanceR, distanceG, distanceB = 1, 0, 0  -- Red: Line of sight blocked (not attackable)
+				-- ✅ Safety check: Only call UnitXP if it exists
+				if UnitXP then
+					-- Try to call UnitXP with pcall to catch any errors
+					local success, los = pcall(function()
+						return UnitXP("inSight", "player", frame.PlayerGUID)
+					end)
+					
+					if success and los ~= nil then
+						if los == true then
+							distanceR, distanceG, distanceB = 0, 1, 0  -- Green: Line of sight clear (attackable)
+						else
+							distanceR, distanceG, distanceB = 1, 0, 0  -- Red: Line of sight blocked (not attackable)
+						end
+					end
+					-- If pcall fails or returns nil, keep white color (default)
 				end
 			end
 			
 			-- HP-Bar: Store class for OnUpdate HP feature
 			frame.playerClass = class
 			
-			-- âœ… CRITICAL FIX: Set frame level RELATIVE to MainWindow
+			-- ✅ CRITICAL FIX: Set frame level RELATIVE to MainWindow
 			frame:SetFrameLevel(Spy.MainWindow:GetFrameLevel() + displayCount + 2)
 			frame.StatusBar:SetFrameLevel(Spy.MainWindow:GetFrameLevel() + displayCount + 1)
 			
