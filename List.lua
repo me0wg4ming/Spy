@@ -1037,100 +1037,49 @@ function Spy:AlertStealthPlayer(player)
 end
 
 function Spy:AnnouncePlayer(player, channel)
-	-- ✅ Safeguard: Check if player name is valid
-	if not player or player == "" then
-		DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Error]|r AnnouncePlayer called with invalid player name")
-		return
-	end
-	
 	if not Spy_IgnoreList[player] then
 		local msg = ""
 		local isKOS = SpyPerCharDB.KOSData[player]
 		local playerData = SpyPerCharDB.PlayerData[player]
 
 		local announce = Spy.db.profile.Announce
-		
-		-- ✅ FIXED: Check if we should send message at all
-		-- Right-click menu (channel set): Always send
-		-- Config auto-announce (announce set, channel nil): Check conditions
-		local shouldAnnounce = false
-		
-		if channel then
-			-- Right-click menu: Always announce (user explicitly chose channel)
-			shouldAnnounce = true
-		else
-			-- Config auto-announce: Check conditions
-			if announce == "Self" or announce == "LocalDefense" or
-				(announce == "Guild" and GetGuildInfo("player") ~= nil and not Spy.InInstance) or
-				(announce == "Party" and GetNumPartyMembers() > 0) or 
-				(announce == "Raid" and UnitInRaid("player")) then
-				shouldAnnounce = true
-			end
-		end
-		
-		if shouldAnnounce then
-			-- ✅ FIXED: Determine message format based on ACTUAL destination
-			-- Use colored format ONLY for Self-announce from config (not right-click)
-			local useColoredFormat = (announce == "Self" and not channel)
-
-			if useColoredFormat then
-				-- Colored format for Self-announce from config
+		if channel or announce == "Self" or announce == "LocalDefense" or
+			(announce == "Guild" and GetGuildInfo("player") ~= nil and not Spy.InInstance) or
+			(announce == "Party" and GetNumPartyMembers() > 0) or (announce == "Raid" and UnitInRaid("player")) then
+			if announce == "Self" and not channel then
 				if isKOS then
-					msg = L["SpySignatureColored"] .. L["KillOnSightDetectedColored"] .. player .. " "
+					msg = msg .. L["SpySignatureColored"] .. L["KillOnSightDetectedColored"] .. player .. " "
 				else
-					msg = L["SpySignatureColored"] .. L["PlayerDetectedColored"] .. player .. " "
+					msg = msg .. L["SpySignatureColored"] .. L["PlayerDetectedColored"] .. player .. " "
 				end
 			else
-				-- Plain text format for all chat channels (both config and right-click)
 				if isKOS then
-					msg = L["KillOnSightDetected"] .. player .. " "
+					msg = msg .. L["KillOnSightDetected"] .. player .. " "
 				else
-					msg = L["PlayerDetected"] .. player .. " "
+					msg = msg .. L["PlayerDetected"] .. player .. " "
 				end
 			end
-			
-			-- ✅ Add player details if available (ALWAYS, regardless of announce type)
 			if playerData then
-				-- Guild
 				if playerData.guild and playerData.guild ~= "" then
 					msg = msg .. "<" .. playerData.guild .. "> "
 				end
-				
-				-- Level, Race, Class
 				if playerData.level or playerData.race or (playerData.class and playerData.class ~= "") then
 					msg = msg .. "- "
-					
-					-- Level
 					if playerData.level then 
-						local levelNum = tonumber(playerData.level)
-						if levelNum then
-							if levelNum == 0 then
-								msg = msg .. L["Level"] .. " ?? "
-							else
-								msg = msg .. L["Level"] .. " " .. levelNum .. " "
-							end
-						end
+						local levelText = (playerData.level == 0) and "??" or playerData.level
+						msg = msg .. L["Level"] .. " " .. levelText .. " " 
 					end
-					
-					-- Race
 					if playerData.race and playerData.race ~= "" then 
 						msg = msg .. playerData.race .. " " 
 					end
-					
-					-- Class
 					if playerData.class and playerData.class ~= "" then
-						if useColoredFormat then
-							-- Localized class name for Self-announce
+						if announce == "Self" and not channel then
 							msg = msg .. L[playerData.class] .. " "
 						else
-							-- Capitalized class name for chat channels
-							local className = playerData.class
-							msg = msg .. upper(strsub(className, 1, 1)) .. lower(strsub(className, 2)) .. " "
+							msg = msg .. upper(strsub(playerData.class, 1, 1)) .. lower(strsub(playerData.class, 2)) .. " "
 						end
 					end
 				end
-				
-				-- Location
 				if playerData.zone then
 					if playerData.subZone and playerData.subZone ~= "" and playerData.subZone ~= playerData.zone then
 						msg = msg .. "- " .. playerData.subZone .. ", " .. playerData.zone
@@ -1138,27 +1087,21 @@ function Spy:AnnouncePlayer(player, channel)
 						msg = msg .. "- " .. playerData.zone
 					end
 				end
-				
-				-- Coordinates
-				if playerData.mapX and playerData.mapY then 
-					local x = math.floor(tonumber(playerData.mapX) * 100)
-					local y = math.floor(tonumber(playerData.mapY) * 100)
-					msg = msg .. " (" .. x .. "," .. y .. ")"
+				if playerData.mapX and playerData.mapY then msg = msg ..
+						" (" .. math.floor(tonumber(playerData.mapX) * 100) .. "," .. math.floor(tonumber(playerData.mapY) * 100) .. ")"
 				end
 			end
 
-			-- ✅ Send message
 			if channel then
-				-- ✅ FIXED: Right-click menu announce - send to selected channel
-				if (channel == "PARTY" and GetNumPartyMembers() > 0) or 
-				   (channel == "RAID" and UnitInRaid("player")) or
-				   (channel == "GUILD" and GetGuildInfo("player") ~= nil) then
+				-- announce to selected channel
+				if (channel == "PARTY" and GetNumPartyMembers() > 0) or (channel == "RAID" and UnitInRaid("player")) or
+					(channel == "GUILD" and GetGuildInfo("player") ~= nil) then
 					SendChatMessage(msg, channel)
 				elseif channel == "LOCAL" then
 					SendChatMessage(msg, "CHANNEL", nil, GetChannelName(L["LocalDefenseChannelName"] .. " - " .. GetZoneText()))
 				end
 			else
-				-- Config auto-announce - send to configured channel
+				-- announce to standard channel
 				if isKOS or not Spy.db.profile.OnlyAnnounceKoS then
 					if announce == "Self" then
 						DEFAULT_CHAT_FRAME:AddMessage(msg)
@@ -1171,19 +1114,17 @@ function Spy:AnnouncePlayer(player, channel)
 			end
 		end
 
-		-- announce to other Spy users (unchanged)
+		-- announce to other Spy users
 		if Spy.db.profile.ShareData then
 			local class, level, race, zone, subZone, mapX, mapY, guild = "", "", "", "", "", "", "", ""
 			if playerData then
 				if playerData.class then class = playerData.class end
-				if playerData.level and playerData.isGuess == false then 
-					level = tostring(playerData.level)
-				end
+				if playerData.level and playerData.isGuess == false then level = playerData.level end
 				if playerData.race then race = playerData.race end
 				if playerData.zone then zone = playerData.zone end
 				if playerData.subZone then subZone = playerData.subZone end
-				if playerData.mapX then mapX = tostring(playerData.mapX) end
-				if playerData.mapY then mapY = tostring(playerData.mapY) end
+				if playerData.mapX then mapX = playerData.mapX end
+				if playerData.mapY then mapY = playerData.mapY end
 				if playerData.guild then guild = playerData.guild end
 			end
 			local details = Spy.Version ..
