@@ -141,6 +141,11 @@ function Spy:RefreshCurrentList(player, source)
 			
 			frame.StatusBar:SetValue(currentBarValue)
 			
+			-- Update LeftText size
+			local leftFont, _, leftFlags = frame.LeftText:GetFont()
+			local leftSize = math.max(Spy.db.profile.MainWindow.RowHeight * 0.85, Spy.db.profile.MainWindow.RowHeight - 1)
+			frame.LeftText:SetFont(leftFont, leftSize, leftFlags or "THINOUTLINE")
+			
 			-- Set level text (left)
 			frame.LeftText:SetText(level)
 			
@@ -148,14 +153,23 @@ function Spy:RefreshCurrentList(player, source)
 			if not frame.MiddleText then
 				frame.MiddleText = frame.StatusBar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 				frame.MiddleText:SetJustifyH("LEFT")
+				
 				local fontName = "Fonts\\FRIZQT__.TTF"
 				local fontSize = math.max(Spy.db.profile.MainWindow.RowHeight * 0.85, Spy.db.profile.MainWindow.RowHeight - 1)
 				if Spy.db.profile.Font and SM and SM.Fetch then
 					fontName = SM:Fetch("font", Spy.db.profile.Font) or fontName
 				end
 				frame.MiddleText:SetFont(fontName, fontSize, "THINOUTLINE")
+				
 				Spy.Colors:RegisterFont("Bar", "Bar Text", frame.MiddleText)
+				Spy:AddFontString(frame.MiddleText)
+			else
+				-- Update font size on refresh (keeps font name from SetFont)
+				local currentFont, _, currentFlags = frame.MiddleText:GetFont()
+				local fontSize = math.max(Spy.db.profile.MainWindow.RowHeight * 0.85, Spy.db.profile.MainWindow.RowHeight - 1)
+				frame.MiddleText:SetFont(currentFont, fontSize, currentFlags or "THINOUTLINE")
 			end
+			
 			frame.MiddleText:SetText(playerName)  -- Name in center
 			
 			-- Calculate available widths to avoid overlap
@@ -171,6 +185,11 @@ function Spy:RefreshCurrentList(player, source)
 			
 			-- Distance on right (only if SP3 is available)
 			if Spy.Distance and Spy.Distance.enabled then
+				-- Update RightText size
+				local rightFont, _, rightFlags = frame.RightText:GetFont()
+				local rightSize = math.max(Spy.db.profile.MainWindow.RowHeight * 0.75, Spy.db.profile.MainWindow.RowHeight - 8)
+				frame.RightText:SetFont(rightFont, rightSize, rightFlags or "THINOUTLINE")
+				
 				local distance = Spy.Distance:GetDistance(playerName)
 				if not distance then
 					distance = Spy.Distance:GetCachedDistance(playerName)

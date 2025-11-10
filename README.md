@@ -20,6 +20,15 @@
 
 ---
 
+## 🚀 What's New in Version 4.0.2 (November 10, 2025)
+- ✅ Fixed shared scans from other Spy users not being shown in the "Statistics" window.:
+- ✅ Different Fonts can be properly changed and applied now to the "Nearby" Window.
+- ✅ Little fixup for enemy detection logics, no more players from the same faction in the list.
+- ✅ Gave the Distance display a black outline.
+- ✅ Announce nearby players (right clicking on the nearby player frame) will work properly now in group, raid, localdefense and guild.
+
+---
+
 ## 🚀 What's New in Version 4.0.1 (November 6, 2025)
 - ✅ LOS Check on Range indicator/numbers:
 - 🟢 Green = Line of Sight free → Player can be attacked

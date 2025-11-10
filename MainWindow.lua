@@ -71,7 +71,12 @@ function Spy:SetupBar(row)
 	row.RightText:SetPoint("RIGHT", row.StatusBar, "RIGHT", -2, 0)
 	row.RightText:SetJustifyH("RIGHT")
 	row.RightText:SetTextColor(1, 1, 1, 1)
-	Spy:SetFontSize(row.RightText,  math.max(Spy.db.profile.MainWindow.RowHeight * 0.75, Spy.db.profile.MainWindow.RowHeight - 8))
+	local rightFontSize = math.max(Spy.db.profile.MainWindow.RowHeight * 0.75, Spy.db.profile.MainWindow.RowHeight - 8)
+	local rightFontName = "Fonts\\FRIZQT__.TTF"
+	if Spy.db.profile.Font and SM and SM.Fetch then
+		rightFontName = SM:Fetch("font", Spy.db.profile.Font) or rightFontName
+	end
+	row.RightText:SetFont(rightFontName, rightFontSize, "THINOUTLINE")
 	Spy:AddFontString(row.RightText)
 
 	Spy.Colors:RegisterFont("Bar", "Bar Text", row.LeftText)
@@ -179,7 +184,7 @@ function Spy:CreatePlayerFrame(playerName)
 	-- Combat feedback text for CombatFeedback_OnCombatEvent
 	local feedback = frame.StatusBar:CreateFontString(nil, "OVERLAY", "NumberFontNormalHuge")
 	feedback:SetAlpha(.8)
-	feedback:SetFont(DAMAGE_TEXT_FONT, 12, "OUTLINE")
+	feedback:SetFont(DAMAGE_TEXT_FONT, 12, "THINOUTLINE")
 	feedback:SetParent(frame.StatusBar)
 	feedback:ClearAllPoints()
 	feedback:SetPoint("CENTER", frame.StatusBar, "CENTER", 0, 0)
@@ -841,7 +846,7 @@ function Spy:CreateMainWindow()
 		theFrame.CountFrame.Text = theFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 		theFrame.CountFrame.Text:SetPoint("RIGHT", theFrame.StatsButton, "LEFT", -20, 0)
 		local fontPath, _, fontFlags = GameFontNormal:GetFont()
-		theFrame.CountFrame.Text:SetFont(fontPath, 14, "OUTLINE")
+		theFrame.CountFrame.Text:SetFont(fontPath, 14, "THINOUTLINE")
 		theFrame.CountFrame.Text:SetJustifyH("RIGHT")
 		theFrame.CountFrame.Text:SetJustifyV("MIDDLE")
 		theFrame.CountFrame.Text:SetTextColor(1, 1, 0, 1)

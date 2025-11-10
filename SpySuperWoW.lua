@@ -651,6 +651,16 @@ scanFrame:SetScript("OnUpdate", function()
 						end
 						-- Mark as detected to prevent spam, but don't add to Spy
 						SpySW.detectedPlayers[playerName] = GetTime()
+					-- ✅ CRITICAL FIX: Check if player passes faction/PvP filters
+					elseif not PassesSpyFilters(playerData.guid) then
+						-- Player is friendly faction, not PvP flagged, or dead - skip
+						if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+							local faction = UnitFactionGroup(playerData.guid) or "?"
+							local pvp = IsPvPFlagged(playerData.guid) and "YES" or "NO"
+							DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW]|r FILTERED: " .. playerName .. " (Faction: " .. faction .. ", PvP: " .. pvp .. ")")
+						end
+						-- Mark as detected to prevent spam
+						SpySW.detectedPlayers[playerName] = GetTime()
 					else
 						-- Player NOT ignored - proceed with normal detection
 						-- Debug output (uses Spy's debug system)
