@@ -326,7 +326,8 @@ function Spy_CreateBarDropdown(level)
 	--First, check if we're on level 1
 	if level == 1 then
 		--If so, get the name of the currently selected player
-		player = this.LeftText:GetText()
+		-- ✅ FIX: MiddleText contains player name, LeftText only has level
+		player = this.MiddleText and this.MiddleText:GetText() or this.LeftText:GetText()
 
 		--Compare it with our storage
 		if Spy.db.profile.selected_player == nil or Spy.db.profile.selected_player ~= player then

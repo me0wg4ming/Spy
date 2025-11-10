@@ -2786,6 +2786,9 @@ function Spy:ParseUnitDetails(name, class, level, race, zone, subZone, mapX, map
 	local playerData = SpyPerCharDB.PlayerData[name]
 	local learnt = false
 	
+	-- ✅ Set name in playerData (required for stats)
+	playerData.name = name
+	
 	-- Update class (only if new data available)
 	if class and not playerData.class then
 		playerData.class = class
