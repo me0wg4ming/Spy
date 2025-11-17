@@ -784,6 +784,37 @@ function Spy:AddPlayerData(name, class, level, race, guild, isEnemy, isGuess)
 end
 
 function Spy:UpdatePlayerData(name, class, level, race, guild, isEnemy, isGuess)
+	-- ✅ PET CHECK: Validate this is actually a player, not a pet
+	local guid = nil
+	if SpySW and SpySW.nameToGuid then
+		guid = SpySW.nameToGuid[name]
+	end
+	
+	local isValidPlayer = Spy:ValidatePlayerNotPet(name, guid)
+	
+	if isValidPlayer == false then
+		-- Confirmed pet - do NOT add to database
+		if Spy.DebugPets then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy-Pet]|r Blocked pet from database: " .. tostring(name))
+		end
+		return false
+	end
+	
+	if isValidPlayer == nil then
+		-- Unable to determine - be cautious
+		-- Only proceed if we already have this player in database
+		if not SpyPerCharDB.PlayerData[name] then
+			if Spy.DebugPets then
+				DEFAULT_CHAT_FRAME:AddMessage("|cff888888[Spy-Pet]|r Uncertain detection skipped: " .. tostring(name))
+			end
+			return false
+		end
+	end
+	
+	if Spy.DebugPets and isValidPlayer == true then
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy-Pet]|r Confirmed player: " .. tostring(name))
+	end
+	
 	-- ✅ FIX: Never process "Unknown" placeholder names
 	if not name or name == "Unknown" or name == "" then
 		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
