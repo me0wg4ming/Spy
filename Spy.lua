@@ -61,7 +61,7 @@ function Spy:ValidatePlayerNotPet(name, guid)
 			return false
 		end
 	end
-	for _, unit in ipairs({"target", "mouseover", "focus"}) do
+	for _, unit in ipairs({"target", "mouseover"}) do
 		if UnitExists(unit) and UnitName(unit) == name then
 			local isPet = self:IsPet(unit)
 			if isPet ~= nil then
