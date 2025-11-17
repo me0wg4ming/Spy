@@ -35,6 +35,68 @@ Spy.initTimer = ""
 Spy.Skull = -1
 Spy.WorldMapInitialized = false  -- ✅ FIX: Track if WorldMap has been initialized
 
+-- ============================================================================
+-- PET DETECTION - Prevents pets from being detected as players
+-- ============================================================================
+
+Spy.DebugPets = false
+
+function Spy:IsPet(unitId)
+	if not unitId or not UnitExists(unitId) then return nil end
+	if UnitIsPlayer(unitId) then return false end
+	if UnitPlayerControlled(unitId) then return true end
+	if UnitCreatureType(unitId) then return true end
+	return nil
+end
+
+function Spy:ValidatePlayerNotPet(name, guid)
+	if not name then return nil end
+	if guid and UnitExists(guid) then
+		local isPet = self:IsPet(guid)
+		if isPet == false then return true end
+		if isPet == true then
+			if self.DebugPets then
+				DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy]|r " .. name .. " is pet - BLOCKED")
+			end
+			return false
+		end
+	end
+	for _, unit in ipairs({"target", "mouseover", "focus"}) do
+		if UnitExists(unit) and UnitName(unit) == name then
+			local isPet = self:IsPet(unit)
+			if isPet ~= nil then
+				if isPet and self.DebugPets then
+					DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy]|r " .. name .. " is pet - BLOCKED")
+				end
+				return not isPet
+			end
+		end
+	end
+	for i = 1, 40 do
+		if UnitExists("raid"..i.."pet") and UnitName("raid"..i.."pet") == name then
+			if self.DebugPets then
+				DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy]|r "..name.." is raid pet - BLOCKED")
+			end
+			return false
+		end
+	end
+	for i = 1, 4 do
+		if UnitExists("party"..i.."pet") and UnitName("party"..i.."pet") == name then
+			if self.DebugPets then
+				DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy]|r "..name.." is party pet - BLOCKED")
+			end
+			return false
+		end
+	end
+	if UnitExists("pet") and UnitName("pet") == name then
+		if self.DebugPets then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy]|r " .. name .. " is your pet - BLOCKED")
+		end
+		return false
+	end
+	return nil
+end
+
 -- Localizations for xml
 L_STATS = "Spy " .. L["Statistics"]
 L_LIST = L["List"]
@@ -1638,6 +1700,51 @@ function SlashCmdList.SPYLISTDEBUG()
 	else
 		Spy.SortDebug = false
 		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy List]|r Sort Debug |cffff0000DISABLED|r")
+	end
+end
+
+-- ✅ Pet Detection Debug Command
+SLASH_SPYPETDEBUG1 = '/spypet'
+SLASH_SPYPETDEBUG2 = '/spypets'
+function SlashCmdList.SPYPETDEBUG(msg)
+	if not msg or msg == "" or msg == "debug" then
+		Spy.DebugPets = not Spy.DebugPets
+		local status = Spy.DebugPets and "|cff00ff00ON|r" or "|cffff0000OFF|r"
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy]|r Pet detection debugging: " .. status)
+		if Spy.DebugPets then
+			DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[Spy]|r You will now see messages when pets are detected and blocked")
+		end
+	elseif strsub(msg, 1, 5) == "check" then
+		local testName = strtrim(strsub(msg, 7))
+		if testName and testName ~= "" then
+			local guid = nil
+			if SpySW and SpySW.nameToGuid then
+				guid = SpySW.nameToGuid[testName]
+			end
+			
+			local isValidPlayer = Spy:ValidatePlayerNotPet(testName, guid)
+			
+			DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy]|r Checking: " .. testName)
+			if isValidPlayer == true then
+				DEFAULT_CHAT_FRAME:AddMessage("  Result: |cff00ff00Confirmed PLAYER|r")
+			elseif isValidPlayer == false then
+				DEFAULT_CHAT_FRAME:AddMessage("  Result: |cffff0000Confirmed PET|r")
+			else
+				DEFAULT_CHAT_FRAME:AddMessage("  Result: |cff888888UNKNOWN|r (unit not visible)")
+			end
+			if guid then
+				DEFAULT_CHAT_FRAME:AddMessage("  GUID: " .. tostring(guid))
+			else
+				DEFAULT_CHAT_FRAME:AddMessage("  GUID: |cff888888No GUID available|r")
+			end
+		else
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy]|r Usage: /spypet check <name>")
+			DEFAULT_CHAT_FRAME:AddMessage("|cff888888Example: /spypet check Darktifa|r")
+		end
+	else
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy Pet Detection]|r Commands:")
+		DEFAULT_CHAT_FRAME:AddMessage("  |cff00ffff/spypet|r or |cff00ffff/spypet debug|r - Toggle debug mode")
+		DEFAULT_CHAT_FRAME:AddMessage("  |cff00ffff/spypet check <name>|r - Check if name is player or pet")
 	end
 end
 
