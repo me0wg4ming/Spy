@@ -437,12 +437,12 @@ end
 	Scanning Loop
 =============================================================================]]
 
-function SpySW:ScanNearbyPlayers()
+function SpySW:ScanNearbyPlayers(currentTime)
 	local foundPlayers = {}
-	local currentTime = GetTime()
+	local now = currentTime or GetTime()  -- Fallback if called without parameter
 	
 	self.Stats.scansPerformed = self.Stats.scansPerformed + 1
-	self.Stats.lastScanTime = currentTime
+	self.Stats.lastScanTime = now
 	
 	-- ✅ Loop only over ENEMY GUIDs (no friendlies anymore!)
 	for guid, lastSeen in pairs(self.enemyGuids) do
@@ -450,7 +450,7 @@ function SpySW:ScanNearbyPlayers()
 		-- This ensures that when a player comes back into range, the GUID doesn't get cleaned up
 		if UnitExists(guid) then
 			-- Update the timestamp (player is back in range!)
-			self.enemyGuids[guid] = currentTime
+			self.enemyGuids[guid] = now
 			
 			-- Now check other filters
 			if UnitIsPlayer(guid) and not UnitIsDead(guid) and UnitIsPVP(guid) then
@@ -471,9 +471,9 @@ end
 	GUID Cleanup
 =============================================================================]]
 
-function SpySW:CleanupOldGUIDs()
+function SpySW:CleanupOldGUIDs(currentTime)
 	local removed = 0
-	local now = GetTime()
+	local now = currentTime or GetTime()  -- Fallback if called without parameter
 	
 	-- âœ… Cleanup main cache
 	for guid, lastSeen in pairs(self.guids) do
@@ -519,9 +519,13 @@ function SpySW:CleanupOldGUIDs()
 				if self.lastStealthState[name] then
 					self.lastStealthState[name] = nil
 				end
-				-- âœ… IMPORTANT: nameToGuid NICHT lÃ¶schen!
-				-- Die Map bleibt persistent fÃ¼r Targeting, auch wenn player auÃŸer Reichweite ist
-				-- Wird nur Ã¼berschrieben wenn neuer player mit gleichem Namen gesehen wird
+				
+				-- ✅ CRITICAL FIX: Clean up nameToGuid if this GUID is stale
+				-- This prevents the expensive Priority 3 loop in RefreshCurrentList
+				-- New GUID will be set when player is detected again
+				if self.nameToGuid[name] == guid then
+					self.nameToGuid[name] = nil
+				end
 			end
 			
 			self.guids[guid] = nil
@@ -568,6 +572,9 @@ local scanTimer = 0
 local cleanupTimer = 0
 
 scanFrame:SetScript("OnUpdate", function()
+	-- ✅ PERFORMANCE: Cache GetTime() once per frame tick
+	local currentTime = GetTime()
+	
 	-- Check if we should scan
 	local isEnabled = Spy.db and Spy.db.profile and Spy.db.profile.Enabled and Spy.EnabledInZone
 	-- ✅ FIX: Stealth-Only mode should work independently of EnabledInZone
@@ -585,7 +592,7 @@ scanFrame:SetScript("OnUpdate", function()
 	if scanTimer >= SpySW.SCAN_INTERVAL then
 		scanTimer = 0
 		
-		local players = SpySW:ScanNearbyPlayers()
+		local players = SpySW:ScanNearbyPlayers(currentTime)
 		
 		-- Send detected players to Spy's main system
 		for _, playerData in ipairs(players) do
@@ -650,7 +657,7 @@ scanFrame:SetScript("OnUpdate", function()
 							DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW]|r IGNORED: " .. playerName .. " (on Ignore list)")
 						end
 						-- Mark as detected to prevent spam, but don't add to Spy
-						SpySW.detectedPlayers[playerName] = GetTime()
+						SpySW.detectedPlayers[playerName] = currentTime
 					-- ✅ CRITICAL FIX: Check if player passes faction/PvP filters
 					elseif not PassesSpyFilters(playerData.guid) then
 						-- Player is friendly faction, not PvP flagged, or dead - skip
@@ -660,7 +667,7 @@ scanFrame:SetScript("OnUpdate", function()
 							DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW]|r FILTERED: " .. playerName .. " (Faction: " .. faction .. ", PvP: " .. pvp .. ")")
 						end
 						-- Mark as detected to prevent spam
-						SpySW.detectedPlayers[playerName] = GetTime()
+						SpySW.detectedPlayers[playerName] = currentTime
 					else
 						-- Player NOT ignored - proceed with normal detection
 						-- Debug output (uses Spy's debug system)
@@ -683,7 +690,7 @@ scanFrame:SetScript("OnUpdate", function()
 						)
 						
 						-- Always mark as detected (even if UpdatePlayerData failed) to prevent spam
-						SpySW.detectedPlayers[playerName] = GetTime()
+						SpySW.detectedPlayers[playerName] = currentTime
 						
 						-- Add to detected list if player was successfully added
 						if detected and Spy.EnabledInZone then
@@ -788,7 +795,7 @@ scanFrame:SetScript("OnUpdate", function()
 					if not (SpyPerCharDB and SpyPerCharDB.IgnoreData and SpyPerCharDB.IgnoreData[playerName]) then
 			-- ✅ CRITICAL FIX: Update detectedPlayers timestamp!
 			-- This prevents the 60s cleanup timer from removing players who are still in range
-			SpySW.detectedPlayers[playerName] = GetTime()
+			SpySW.detectedPlayers[playerName] = currentTime
 
 						Spy:UpdatePlayerData(
 							playerName,
@@ -818,7 +825,7 @@ scanFrame:SetScript("OnUpdate", function()
 	-- Cleanup old GUIDs
 	if cleanupTimer >= SpySW.CLEANUP_INTERVAL then
 		cleanupTimer = 0
-		SpySW:CleanupOldGUIDs()
+		SpySW:CleanupOldGUIDs(currentTime)
 	end
 end)
 
