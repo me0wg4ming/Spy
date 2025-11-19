@@ -1086,11 +1086,25 @@ function Spy:AlertStealthPlayer(player)
 	end
 end
 
-function Spy:AnnouncePlayer(player, channel)
+function Spy:AnnouncePlayer(player, channel, retryCount)
 	if not Spy_IgnoreList[player] then
 		local msg = ""
 		local isKOS = SpyPerCharDB.KOSData[player]
 		local playerData = SpyPerCharDB.PlayerData[player]
+		
+		-- ✅ Check if player data is complete (at least class or level should be present)
+		-- If not complete, delay the announce by 0.2s to let server data load
+		retryCount = retryCount or 0
+		if playerData and not playerData.class and not playerData.level and retryCount < 2 then
+			-- Schedule a retry after 0.2s (max 2 retries = 0.4s total)
+			Spy:ScheduleTimer(function()
+				Spy:AnnouncePlayer(player, channel, retryCount + 1)
+			end, 0.2)
+			return
+		end
+		
+		-- ✅ After retries, send announce even if data incomplete (better than nothing)
+		-- This handles the rare case where server data takes >0.4s to load
 
 		local announce = Spy.db.profile.Announce
 		if channel or announce == "Self" or announce == "LocalDefense" or
