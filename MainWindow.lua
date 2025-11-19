@@ -1466,7 +1466,7 @@ end
 --[[===========================================================================
 	Centralized HP Bar Update System
 	✅ PERFORMANCE: Single OnUpdate handler instead of 10-20 separate ones
-	Updates HP bars for all visible player frames every 0.2 seconds
+	Updates HP bars for all visible player frames every 0.1 seconds
 =============================================================================]]
 
 local hpUpdateFrame = CreateFrame("Frame")
@@ -1478,7 +1478,7 @@ hpUpdateFrame:SetScript("OnUpdate", function()
 	
 	hpUpdateTimer = hpUpdateTimer + elapsed
 	
-	-- Only update every 0.2 seconds
+	-- Only update every 0.1 seconds
 	if hpUpdateTimer < HP_UPDATE_INTERVAL then
 		return
 	end
