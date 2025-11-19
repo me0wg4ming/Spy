@@ -86,7 +86,7 @@ function Spy:SetupBar(row)
 	row:SetScript("OnUpdate", function()
 		if not this:IsShown() then return end
 		if (this.hpTick or 0) > GetTime() then return end
-		this.hpTick = GetTime() + 0.2
+		this.hpTick = GetTime() + 0.1
 		
 		local playerName = this.PlayerName or (this.id and Spy.ButtonName and Spy.ButtonName[this.id])
 		if not playerName then return end
@@ -208,28 +208,8 @@ function Spy:CreatePlayerFrame(playerName)
 		Spy:ShowTooltip(false)
 	end)
 	
-	-- OnUpdate for HP
-	frame:SetScript("OnUpdate", function()
-		if not this:IsShown() then return end
-		if (this.hpTick or 0) > GetTime() then return end
-		this.hpTick = GetTime() + 0.2
-		
-		local guid = this.PlayerGUID
-		if not guid or not UnitExists(guid) then return end
-		
-		local currentHP = UnitHealth(guid)
-		local maxHP = UnitHealthMax(guid)
-		
-		if maxHP > 0 then
-			local healthPercent = currentHP / maxHP
-			local barValue = healthPercent * 100
-			
-			local currentValue = this.StatusBar:GetValue()
-			if math.abs(currentValue - barValue) > 1 then
-				this.StatusBar:SetValue(barValue)
-			end
-		end
-	end)
+	-- ✅ HP Bar OnUpdate moved to centralized handler (see bottom of file)
+	-- This improves performance by having ONE handler instead of 10-20 separate ones
 	
 	-- ✅ OnClick ONLY SET ONCE during creation
 	frame:SetScript("OnClick", function()
@@ -1482,6 +1462,65 @@ function Spy:CreateKoSButton()
 		end)
 	end
 end
+
+--[[===========================================================================
+	Centralized HP Bar Update System
+	✅ PERFORMANCE: Single OnUpdate handler instead of 10-20 separate ones
+	Updates HP bars for all visible player frames every 0.2 seconds
+=============================================================================]]
+
+local hpUpdateFrame = CreateFrame("Frame")
+local hpUpdateTimer = 0
+local HP_UPDATE_INTERVAL = 0.1  -- Update every 0.1 seconds (smooth & efficient)
+
+hpUpdateFrame:SetScript("OnUpdate", function()
+	local elapsed = arg1 or 0
+	
+	hpUpdateTimer = hpUpdateTimer + elapsed
+	
+	-- Only update every 0.2 seconds
+	if hpUpdateTimer < HP_UPDATE_INTERVAL then
+		return
+	end
+	hpUpdateTimer = 0
+	
+	-- Check if Spy is enabled and MainWindow exists
+	if not Spy.db or not Spy.db.profile.Enabled then
+		return
+	end
+	
+	if not Spy.MainWindow or not Spy.MainWindow:IsVisible() then
+		return
+	end
+	
+	if not Spy.MainWindow.PlayerFrames then
+		return
+	end
+	
+	-- Update HP bars for all visible frames
+	for playerName, frame in pairs(Spy.MainWindow.PlayerFrames) do
+		if frame.visible and frame:IsVisible() and frame.PlayerGUID then
+			local guid = frame.PlayerGUID
+			
+			if UnitExists(guid) then
+				local currentHP = UnitHealth(guid)
+				local maxHP = UnitHealthMax(guid)
+				
+				if maxHP > 0 then
+					local healthPercent = currentHP / maxHP
+					local barValue = healthPercent * 100
+					
+					local currentValue = frame.StatusBar:GetValue()
+					-- Only update if difference is significant (avoid micro-updates)
+					if math.abs(currentValue - barValue) > 1 then
+						frame.StatusBar:SetValue(barValue)
+					end
+				end
+			end
+		end
+	end
+end)
+
 --[[
 local function showKosButton()
 	if Spy and Spy.db and Spy.db.profile.ShowKoSButton then
