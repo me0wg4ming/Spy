@@ -858,36 +858,35 @@ function Spy:UpdatePlayerData(name, class, level, race, guild, isEnemy, isGuess)
 	
 	if playerData then
 		playerData.time = time()
-		if not Spy.ActiveList[name] then
-			-- ✅ FIX: Try to get map coordinates, but don't fail detection if unavailable
-			-- Only try SetMapToCurrentZone if WorldMap is already visible (safe)
-			local mapX, mapY = 0, 0
+		
+		-- ✅ ALWAYS update zone/coords - this is YOUR location where you detected them
+		-- Get map coordinates (your current position)
+		local mapX, mapY = 0, 0
+		
+		if WorldMapFrame:IsVisible() then
+			SetMapToCurrentZone()
+			mapX, mapY = GetPlayerMapPosition("player")
+		else
+			-- Try to get position without showing WorldMap
+			mapX, mapY = GetPlayerMapPosition("player")
+		end
+		
+		if mapX ~= 0 and mapY ~= 0 then
+			mapX = math.floor(tonumber(mapX) * 100) / 100
+			mapY = math.floor(tonumber(mapY) * 100) / 100
+			playerData.mapX = mapX
+			playerData.mapY = mapY
+			playerData.zone = GetZoneText()
+			playerData.subZone = GetSubZoneText()
+		else
+			-- ✅ Map coords not available yet - store zone info only
+			-- This is NORMAL on first login
+			playerData.zone = GetZoneText()
+			playerData.subZone = GetSubZoneText()
 			
-			if WorldMapFrame:IsVisible() then
-				SetMapToCurrentZone()
-				mapX, mapY = GetPlayerMapPosition("player")
-			else
-				-- Try to get position without showing WorldMap
-				mapX, mapY = GetPlayerMapPosition("player")
-			end
-			
-			if mapX ~= 0 and mapY ~= 0 then
-				mapX = math.floor(tonumber(mapX) * 100) / 100
-				mapY = math.floor(tonumber(mapY) * 100) / 100
-				playerData.mapX = mapX
-				playerData.mapY = mapY
-				playerData.zone = GetZoneText()
-				playerData.subZone = GetSubZoneText()
-			else
-				-- ✅ Map coords not available yet - store zone info only
-				-- This is NORMAL on first login and should NOT fail detection
-				playerData.zone = GetZoneText()
-				playerData.subZone = GetSubZoneText()
-				
-				-- ✅ Debug ONLY if new player AND no coords (interesting case)
-				if isNewPlayer and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-					DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy DEBUG]|r No map coords for " .. name .. ", zone: " .. tostring(playerData.zone))
-				end
+			-- ✅ Debug if no coords available
+			if isNewPlayer and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+				DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy DEBUG]|r No map coords for " .. name .. ", zone: " .. tostring(playerData.zone))
 			end
 		end
 	end
@@ -1086,25 +1085,23 @@ function Spy:AlertStealthPlayer(player)
 	end
 end
 
-function Spy:AnnouncePlayer(player, channel, retryCount)
+function Spy:AnnouncePlayer(player, channel)
 	if not Spy_IgnoreList[player] then
 		local msg = ""
 		local isKOS = SpyPerCharDB.KOSData[player]
 		local playerData = SpyPerCharDB.PlayerData[player]
 		
-		-- ✅ Check if player data is complete (at least class or level should be present)
-		-- If not complete, delay the announce by 0.2s to let server data load
-		retryCount = retryCount or 0
-		if playerData and not playerData.class and not playerData.level and retryCount < 2 then
-			-- Schedule a retry after 0.2s (max 2 retries = 0.4s total)
-			Spy:ScheduleTimer(function()
-				Spy:AnnouncePlayer(player, channel, retryCount + 1)
-			end, 0.2)
+		-- ✅ CRITICAL: Only announce if we have BOTH class AND level
+		-- This is the final failsafe to prevent incomplete announcements
+		-- Even if playerData exists, we need the essential info
+		if not playerData or not playerData.class or playerData.level == nil then
+			if Spy.db.profile.DebugMode then
+				DEFAULT_CHAT_FRAME:AddMessage("|cffff8800[Spy Announce]|r Skipped incomplete data for: " .. player .. 
+					" (class=" .. tostring(playerData and playerData.class or "nil") .. 
+					", level=" .. tostring(playerData and playerData.level or "nil") .. ")")
+			end
 			return
 		end
-		
-		-- ✅ After retries, send announce even if data incomplete (better than nothing)
-		-- This handles the rare case where server data takes >0.4s to load
 
 		local announce = Spy.db.profile.Announce
 		if channel or announce == "Self" or announce == "LocalDefense" or
@@ -1127,23 +1124,25 @@ function Spy:AnnouncePlayer(player, channel, retryCount)
 				if playerData.guild and playerData.guild ~= "" then
 					msg = msg .. "<" .. playerData.guild .. "> "
 				end
-				if playerData.level or playerData.race or (playerData.class and playerData.class ~= "") then
-					msg = msg .. "- "
-					if playerData.level then 
-						local levelText = (playerData.level == 0) and "??" or playerData.level
-						msg = msg .. L["Level"] .. " " .. levelText .. " " 
-					end
-					if playerData.race and playerData.race ~= "" then 
-						msg = msg .. playerData.race .. " " 
-					end
-					if playerData.class and playerData.class ~= "" then
-						if announce == "Self" and not channel then
-							msg = msg .. L[playerData.class] .. " "
-						else
-							msg = msg .. upper(strsub(playerData.class, 1, 1)) .. lower(strsub(playerData.class, 2)) .. " "
-						end
+				
+				-- Details are guaranteed to exist (class + level) because of strict check above
+				msg = msg .. "- "
+				
+				if playerData.level ~= nil then 
+					local levelText = (playerData.level == 0) and "??" or playerData.level
+					msg = msg .. L["Level"] .. " " .. levelText .. " " 
+				end
+				if playerData.race and playerData.race ~= "" then 
+					msg = msg .. playerData.race .. " " 
+				end
+				if playerData.class and playerData.class ~= "" then
+					if announce == "Self" and not channel then
+						msg = msg .. L[playerData.class] .. " "
+					else
+						msg = msg .. upper(strsub(playerData.class, 1, 1)) .. lower(strsub(playerData.class, 2)) .. " "
 					end
 				end
+				
 				if playerData.zone then
 					if playerData.subZone and playerData.subZone ~= "" and playerData.subZone ~= playerData.zone then
 						msg = msg .. "- " .. playerData.subZone .. ", " .. playerData.zone

@@ -426,6 +426,13 @@ local function GetPlayerData(guid)
 		end
 	end
 	
+	-- ✅ CRITICAL: Only return data if we have class (level can be 0 for skull/skull)
+	-- Without class, the nearby announce would be incomplete
+	-- This prevents the race condition where UnitExists=true but class not loaded yet
+	if not data.classToken then
+		return nil
+	end
+	
 	-- Additional data
 	data.isPlayer = true
 	data.time = time()  -- Unix timestamp for Spy
