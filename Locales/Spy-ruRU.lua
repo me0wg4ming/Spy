@@ -37,7 +37,7 @@ L["SpyDescription3"] = [[
 |cffffd000Kill On Sight Button|cffffffff
 Если эта кнопка включена, она будет расположена на целевом кадре врага. Нажатие на эту кнопку добавит / удалит вражескую цель в / из списка Kill on Sight. Правый клик по кнопке позволит вам ввести причины Kill on Sight.
 
-|cffffd000автор: Meow (me0wg4ming)|cffffffff
+|cffffd000автор: Meow [me0wg4ming]|cffffffff
 ]]
 
 -- General Settings
