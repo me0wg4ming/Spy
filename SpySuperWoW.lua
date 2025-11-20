@@ -70,6 +70,9 @@ SpySW.detectedPlayers = {}
 -- Track stealth state per player (to only alert on state change)
 SpySW.lastStealthState = {}
 
+-- ✅ Track which GUIDs were present in last scan (to reduce debug spam)
+SpySW.lastScanPresent = {}
+
 -- GUID storage
 SpySW.guids = {}
 
@@ -461,13 +464,34 @@ function SpySW:ScanNearbyPlayers(currentTime)
 	self.Stats.scansPerformed = self.Stats.scansPerformed + 1
 	self.Stats.lastScanTime = now
 	
+	-- ✅ Clear lastScanPresent tracking for this scan cycle
+	local previousScanPresent = {}
+	for guid, _ in pairs(self.lastScanPresent) do
+		previousScanPresent[guid] = true
+	end
+	self.lastScanPresent = {}
+	
 	-- ✅ Loop only over ENEMY GUIDs (no friendlies anymore!)
 	for guid, lastSeen in pairs(self.enemyGuids) do
 		-- ✅ CRITICAL FIX: Update timestamp when GUID exists again!
 		-- This ensures that when a player comes back into range, the GUID doesn't get cleaned up
 		if UnitExists(guid) then
-			-- Update the timestamp (player is back in range!)
+			-- Update BOTH timestamps (player is back in range!)
 			self.enemyGuids[guid] = now
+			self.guids[guid] = now  -- ✅ FIX: Also update main cache for cleanup logic!
+			
+			-- ✅ Mark as present in this scan
+			self.lastScanPresent[guid] = true
+			
+			-- ✅ DEBUG: Log only when player RETURNS (was not present in previous scan)
+			if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+				if not previousScanPresent[guid] then
+					local name = UnitName(guid)
+					if name then
+						DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[SpySW SCAN]|r ✓ " .. name .. " returned to range (timestamp reset)")
+					end
+				end
+			end
 			
 			-- Now check other filters
 			if UnitIsPlayer(guid) and not UnitIsDead(guid) and UnitIsPVP(guid) then
@@ -476,6 +500,18 @@ function SpySW:ScanNearbyPlayers(currentTime)
 				if playerData then
 					playerData.guid = guid  -- Store GUID for debugging
 					tinsert(foundPlayers, playerData)
+				end
+			end
+		end
+	end
+	
+	-- ✅ DEBUG: Log players who LEFT range (were present last scan, not present now)
+	if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+		for guid, _ in pairs(previousScanPresent) do
+			if not self.lastScanPresent[guid] then
+				local name = UnitName(guid)
+				if name then
+					DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW SCAN]|r ✗ " .. name .. " left range (timer running)")
 				end
 			end
 		end
@@ -540,6 +576,11 @@ function SpySW:CleanupOldGUIDs(currentTime)
 						self.lastStealthState[name] = nil
 					end
 					
+					-- ✅ Clean up scan tracking
+					if self.lastScanPresent[guid] then
+						self.lastScanPresent[guid] = nil
+					end
+					
 					-- ✅ Clean up nameToGuid mapping
 					if self.nameToGuid[name] == guid then
 						self.nameToGuid[name] = nil
@@ -552,14 +593,19 @@ function SpySW:CleanupOldGUIDs(currentTime)
 			else
 				-- ✅ No name = invalid GUID, remove immediately
 				self.guids[guid] = nil
+				self.lastScanPresent[guid] = nil  -- Clean up tracking
 				removed = removed + 1
 			end
 		end
 	end
 	
 	-- ✅ IMPROVED: Individual timestamp-based cleanup for enemy cache
+	-- Only clean up if GUID is still in main cache (hasn't been cleaned up already)
 	for guid, lastSeen in pairs(self.enemyGuids) do
-		if not UnitExists(guid) then
+		if not self.guids[guid] then
+			-- ✅ GUID was already removed from main cache - just clean up this reference
+			self.enemyGuids[guid] = nil
+		elseif not UnitExists(guid) then
 			local timeSinceLastSeen = now - lastSeen
 			local timeout = Spy.InactiveTimeout or 60
 			

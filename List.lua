@@ -193,24 +193,24 @@ function Spy:RefreshCurrentList(player, source)
 				local rightSize = math.max(Spy.db.profile.MainWindow.RowHeight * 0.75, Spy.db.profile.MainWindow.RowHeight - 8)
 				frame.RightText:SetFont(rightFont, rightSize, rightFlags or "THINOUTLINE")
 				
-				local distance = Spy.Distance:GetDistance(playerName)
-				if not distance then
-					distance = Spy.Distance:GetCachedDistance(playerName)
-				end
+				local distanceText = "--"
+				local distance = nil
 				
-				local distanceText = ""
-				if distance then
-					distanceText = Spy.Distance:FormatDistance(distance)
-				else
-					distanceText = "--"
+				-- ✅ FIX: Use same logic as opacity - only show distance if player is ACTIVE
+				-- If player is in InactiveList (grayed out), they're out of range → show "--"
+				if not (mode == 1 and Spy.InactiveList[playerName]) then
+					distance = Spy.Distance:GetDistance(playerName)
+					if distance then
+						distanceText = Spy.Distance:FormatDistance(distance)
+					end
 				end
 				
 				frame.RightText:SetText(distanceText)
 				frame.RightText:Show()
 				
-				-- Line of Sight color (only if we have actual distance)
+				-- Line of Sight color (only if we have actual distance AND player is active)
 				local distanceR, distanceG, distanceB = 1, 1, 1  -- Default: White
-				if distanceText ~= "--" and frame.PlayerGUID and UnitExists(frame.PlayerGUID) then
+				if distance and frame.PlayerGUID and UnitExists(frame.PlayerGUID) then
 					local los = UnitXP("inSight", "player", frame.PlayerGUID)
 					if los == true then
 						distanceR, distanceG, distanceB = 0, 1, 0  -- Green: Line of sight clear
