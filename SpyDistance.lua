@@ -99,7 +99,27 @@ function Spy.Distance:GetDistance(playerName)
     
     -- Check if unit exists
     if not UnitExists(guid) then
-        return nil
+        -- ✅ FIX: GUID might be stale - try fallback search to find current GUID
+        if SpySW and SpySW.guids then
+            for cachedGuid, timestamp in pairs(SpySW.guids) do
+                if UnitExists(cachedGuid) then
+                    local name = UnitName(cachedGuid)
+                    if name == playerName then
+                        guid = cachedGuid
+                        -- Update nameToGuid map for future lookups
+                        if SpySW.nameToGuid then
+                            SpySW.nameToGuid[playerName] = guid
+                        end
+                        break
+                    end
+                end
+            end
+        end
+        
+        -- Final check after fallback attempt
+        if not UnitExists(guid) then
+            return nil
+        end
     end
     
     -- Get distance using the stored working method

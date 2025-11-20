@@ -84,7 +84,7 @@ SpySW.nameToGuid = {}
 SpySW.SCAN_INTERVAL = 0.5
 
 -- GUID cleanup interval (check if units still exist)
-SpySW.CLEANUP_INTERVAL = 5  -- Check every 5 seconds if GUIDs still exist
+SpySW.CLEANUP_INTERVAL = 5  -- Check every 10 seconds if GUIDs still exist
 
 -- ✅ Stealth Spell IDs (for UNIT_CASTEVENT detection)
 SpySW.STEALTH_SPELL_IDS = {
@@ -480,94 +480,100 @@ end
 
 function SpySW:CleanupOldGUIDs(currentTime)
 	local removed = 0
-	local now = currentTime or GetTime()  -- Fallback if called without parameter
+	local now = currentTime or GetTime()
 	
-	-- âœ… Cleanup main cache
+	-- ✅ IMPROVED: Individual timestamp-based cleanup for main GUID cache
 	for guid, lastSeen in pairs(self.guids) do
 		if not UnitExists(guid) then
+			-- ✅ Calculate how long this specific GUID has been gone
+			local timeSinceLastSeen = now - lastSeen
 			local name = UnitName(guid)
+			
 			if name then
-				-- âœ… Check if this was an ENEMY or FRIENDLY player
+				-- ✅ Check faction to determine cleanup strategy
 				local wasEnemy = self.enemyGuids[guid] ~= nil
 				local wasFriendly = self.friendlyGuids[guid] ~= nil
+				local timeout = Spy.InactiveTimeout or 10
 				
-				local lastDetected = self.detectedPlayers[name]
+				local shouldRemove = false
 				
 				if wasFriendly then
-					-- âœ… FRIENDLY: Remove immediately (no timeout)
-					if lastDetected then
-						self.detectedPlayers[name] = nil
-						if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-							DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW Cleanup]|r Removed friendly " .. name .. " (no timeout)")
-						end
+					-- ✅ FRIENDLY: Remove immediately (timeout = 0)
+					shouldRemove = true
+					if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+						DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW Cleanup]|r Removed friendly " .. name .. " (no timeout, gone for " .. math.floor(timeSinceLastSeen) .. "s)")
 					end
 				elseif wasEnemy then
-					-- âœ… ENEMY: Only remove after configured timeout
-					if lastDetected then
-						local timeout = Spy.InactiveTimeout or 60
-						if timeout > 0 and (now - lastDetected) > timeout then
-							self.detectedPlayers[name] = nil
-							if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-								DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW Cleanup]|r Removed enemy " .. name .. " after " .. timeout .. "s timeout")
-							end
+					-- ✅ ENEMY: Only remove after timeout
+					if timeout > 0 and timeSinceLastSeen > timeout then
+						shouldRemove = true
+						if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+							DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW Cleanup]|r Removed enemy " .. name .. " after " .. timeout .. "s timeout (gone for " .. math.floor(timeSinceLastSeen) .. "s)")
 						end
 					end
 				else
-					-- âœ… UNKNOWN: Remove immediately (safety fallback)
-					if lastDetected then
-						self.detectedPlayers[name] = nil
-						if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-							DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW Cleanup]|r Removed unknown " .. name .. " (no faction data)")
-						end
+					-- ✅ UNKNOWN: Remove immediately (safety)
+					shouldRemove = true
+					if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+						DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW Cleanup]|r Removed unknown " .. name .. " (no faction data, gone for " .. math.floor(timeSinceLastSeen) .. "s)")
 					end
 				end
 				
-				-- Reset stealth state (so it can re-alert when player returns)
-				if self.lastStealthState[name] then
-					self.lastStealthState[name] = nil
+				if shouldRemove then
+					-- Remove from detectedPlayers
+					if self.detectedPlayers[name] then
+						self.detectedPlayers[name] = nil
+					end
+					
+					-- Reset stealth state
+					if self.lastStealthState[name] then
+						self.lastStealthState[name] = nil
+					end
+					
+					-- ✅ Clean up nameToGuid mapping
+					if self.nameToGuid[name] == guid then
+						self.nameToGuid[name] = nil
+					end
+					
+					-- Remove from main cache
+					self.guids[guid] = nil
+					removed = removed + 1
 				end
-				
-				-- ✅ CRITICAL FIX: Clean up nameToGuid if this GUID is stale
-				-- This prevents the expensive Priority 3 loop in RefreshCurrentList
-				-- New GUID will be set when player is detected again
-				if self.nameToGuid[name] == guid then
-					self.nameToGuid[name] = nil
-				end
+			else
+				-- ✅ No name = invalid GUID, remove immediately
+				self.guids[guid] = nil
+				removed = removed + 1
 			end
-			
-			self.guids[guid] = nil
-			removed = removed + 1
 		end
 	end
 	
-	-- ✅ CRITICAL FIX: Keep GUIDs in enemyGuids cache longer!
-	-- Don't remove immediately when UnitExists() returns false
-	-- Only remove after the INACTIVE timeout (default 60 seconds)
-	-- This allows the scanner to continue finding the player when they come back into range
+	-- ✅ IMPROVED: Individual timestamp-based cleanup for enemy cache
 	for guid, lastSeen in pairs(self.enemyGuids) do
 		if not UnitExists(guid) then
-			-- Check how long ago we last saw this GUID
 			local timeSinceLastSeen = now - lastSeen
-			local timeout = Spy.InactiveTimeout or 60
+			local timeout = Spy.InactiveTimeout or 10
 			
-			-- Only remove after timeout (not immediately!)
+			-- ✅ Only remove after individual timeout per GUID
 			if timeout > 0 and timeSinceLastSeen > timeout then
 				self.enemyGuids[guid] = nil
 				if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 					local name = UnitName(guid) or "Unknown"
-					DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW Cleanup]|r Removed enemy GUID " .. name .. " from cache after " .. math.floor(timeSinceLastSeen) .. "s")
+					DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW Cleanup]|r Removed enemy GUID " .. name .. " from cache (gone for " .. math.floor(timeSinceLastSeen) .. "s)")
 				end
 			end
 		end
 	end
 	
-	-- ✅ Cleanup friendly cache (these can be removed immediately)
+	-- ✅ Cleanup friendly cache (immediate removal)
 	for guid, lastSeen in pairs(self.friendlyGuids) do
 		if not UnitExists(guid) then
 			self.friendlyGuids[guid] = nil
 		end
 	end
-
+	
+	if removed > 0 and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+		DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW Cleanup]|r Cleaned up " .. removed .. " GUIDs")
+	end
 end
 
 --[[===========================================================================

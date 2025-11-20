@@ -9,7 +9,7 @@ local strgfind = string.gfind
 local tinsert = table.insert
 local tsort = table.sort
 
--- ✅ FIX 1: In RefreshCurrentList() - Store GUID directly in frame
+-- âœ… FIX 1: In RefreshCurrentList() - Store GUID directly in frame
 function Spy:RefreshCurrentList(player, source)
 	local MainWindow = Spy.MainWindow
 	if not MainWindow then return end
@@ -21,13 +21,13 @@ function Spy:RefreshCurrentList(player, source)
 	local manageFunction = Spy.ListTypes[mode][2]
 	if manageFunction then manageFunction() end
 
-	-- ✅ Build list of players currently in CurrentList
+	-- âœ… Build list of players currently in CurrentList
 	local playersInList = {}
 	for index, data in pairs(Spy.CurrentList) do
 		playersInList[data.player] = true
 	end
 	
-	-- ✅ Hide only frames NOT in current list
+	-- âœ… Hide only frames NOT in current list
 	for playerName, frame in pairs(Spy.MainWindow.PlayerFrames) do
 		if not playersInList[playerName] then
 			frame:Hide()
@@ -36,7 +36,7 @@ function Spy:RefreshCurrentList(player, source)
 		end
 	end
 
-	-- ✅ Also hide old row-based frames if any exist
+	-- âœ… Also hide old row-based frames if any exist
 	if Spy.MainWindow.Rows then
 		for i, row in pairs(Spy.MainWindow.Rows) do
 			row:Hide()
@@ -54,7 +54,7 @@ function Spy:RefreshCurrentList(player, source)
 			-- Get or create frame for this player
 			local frame = Spy:CreatePlayerFrame(playerName)
 			
-			-- ✅ CRITICAL FIX: Always update GUID before showing frame
+			-- âœ… CRITICAL FIX: Always update GUID before showing frame
 			-- This ensures targeting works even if GUID was missing during creation
 			if not frame.PlayerGUID or not UnitExists(frame.PlayerGUID) then
 				local guid = nil
@@ -90,7 +90,7 @@ function Spy:RefreshCurrentList(player, source)
 				end
 			end
 			
-			-- ✅ CRITICAL FIX: Store name in ButtonName table for backwards compatibility
+			-- âœ… CRITICAL FIX: Store name in ButtonName table for backwards compatibility
 			-- This ensures OnClick handlers can always find the player name
 			if not frame.id then
 				-- Assign a stable ID to this frame
@@ -226,7 +226,7 @@ function Spy:RefreshCurrentList(player, source)
 			-- HP-Bar: Store class for OnUpdate HP feature
 			frame.playerClass = class
 			
-			-- ✅ CRITICAL FIX: Set frame level RELATIVE to MainWindow
+			-- âœ… CRITICAL FIX: Set frame level RELATIVE to MainWindow
 			frame:SetFrameLevel(Spy.MainWindow:GetFrameLevel() + displayCount + 2)
 			frame.StatusBar:SetFrameLevel(Spy.MainWindow:GetFrameLevel() + displayCount + 1)
 			
@@ -266,7 +266,7 @@ function Spy:RefreshCurrentList(player, source)
 			frame:SetPoint("TOPLEFT", MainWindow, "TOPLEFT", 2, -yOffset)
 			yOffset = yOffset + Spy.db.profile.MainWindow.RowHeight + Spy.db.profile.MainWindow.RowSpacing
 			
-			-- ✅ Show frame and mark as visible
+			-- âœ… Show frame and mark as visible
 			frame:Show()
 			frame.visible = true
 			frame.displayIndex = displayCount + 1
@@ -311,7 +311,7 @@ function Spy:RefreshCurrentList(player, source)
 	Spy:ManageBarsDisplayed()
 end
 
--- ✅ NEW: /spyguid command - Show GUID info for all visible players
+-- âœ… NEW: /spyguid command - Show GUID info for all visible players
 SLASH_SPYGUID1 = "/spyguid"
 SlashCmdList["SPYGUID"] = function()
 	if not Spy.MainWindow or not Spy.MainWindow.PlayerFrames then
@@ -373,12 +373,12 @@ SlashCmdList["SPYGUID"] = function()
 	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00========================================|r")
 end
 
--- ✅ STABLE SORT: Track insertion order
+-- âœ… STABLE SORT: Track insertion order
 Spy.DetectionOrder = Spy.DetectionOrder or {}
 Spy.DetectionOrderCounter = Spy.DetectionOrderCounter or 0
 
 function Spy:ManageNearbyList()
-	-- ✅ SAFETY: Ensure tables exist (defensive programming)
+	-- âœ… SAFETY: Ensure tables exist (defensive programming)
 	Spy.DetectionOrder = Spy.DetectionOrder or {}
 	Spy.DetectionTimestamp = Spy.DetectionTimestamp or {}
 	
@@ -387,7 +387,7 @@ function Spy:ManageNearbyList()
 	local activeKoS = {}
 	local active = {}
 	
-	-- ✅ FIX: Create sorted list from ActiveList first (by high-precision timestamp)
+	-- âœ… FIX: Create sorted list from ActiveList first (by high-precision timestamp)
 	-- This ensures stable iteration order before sorting by time
 	local activePlayers = {}
 	for player in pairs(Spy.ActiveList) do
@@ -398,7 +398,7 @@ function Spy:ManageNearbyList()
 		local timeA = Spy.DetectionTimestamp[a] or 0
 		local timeB = Spy.DetectionTimestamp[b] or 0
 		if timeA == timeB then
-			-- Same timestamp → use DetectionOrder for stable sort
+			-- Same timestamp â†’ use DetectionOrder for stable sort
 			local orderA = Spy.DetectionOrder[a] or 0
 			local orderB = Spy.DetectionOrder[b] or 0
 			return orderA < orderB  -- Lower order (earlier detection) first
@@ -409,7 +409,7 @@ function Spy:ManageNearbyList()
 	for _, player in ipairs(activePlayers) do
 		local position = Spy.NearbyList[player]
 		if position ~= nil then
-			-- ✅ Use DetectionTimestamp for sorting (millisecond precision) instead of position (second precision)
+			-- âœ… Use DetectionTimestamp for sorting (millisecond precision) instead of position (second precision)
 			local preciseTime = Spy.DetectionTimestamp[player] or position
 			local order = Spy.DetectionOrder[player] or 0
 			
@@ -424,7 +424,7 @@ function Spy:ManageNearbyList()
 	local inactiveKoS = {}
 	local inactive = {}
 	
-	-- ✅ Same fix for InactiveList
+	-- âœ… Same fix for InactiveList
 	local inactivePlayers = {}
 	for player in pairs(Spy.InactiveList) do
 		tinsert(inactivePlayers, player)
@@ -433,7 +433,7 @@ function Spy:ManageNearbyList()
 		local timeA = Spy.DetectionTimestamp[a] or 0
 		local timeB = Spy.DetectionTimestamp[b] or 0
 		if timeA == timeB then
-			-- Same timestamp → use DetectionOrder for stable sort
+			-- Same timestamp â†’ use DetectionOrder for stable sort
 			local orderA = Spy.DetectionOrder[a] or 0
 			local orderB = Spy.DetectionOrder[b] or 0
 			return orderA < orderB  -- Lower order (earlier detection) first
@@ -444,7 +444,7 @@ function Spy:ManageNearbyList()
 	for _, player in ipairs(inactivePlayers) do
 		local position = Spy.NearbyList[player]
 		if position ~= nil then
-			-- ✅ Use DetectionTimestamp for sorting (millisecond precision) instead of position (second precision)
+			-- âœ… Use DetectionTimestamp for sorting (millisecond precision) instead of position (second precision)
 			local preciseTime = Spy.DetectionTimestamp[player] or position
 			local order = Spy.DetectionOrder[player] or 0
 			
@@ -462,12 +462,12 @@ function Spy:ManageNearbyList()
 	if sortOrder == "range" then
 		-- Sort by distance (closest first) - requires SpyDistance
 		if Spy.Distance and Spy.Distance.enabled and Spy.Distance.GetDistance then
-			-- ✅ STABLE SORT: Use order as tiebreaker
+			-- âœ… STABLE SORT: Use order as tiebreaker
 			tsort(activeKoS, function(a, b)
 				local distA = Spy.Distance:GetDistance(a.player) or 999999
 				local distB = Spy.Distance:GetDistance(b.player) or 999999
 				if distA == distB then
-					return a.order < b.order  -- Same distance → use insertion order
+					return a.order < b.order  -- Same distance â†’ use insertion order
 				end
 				return distA < distB
 			end)
@@ -497,7 +497,7 @@ function Spy:ManageNearbyList()
 			end)
 		else
 			-- Fallback to time if SpyDistance not available
-			-- ✅ STABLE SORT: Use order as tiebreaker
+			-- âœ… STABLE SORT: Use order as tiebreaker
 			tsort(activeKoS, function(a, b)
 				if a.time == b.time then
 					return a.order < b.order
@@ -525,7 +525,7 @@ function Spy:ManageNearbyList()
 		end
 	elseif sortOrder == "name" then
 		-- Sort by name (alphabetical)
-		-- ✅ STABLE SORT: Use order as tiebreaker (edge case: same name shouldn't happen)
+		-- âœ… STABLE SORT: Use order as tiebreaker (edge case: same name shouldn't happen)
 		tsort(activeKoS, function(a, b)
 			if a.player == b.player then
 				return a.order < b.order
@@ -552,7 +552,7 @@ function Spy:ManageNearbyList()
 		end)
 	elseif sortOrder == "class" then
 		-- Sort by class (alphabetical)
-		-- ✅ STABLE SORT: Use order as tiebreaker
+		-- âœ… STABLE SORT: Use order as tiebreaker
 		tsort(activeKoS, function(a, b)
 			local classA = SpyPerCharDB.PlayerData[a.player] and SpyPerCharDB.PlayerData[a.player].class or "ZZZ"
 			local classB = SpyPerCharDB.PlayerData[b.player] and SpyPerCharDB.PlayerData[b.player].class or "ZZZ"
@@ -587,10 +587,10 @@ function Spy:ManageNearbyList()
 		end)
 	else
 		-- Sort by time (newest first) - default
-		-- ✅ STABLE SORT: Newer detections on top, same time = EARLIER detection (lower order) stays on top
+		-- âœ… STABLE SORT: Newer detections on top, same time = EARLIER detection (lower order) stays on top
 		tsort(activeKoS, function(a, b)
 			if a.time == b.time then
-				return a.order < b.order  -- Same time → earlier detection (lower order) stays on top
+				return a.order < b.order  -- Same time â†’ earlier detection (lower order) stays on top
 			end
 			return a.time > b.time
 		end)
@@ -763,7 +763,7 @@ function Spy:ClearList()
 end
 
 function Spy:AddPlayerData(name, class, level, race, guild, isEnemy, isGuess)
-	-- ✅ FIX: Never add "Unknown" placeholder names
+	-- âœ… FIX: Never add "Unknown" placeholder names
 	if not name or name == "Unknown" or name == "" then
 		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy]|r Rejected Unknown/invalid name")
@@ -784,7 +784,7 @@ function Spy:AddPlayerData(name, class, level, race, guild, isEnemy, isGuess)
 end
 
 function Spy:UpdatePlayerData(name, class, level, race, guild, isEnemy, isGuess)
-	-- ✅ PET CHECK: Validate this is actually a player, not a pet
+	-- âœ… PET CHECK: Validate this is actually a player, not a pet
 	local guid = nil
 	if SpySW and SpySW.nameToGuid then
 		guid = SpySW.nameToGuid[name]
@@ -815,7 +815,7 @@ function Spy:UpdatePlayerData(name, class, level, race, guild, isEnemy, isGuess)
 		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy-Pet]|r Confirmed player: " .. tostring(name))
 	end
 	
-	-- ✅ FIX: Never process "Unknown" placeholder names
+	-- âœ… FIX: Never process "Unknown" placeholder names
 	if not name or name == "Unknown" or name == "" then
 		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy]|r Rejected Unknown/invalid name")
@@ -826,7 +826,7 @@ function Spy:UpdatePlayerData(name, class, level, race, guild, isEnemy, isGuess)
 	local detected = true
 	local playerData = SpyPerCharDB.PlayerData[name]
 	
-	-- ✅ Check if this is a NEW player (never seen before)
+	-- âœ… Check if this is a NEW player (never seen before)
 	local isNewPlayer = (playerData == nil)
 	
 	if Spy:PlayerIsFriend(name) then
@@ -841,12 +841,12 @@ function Spy:UpdatePlayerData(name, class, level, race, guild, isEnemy, isGuess)
 		if not playerData then
 			return false  -- AddPlayerData rejected the name
 		end
-		-- ✅ Debug ONLY for NEW players
+		-- âœ… Debug ONLY for NEW players
 		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 			DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[Spy DEBUG]|r NEW PLAYER: " .. name .. " Lvl" .. tostring(level) .. " " .. tostring(class))
 		end
 	else
-		-- ✅ Player already exists - only update changed fields (NO DEBUG)
+		-- âœ… Player already exists - only update changed fields (NO DEBUG)
 		if name ~= nil then playerData.name = name end 
 		if class ~= nil then playerData.class = class end
 		if type(level) == "number" then playerData.level = level end
@@ -859,7 +859,7 @@ function Spy:UpdatePlayerData(name, class, level, race, guild, isEnemy, isGuess)
 	if playerData then
 		playerData.time = time()
 		
-		-- ✅ ALWAYS update zone/coords - this is YOUR location where you detected them
+		-- âœ… ALWAYS update zone/coords - this is YOUR location where you detected them
 		-- Get map coordinates (your current position)
 		local mapX, mapY = 0, 0
 		
@@ -879,19 +879,19 @@ function Spy:UpdatePlayerData(name, class, level, race, guild, isEnemy, isGuess)
 			playerData.zone = GetZoneText()
 			playerData.subZone = GetSubZoneText()
 		else
-			-- ✅ Map coords not available yet - store zone info only
+			-- âœ… Map coords not available yet - store zone info only
 			-- This is NORMAL on first login
 			playerData.zone = GetZoneText()
 			playerData.subZone = GetSubZoneText()
 			
-			-- ✅ Debug if no coords available
+			-- âœ… Debug if no coords available
 			if isNewPlayer and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 				DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy DEBUG]|r No map coords for " .. name .. ", zone: " .. tostring(playerData.zone))
 			end
 		end
 	end
 	
-	-- ✅ NO DEBUG for routine updates - only logged once per NEW player above
+	-- âœ… NO DEBUG for routine updates - only logged once per NEW player above
 	return detected
 end
 
@@ -1091,7 +1091,7 @@ function Spy:AnnouncePlayer(player, channel)
 		local isKOS = SpyPerCharDB.KOSData[player]
 		local playerData = SpyPerCharDB.PlayerData[player]
 		
-		-- ✅ CRITICAL: Only announce if we have BOTH class AND level
+		-- âœ… CRITICAL: Only announce if we have BOTH class AND level
 		-- This is the final failsafe to prevent incomplete announcements
 		-- Even if playerData exists, we need the essential info
 		if not playerData or not playerData.class or playerData.level == nil then
@@ -1565,10 +1565,10 @@ function Spy:AddDetectedToLists(player, timestamp, learnt, source)
 			Spy:SetCurrentList(1)
 		end
 
-		-- ✅ CRITICAL: Store high-precision timestamp AND detection order for stable sorting
+		-- âœ… CRITICAL: Store high-precision timestamp AND detection order for stable sorting
 		Spy.DetectionTimestamp[player] = GetTime()
 		
-		-- ✅ CRITICAL: Set detection order immediately when player is first detected
+		-- âœ… CRITICAL: Set detection order immediately when player is first detected
 		if not Spy.DetectionOrder[player] then
 			Spy.DetectionOrderCounter = Spy.DetectionOrderCounter + 1
 			Spy.DetectionOrder[player] = Spy.DetectionOrderCounter
@@ -1599,7 +1599,7 @@ function Spy:AddDetectedToLists(player, timestamp, learnt, source)
 			end
 		end
 	elseif not Spy.ActiveList[player] then
-		-- ✅ Player is in NearbyList but NOT in ActiveList (was inactive/grayed out)
+		-- âœ… Player is in NearbyList but NOT in ActiveList (was inactive/grayed out)
 		-- This happens when player was out of range for >10s (inactive) but still in Nearby
 		-- Now they're back in range, so we move them from inactive to active
 		
@@ -1611,7 +1611,7 @@ function Spy:AddDetectedToLists(player, timestamp, learnt, source)
 			Spy:SetCurrentList(1)
 		end
 
-		-- ✅ FIX: DON'T update DetectionTimestamp on reactivation
+		-- âœ… FIX: DON'T update DetectionTimestamp on reactivation
 		-- Keep original detection time so player maintains position in list
 		-- DetectionTimestamp should only be set on BRAND NEW detection
 		
@@ -1620,7 +1620,7 @@ function Spy:AddDetectedToLists(player, timestamp, learnt, source)
 		Spy.InactiveList[player] = nil
 		Spy:UpdateActiveCount()
 
-		-- ✅ ALWAYS refresh the UI to update opacity (grayed out -> active)
+		-- âœ… ALWAYS refresh the UI to update opacity (grayed out -> active)
 		if Spy.db.profile.CurrentList == 1 then
 			-- Check if we got this from comm system (needs alert/announce)
 			if Spy.PlayerCommList[player] ~= nil then
@@ -1639,14 +1639,14 @@ function Spy:AddDetectedToLists(player, timestamp, learnt, source)
 			end
 		end
 	else
-		-- ✅ FIX: Update timestamps for players already in all lists
+		-- âœ… FIX: Update timestamps for players already in all lists
 		-- Player is ALREADY in ActiveList AND in NearbyList
 		-- This happens when:
 		-- 1. Player was detected, went out of range (stayed in Nearby due to timeout)
 		-- 2. Player came back into range and was detected again
 		-- 3. SuperWoW scans them continuously while in range
 		
-		-- ✅ FIX: DON'T update DetectionTimestamp here - it should only be set on NEW detection
+		-- âœ… FIX: DON'T update DetectionTimestamp here - it should only be set on NEW detection
 		-- Updating it here causes players to "jump around" in the list on HP updates
 		
 		Spy.NearbyList[player] = timestamp
@@ -1654,7 +1654,7 @@ function Spy:AddDetectedToLists(player, timestamp, learnt, source)
 		Spy.LastHourList[player] = timestamp
 		Spy:UpdateActiveCount()
 		
-		-- ✅ CRITICAL FIX: Always refresh the UI when in Nearby list mode
+		-- âœ… CRITICAL FIX: Always refresh the UI when in Nearby list mode
 		-- Even if no new information was learned (learnt == false)
 		-- This ensures the player shows as "active" (not grayed out) immediately
 		-- when they come back into range
