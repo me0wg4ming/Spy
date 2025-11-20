@@ -1949,28 +1949,30 @@ function Spy:OnEnable(first)
 		return
 	end
 	
-	-- ✅ FIX Bug 2: Clear all lists on startup if in Stealth-Only mode
-	-- This prevents Nearby list from showing when Spy is disabled after reload
-	if stealthOnlyMode then
-		-- Clear SpySW detected players cache
-		if SpySW and SpySW.detectedPlayers then
-			for k in pairs(SpySW.detectedPlayers) do
-				SpySW.detectedPlayers[k] = nil
-			end
-		end
-		
-		-- Clear Spy's internal lists (these are loaded from SavedVariables!)
-		Spy.NearbyList = {}
-		Spy.ActiveList = {}
-		Spy.InactiveList = {}
-		Spy.LastHourList = {}
-		Spy.PlayerCommList = {}
-		Spy.ListAmountDisplayed = 0
-		
-		if Spy.db.profile.DebugMode then
-			DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy]|r Cleared all lists on startup (Stealth-Only mode)")
+	-- ✅ FIX: Clear all lists on startup to prevent showing stale data from last session
+	-- Old players from SavedVariables are no longer nearby after a reload
+	-- Clear SpySW detected players cache
+	if SpySW and SpySW.detectedPlayers then
+		for k in pairs(SpySW.detectedPlayers) do
+			SpySW.detectedPlayers[k] = nil
 		end
 	end
+	
+	-- Clear Spy's internal lists (these are loaded from SavedVariables!)
+	Spy.NearbyList = {}
+	Spy.ActiveList = {}
+	Spy.InactiveList = {}
+	Spy.LastHourList = {}
+	Spy.PlayerCommList = {}
+	Spy.ListAmountDisplayed = 0
+	
+	if Spy.db.profile.DebugMode then
+		local modeStr = stealthOnlyMode and " (Stealth-Only mode)" or ""
+		DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy]|r Cleared all lists on startup" .. modeStr)
+	end
+	
+	-- ✅ Update counter immediately after clearing to show grey 0
+	Spy:UpdateActiveCount()
 	
 	Spy.timeid = Spy:ScheduleRepeatingTimer("ManageExpirations", 1, 1, true)
 	Spy:RegisterEvent("ZONE_CHANGED", "ZoneChangedEvent")

@@ -58,19 +58,22 @@ function Spy:RefreshCurrentList(player, source)
 			-- This ensures targeting works even if GUID was missing during creation
 			if not frame.PlayerGUID or not UnitExists(frame.PlayerGUID) then
 				local guid = nil
-				local playerData = SpyPerCharDB.PlayerData[playerName]
 				
-				-- Priority 1: GUID from PlayerData
-				if playerData and playerData.guid then
-					guid = playerData.guid
-				end
-				
-				-- Priority 2: GUID from SpySW Cache (nameToGuid map)
-				if not guid and SpySW and SpySW.nameToGuid then
+				-- ✅ Priority 1: SpySW nameToGuid (always fresh from scanner)
+				-- SuperWoW can target units even if UnitExists returns false, so trust the GUID!
+				if SpySW and SpySW.nameToGuid then
 					guid = SpySW.nameToGuid[playerName]
 				end
 				
-				-- Priority 3: GUID from SpySW.guids table
+				-- Priority 2: GUID from PlayerData (fallback if SpySW doesn't have it yet)
+				if not guid then
+					local playerData = SpyPerCharDB.PlayerData[playerName]
+					if playerData and playerData.guid then
+						guid = playerData.guid
+					end
+				end
+				
+				-- Priority 3: GUID from SpySW.guids table (search by name)
 				if not guid and SpySW and SpySW.guids then
 					for cachedGuid, timestamp in pairs(SpySW.guids) do
 						if UnitExists(cachedGuid) then
@@ -859,6 +862,19 @@ function Spy:UpdatePlayerData(name, class, level, race, guild, isEnemy, isGuess)
 	if playerData then
 		playerData.time = time()
 		
+		-- ✅ CRITICAL FIX: Always update GUID from SpySW for distance calculation
+		-- The GUID is needed by SpyDistance to calculate range
+		-- Update it every time to ensure it's never stale
+		if SpySW and SpySW.nameToGuid then
+			local guid = SpySW.nameToGuid[name]
+			if guid then
+				-- ✅ FIX: Update playerData.guid even if UnitExists returns false temporarily
+				-- The GUID might be valid but unit temporarily unavailable (phasing, loading, etc)
+				-- We trust SpySW's scanner - if it has the GUID, it's current
+				playerData.guid = guid
+			end
+		end
+		
 		-- ✅ ALWAYS update zone/coords - this is YOUR location where you detected them
 		-- Get map coordinates (your current position)
 		local mapX, mapY = 0, 0
@@ -1096,9 +1112,11 @@ function Spy:AnnouncePlayer(player, channel)
 		-- Even if playerData exists, we need the essential info
 		if not playerData or not playerData.class or playerData.level == nil then
 			if Spy.db.profile.DebugMode then
+				-- ✅ FIX: Correctly display level 0 (skull) instead of showing it as "nil"
+				local classStr = playerData and playerData.class or "nil"
+				local levelStr = (playerData and playerData.level ~= nil) and tostring(playerData.level) or "nil"
 				DEFAULT_CHAT_FRAME:AddMessage("|cffff8800[Spy Announce]|r Skipped incomplete data for: " .. player .. 
-					" (class=" .. tostring(playerData and playerData.class or "nil") .. 
-					", level=" .. tostring(playerData and playerData.level or "nil") .. ")")
+					" (class=" .. classStr .. ", level=" .. levelStr .. ")")
 			end
 			return
 		end

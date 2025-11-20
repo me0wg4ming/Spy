@@ -391,6 +391,16 @@ local function GetPlayerData(guid)
 	data.class = class
 	data.classToken = classToken
 	
+	-- ✅ FIX: If classToken is nil, try to convert class to uppercase as fallback
+	-- This can happen with some SuperWoW versions or unit states
+	if not classToken and class then
+		classToken = strupper(class)  -- Convert "Druid" → "DRUID"
+		data.classToken = classToken
+		if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[SpySW]|r Fallback: Converted class '" .. class .. "' → '" .. classToken .. "'")
+		end
+	end
+	
 	-- Get race
 	local race, raceToken = UnitRace(guid)
 	data.race = race
@@ -493,7 +503,7 @@ function SpySW:CleanupOldGUIDs(currentTime)
 				-- ✅ Check faction to determine cleanup strategy
 				local wasEnemy = self.enemyGuids[guid] ~= nil
 				local wasFriendly = self.friendlyGuids[guid] ~= nil
-				local timeout = Spy.InactiveTimeout or 10
+				local timeout = Spy.InactiveTimeout or 60
 				
 				local shouldRemove = false
 				
@@ -551,7 +561,7 @@ function SpySW:CleanupOldGUIDs(currentTime)
 	for guid, lastSeen in pairs(self.enemyGuids) do
 		if not UnitExists(guid) then
 			local timeSinceLastSeen = now - lastSeen
-			local timeout = Spy.InactiveTimeout or 10
+			local timeout = Spy.InactiveTimeout or 60
 			
 			-- ✅ Only remove after individual timeout per GUID
 			if timeout > 0 and timeSinceLastSeen > timeout then
@@ -694,7 +704,7 @@ scanFrame:SetScript("OnUpdate", function()
 						-- Update player data (creates entry if doesn't exist)
 						local detected = Spy:UpdatePlayerData(
 							playerName,
-							playerData.classToken,
+							playerData.classToken,  -- Use classToken (with fallback from above)
 							level,
 							playerData.race,
 							playerData.guild,
@@ -812,7 +822,7 @@ scanFrame:SetScript("OnUpdate", function()
 
 						Spy:UpdatePlayerData(
 							playerName,
-							playerData.classToken,
+							playerData.classToken,  -- Use classToken (with fallback)
 							level,
 							playerData.race,
 							playerData.guild,
