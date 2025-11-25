@@ -1478,7 +1478,7 @@ end
 --[[===========================================================================
 	Centralized HP Bar Update System
 	✅ PERFORMANCE: Single OnUpdate handler instead of 10-20 separate ones
-	Updates HP bars for all visible player frames every 0.2 seconds
+	Updates HP bars for all visible player frames every 0.1 seconds
 =============================================================================]]
 
 local hpUpdateFrame = CreateFrame("Frame")
@@ -1490,7 +1490,7 @@ hpUpdateFrame:SetScript("OnUpdate", function()
 	
 	hpUpdateTimer = hpUpdateTimer + elapsed
 	
-	-- Only update every 0.2 seconds
+	-- Only update every 0.1 seconds
 	if hpUpdateTimer < HP_UPDATE_INTERVAL then
 		return
 	end
@@ -1511,10 +1511,28 @@ hpUpdateFrame:SetScript("OnUpdate", function()
 	
 	-- Update HP bars for all visible frames
 	for playerName, frame in pairs(Spy.MainWindow.PlayerFrames) do
-		if frame.visible and frame:IsVisible() and frame.PlayerGUID then
+		if frame.visible and frame:IsVisible() then
 			local guid = frame.PlayerGUID
 			
-			if UnitExists(guid) then
+			-- ✅ GUID Nachladen wenn ungültig (aus altem SetupBar OnUpdate)
+			if not guid or not UnitExists(guid) then
+				local playerData = SpyPerCharDB.PlayerData[playerName]
+				if playerData and playerData.guid then
+					guid = playerData.guid
+				elseif SpySW and SpySW.nameToGuid then
+					guid = SpySW.nameToGuid[playerName]
+				end
+				
+				-- Update frame GUID if we found a valid one
+				if guid and UnitExists(guid) then
+					frame.PlayerGUID = guid
+				end
+			end
+			
+			-- Skip if still no valid GUID
+			if not guid or not UnitExists(guid) then
+				-- No valid GUID - skip this frame
+			else
 				local currentHP = UnitHealth(guid)
 				local maxHP = UnitHealthMax(guid)
 				
@@ -1526,6 +1544,11 @@ hpUpdateFrame:SetScript("OnUpdate", function()
 					-- Only update if difference is significant (avoid micro-updates)
 					if math.abs(currentValue - barValue) > 1 then
 						frame.StatusBar:SetValue(barValue)
+						
+						-- ✅ Klassenfarbe aktualisieren (aus altem SetupBar OnUpdate)
+						local class = frame.playerClass or "UNKNOWN"
+						local r, g, b = Spy:GetClassColor(class)
+						frame.StatusBar:SetStatusBarColor(r, g, b, 1)
 					end
 				end
 			end
