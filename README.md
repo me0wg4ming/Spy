@@ -25,6 +25,7 @@
 - ✅ Fixed players changing their PvP state to non-pvp to still show the range update on nearby frame.
 - ✅ Data Management rework, added a slider to let the player decide after how many minutes non-detected players are removed from the nearby frame.
 <img width="848" height="143" alt="grafik" src="https://github.com/user-attachments/assets/1832b61e-c4e8-4a27-8a1d-1a64c69338e8" />
+
 - ✅Several performance improvements for the frames.
 
 
