@@ -82,47 +82,8 @@ function Spy:SetupBar(row)
 	Spy.Colors:RegisterFont("Bar", "Bar Text", row.LeftText)
 	Spy.Colors:RegisterFont("Bar", "Bar Text", row.RightText)
 	
-	-- ✅ HP-Bar Feature: Live HP updates
-	row:SetScript("OnUpdate", function()
-		if not this:IsShown() then return end
-		if (this.hpTick or 0) > GetTime() then return end
-		this.hpTick = GetTime() + 0.1
-		
-		local playerName = this.PlayerName or (this.id and Spy.ButtonName and Spy.ButtonName[this.id])
-		if not playerName then return end
-		
-		-- ✅ NEVER modify PlayerGUID (like ShaguScan!)
-		local guid = this.PlayerGUID
-		
-		-- If GUID invalid, get fresh one for THIS update only
-		if not guid or not UnitExists(guid) then
-			local playerData = SpyPerCharDB.PlayerData[playerName]
-			if playerData and playerData.guid then
-				guid = playerData.guid
-			elseif SpySW and SpySW.nameToGuid then
-				guid = SpySW.nameToGuid[playerName]
-			end
-		end
-		
-		if not guid or not UnitExists(guid) then return end
-		
-		local currentHP = UnitHealth(guid)
-		local maxHP = UnitHealthMax(guid)
-		
-		if maxHP > 0 then
-			local healthPercent = currentHP / maxHP
-			local barValue = healthPercent * 100
-			
-			local currentValue = this.StatusBar:GetValue()
-			if math.abs(currentValue - barValue) > 1 then
-				this.StatusBar:SetValue(barValue)
-				
-				local class = this.playerClass or "UNKNOWN"
-				local r, g, b = Spy:GetClassColor(class)
-				this.StatusBar:SetStatusBarColor(r, g, b, 1)
-			end
-		end
-	end)
+	-- ✅ HP-Bar updates handled by centralized handler at bottom of file
+	-- This prevents duplicate OnUpdate handlers for each frame
 end
 
 -- NEW: Create permanent frame for a player (like ShaguScan)
@@ -257,6 +218,57 @@ function Spy:CreatePlayerFrame(playerName)
 	frame:Hide()
 	
 	return frame
+end
+
+-- ✅ NEW: Destroy player frame when player leaves Nearby list
+-- WoW 1.12 can't truly destroy frames, but we clean up events and remove from table
+function Spy:DestroyPlayerFrame(playerName)
+	if not Spy.MainWindow or not Spy.MainWindow.PlayerFrames then return end
+	
+	local frame = Spy.MainWindow.PlayerFrames[playerName]
+	if not frame then return end
+	
+	-- Unregister events to prevent memory leak
+	frame:UnregisterAllEvents()
+	
+	-- Clear scripts to prevent callbacks on destroyed frames
+	frame:SetScript("OnEvent", nil)
+	frame:SetScript("OnEnter", nil)
+	frame:SetScript("OnLeave", nil)
+	frame:SetScript("OnClick", nil)
+	frame:SetScript("OnUpdate", nil)
+	
+	-- Hide frame
+	frame:Hide()
+	frame.visible = false
+	
+	-- Clear references
+	frame.PlayerGUID = nil
+	frame.PlayerName = nil
+	frame.playerClass = nil
+	
+	-- Remove from table - this is the key fix!
+	Spy.MainWindow.PlayerFrames[playerName] = nil
+	
+	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+		DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[Spy]|r Destroyed frame for: " .. playerName)
+	end
+end
+
+-- ✅ NEW: Destroy all player frames (for ClearList)
+function Spy:DestroyAllPlayerFrames()
+	if not Spy.MainWindow or not Spy.MainWindow.PlayerFrames then return end
+	
+	for playerName, frame in pairs(Spy.MainWindow.PlayerFrames) do
+		Spy:DestroyPlayerFrame(playerName)
+	end
+	
+	-- Reset table
+	Spy.MainWindow.PlayerFrames = {}
+	
+	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+		DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[Spy]|r Destroyed all player frames")
+	end
 end
 
 function Spy:UpdateBarTextures(event, media, key)

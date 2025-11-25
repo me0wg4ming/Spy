@@ -1911,6 +1911,11 @@ function Spy:OnEnable(first)
 	Spy.PlayerCommList = {}
 	Spy.ListAmountDisplayed = 0
 	
+	-- ✅ FIX: Also destroy any leftover player frames from previous session
+	if Spy.MainWindow and Spy.MainWindow.PlayerFrames then
+		Spy:DestroyAllPlayerFrames()
+	end
+	
 	if Spy.db.profile.DebugMode then
 		local modeStr = stealthOnlyMode and " (Stealth-Only mode)" or ""
 		DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy]|r Cleared all lists on startup" .. modeStr)

@@ -708,6 +708,8 @@ function Spy:ManageNearbyListExpirations()
 				-- Map note cleanup removed - MapNoteList no longer exists
 				Spy.InactiveList[player] = nil
 				Spy.NearbyList[player] = nil
+				-- ✅ FIX: Destroy player frame when removed from Nearby
+				Spy:DestroyPlayerFrame(player)
 				expired = true
 			end
 		end
@@ -742,6 +744,8 @@ function Spy:RemovePlayerFromList(player)
 	Spy.NearbyList[player] = nil
 	Spy.ActiveList[player] = nil
 	Spy.InactiveList[player] = nil
+	-- ✅ FIX: Destroy player frame when manually removed
+	Spy:DestroyPlayerFrame(player)
 	-- Map note cleanup removed - MapNoteList no longer exists
 	Spy:RefreshCurrentList()
 	Spy:UpdateActiveCount()
@@ -751,6 +755,8 @@ function Spy:ClearList()
 	if IsShiftKeyDown () then
 		Spy:EnableSound(not Spy.db.profile.EnableSound, false)
 	else
+		-- ✅ FIX: Destroy all player frames when clearing list
+		Spy:DestroyAllPlayerFrames()
 		Spy.NearbyList = {}
 		Spy.ActiveList = {}
 		Spy.InactiveList = {}
