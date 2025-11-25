@@ -309,15 +309,19 @@ distanceUpdateFrame:SetScript("OnUpdate", function()
     
     for playerName, frame in pairs(Spy.MainWindow.PlayerFrames) do
         if frame.visible and frame:IsVisible() and frame.PlayerName and frame.RightText then
-            local distance = Spy.Distance:GetDistance(frame.PlayerName)
-            if not distance then
-                distance = Spy.Distance:GetCachedDistance(frame.PlayerName)
-            end
-            
-            -- Wenn immer noch keine Distance verfügbar, zeige "--"
             local distanceText = "--"
-            if distance then
-                distanceText = Spy.Distance:FormatDistance(distance)
+            
+            -- ✅ FIX: Nur Distanz aktualisieren, wenn Spieler NICHT in InactiveList ist
+            -- Inaktive Spieler (nicht mehr PVP flagged) sind für nearby list uninteressant
+            if not Spy.InactiveList[frame.PlayerName] then
+                local distance = Spy.Distance:GetDistance(frame.PlayerName)
+                if not distance then
+                    distance = Spy.Distance:GetCachedDistance(frame.PlayerName)
+                end
+                
+                if distance then
+                    distanceText = Spy.Distance:FormatDistance(distance)
+                end
             end
             
             frame.RightText:SetText(distanceText)

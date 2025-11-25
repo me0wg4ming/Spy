@@ -1197,7 +1197,7 @@ function Spy:AnnouncePlayer(player, channel)
 
 		-- announce to other Spy users
 		if Spy.db.profile.ShareData then
-			local class, level, race, zone, subZone, mapX, mapY, guild = "", "", "", "", "", "", "", ""
+			local class, level, race, zone, subZone, mapX, mapY, guild, guid = "", "", "", "", "", "", "", "", ""
 			if playerData then
 				if playerData.class then class = playerData.class end
 				if playerData.level and playerData.isGuess == false then level = playerData.level end
@@ -1207,10 +1207,13 @@ function Spy:AnnouncePlayer(player, channel)
 				if playerData.mapX then mapX = playerData.mapX end
 				if playerData.mapY then mapY = playerData.mapY end
 				if playerData.guild then guild = playerData.guild end
+				-- ✅ NEW: Include GUID if available (SuperWoW)
+				if playerData.guid then guid = playerData.guid end
 			end
+			-- ✅ NEW: Append GUID to message (backwards compatible - old clients will ignore it)
 			local details = Spy.Version ..
 				"," .. player .. "," .. class .. "," .. level .. "," ..
-				race .. "," .. zone .. "," .. subZone .. "," .. mapX .. "," .. mapY .. "," .. guild
+				race .. "," .. zone .. "," .. subZone .. "," .. mapX .. "," .. mapY .. "," .. guild .. "," .. guid
 
 			if strlen(details) < 240 then
 				if channel then

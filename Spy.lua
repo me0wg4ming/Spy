@@ -931,103 +931,30 @@ Spy.options = {
 					fontSize = "medium",
 				},
 				RemoveUndetected = {
-					name = L["RemoveUndetected"],
-					type = "group",
+					name = function()
+						local val = Spy.db.profile.RemoveUndetectedTime or 0
+						if val == 0 then
+							return L["RemoveUndetected"] .. ": |cff00ff00" .. L["Never"] .. "|r"
+						elseif val >= 121 then
+							return L["RemoveUndetected"] .. ": |cffff0000" .. L["Always"] .. "|r"
+						else
+							return L["RemoveUndetected"] .. ": |cffffff00" .. val .. " " .. L["Minutes"] .. "|r"
+						end
+					end,
+					desc = L["RemoveUndetectedDescription"],
+					type = "range",
 					order = 2,
-					inline = true,
-					args = {
-						Always = {
-							name = L["Always"],
-							desc = L["AlwaysDescription"],
-							type = "toggle",
-							order = 1,
-							get = function(info)
-								return Spy.db.profile.RemoveUndetected == "Always"
-							end,
-							set = function(info, value)
-								Spy.db.profile.RemoveUndetected = "Always"
-								Spy:UpdateTimeoutSettings()
-							end,
-						},
-						OneMinute = {
-							name = L["1Min"],
-							desc = L["1MinDescription"],
-							type = "toggle",
-							order = 2,
-							get = function(info)
-								return Spy.db.profile.RemoveUndetected == "OneMinute"
-							end,
-							set = function(info, value)
-								Spy.db.profile.RemoveUndetected = "OneMinute"
-								Spy:UpdateTimeoutSettings()
-							end,
-						},
-						TwoMinutes = {
-							name = L["2Min"],
-							desc = L["2MinDescription"],
-							type = "toggle",
-							order = 3,
-							get = function(info)
-								return Spy.db.profile.RemoveUndetected == "TwoMinutes"
-							end,
-							set = function(info, value)
-								Spy.db.profile.RemoveUndetected = "TwoMinutes"
-								Spy:UpdateTimeoutSettings()
-							end,
-						},
-						FiveMinutes = {
-							name = L["5Min"],
-							desc = L["5MinDescription"],
-							type = "toggle",
-							order = 4,
-							get = function(info)
-								return Spy.db.profile.RemoveUndetected == "FiveMinutes"
-							end,
-							set = function(info, value)
-								Spy.db.profile.RemoveUndetected = "FiveMinutes"
-								Spy:UpdateTimeoutSettings()
-							end,
-						},
-						TenMinutes = {
-							name = L["10Min"],
-							desc = L["10MinDescription"],
-							type = "toggle",
-							order = 5,
-							get = function(info)
-								return Spy.db.profile.RemoveUndetected == "TenMinutes"
-							end,
-							set = function(info, value)
-								Spy.db.profile.RemoveUndetected = "TenMinutes"
-								Spy:UpdateTimeoutSettings()
-							end,
-						},
-						FifteenMinutes = {
-							name = L["15Min"],
-							desc = L["15MinDescription"],
-							type = "toggle",
-							order = 6,
-							get = function(info)
-								return Spy.db.profile.RemoveUndetected == "FifteenMinutes"
-							end,
-							set = function(info, value)
-								Spy.db.profile.RemoveUndetected = "FifteenMinutes"
-								Spy:UpdateTimeoutSettings()
-							end,
-						},
-						Never = {
-							name = L["Never"],
-							desc = L["NeverDescription"],
-							type = "toggle",
-							order = 7,
-							get = function(info)
-								return Spy.db.profile.RemoveUndetected == "Never"
-							end,
-							set = function(info, value)
-								Spy.db.profile.RemoveUndetected = "Never"
-								Spy:UpdateTimeoutSettings()
-							end,
-						},
-					},
+					width = "full",
+					min = 0,
+					max = 121,
+					step = 1,
+					get = function(info)
+						return Spy.db.profile.RemoveUndetectedTime or 0
+					end,
+					set = function(info, value)
+						Spy.db.profile.RemoveUndetectedTime = value
+						Spy:UpdateTimeoutSettings()
+					end,
 				},
 				PurgeData = {
 					name = L["PurgeData"],
@@ -1175,16 +1102,6 @@ Spy.options = {
 						if value then Spy:RegenerateKOSCentralList() end
 					end,
 				},
-				census = {
-					name = L["Get Census Data"],
-					desc = L["GetCensusData"],
-					type = 'execute',
-
-					order = 13,
-					func = function()
-						Spy:GetCensusData()
-					end,
-				},
 
 			},
 		},
@@ -1293,11 +1210,26 @@ Spy.optionsSlash = {
 			end,
 			dialogHidden = true
 		},
+		commdebug = {
+			name = "Comm Debug",
+			desc = "Toggle Comm Debug Mode to see received/rejected player data",
+			type = 'execute',
+			order = 10,
+			func = function()
+				Spy.db.profile.CommDebug = not Spy.db.profile.CommDebug
+				if Spy.db.profile.CommDebug then
+					DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy]|r Comm Debug Mode: |cff00ff00ON|r - You will see accepted/rejected comm data")
+				else
+					DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy]|r Comm Debug Mode: |cffff0000OFF|r")
+				end
+			end,
+			dialogHidden = true
+		},
 		test = {
 			name = L["Test"],
 			desc = L["TestDescription"],
 			type = 'execute',
-			order = 10,
+			order = 11,
 			func = function()
 				Spy:AlertStealthPlayer("Bazzalan")
 			end
@@ -1436,7 +1368,7 @@ local Default_Profile = {
 		EnableSound = true,
 		OnlySoundKoS = false,
 		StopAlertsOnTaxi = true,
-		RemoveUndetected = "Always",
+		RemoveUndetectedTime = 121, -- 0=Never, 1-120=Minutes, 121=Always
 		ShowNearbyList = true,
 		PrioritiseKoS = true,
 		PurgeData = "NinetyDays",
@@ -1444,6 +1376,8 @@ local Default_Profile = {
 		PurgeWinLossData = false,
 		ShareData = false,
 		UseData = false,
+		CommUpdateInterval = 5,
+		CommDebug = false,
 		ShareKOSBetweenCharacters = true,
 		FilteredZones = {
 			["Booty Bay"] = false,
@@ -1821,30 +1755,41 @@ function Spy:InitDBIcon()
 end
 
 function Spy:UpdateTimeoutSettings()
-	if not Spy.db.profile.RemoveUndetected or Spy.db.profile.RemoveUndetected == "Always" then
-		Spy.ActiveTimeout = 1
-		Spy.InactiveTimeout = 0.1
-	elseif Spy.db.profile.RemoveUndetected == "OneMinute" then
-		Spy.ActiveTimeout = 1
-		Spy.InactiveTimeout = 60
-	elseif Spy.db.profile.RemoveUndetected == "TwoMinutes" then
-		Spy.ActiveTimeout = 1
-		Spy.InactiveTimeout = 120
-	elseif Spy.db.profile.RemoveUndetected == "FiveMinutes" then
-		Spy.ActiveTimeout = 1
-		Spy.InactiveTimeout = 300
-	elseif Spy.db.profile.RemoveUndetected == "TenMinutes" then
-		Spy.ActiveTimeout = 1
-		Spy.InactiveTimeout = 600
-	elseif Spy.db.profile.RemoveUndetected == "FifteenMinutes" then
-		Spy.ActiveTimeout = 1
-		Spy.InactiveTimeout = 900
-	elseif Spy.db.profile.RemoveUndetected == "Never" then
-		Spy.ActiveTimeout = 1
+	-- ✅ Migration: Convert old string values to new number format
+	if type(Spy.db.profile.RemoveUndetected) == "string" then
+		local oldValue = Spy.db.profile.RemoveUndetected
+		if oldValue == "Never" then
+			Spy.db.profile.RemoveUndetectedTime = 0
+		elseif oldValue == "Always" then
+			Spy.db.profile.RemoveUndetectedTime = 121
+		elseif oldValue == "OneMinute" then
+			Spy.db.profile.RemoveUndetectedTime = 1
+		elseif oldValue == "TwoMinutes" then
+			Spy.db.profile.RemoveUndetectedTime = 2
+		elseif oldValue == "FiveMinutes" then
+			Spy.db.profile.RemoveUndetectedTime = 5
+		elseif oldValue == "TenMinutes" then
+			Spy.db.profile.RemoveUndetectedTime = 10
+		elseif oldValue == "FifteenMinutes" then
+			Spy.db.profile.RemoveUndetectedTime = 15
+		else
+			Spy.db.profile.RemoveUndetectedTime = 5 -- Default
+		end
+		Spy.db.profile.RemoveUndetected = nil -- Clear old value
+	end
+	
+	local timeout = Spy.db.profile.RemoveUndetectedTime or 5
+	Spy.ActiveTimeout = 1
+	
+	if timeout == 0 then
+		-- Never remove
 		Spy.InactiveTimeout = -1
+	elseif timeout >= 121 then
+		-- Always remove immediately
+		Spy.InactiveTimeout = 0.1
 	else
-		Spy.ActiveTimeout = 1
-		Spy.InactiveTimeout = 300
+		-- Remove after X minutes
+		Spy.InactiveTimeout = timeout * 60
 	end
 end
 
@@ -2192,9 +2137,12 @@ function Spy:OnInitialize()
 		["Tauren"] = true,
 		["Troll"] = true,
 		["NightElf"] = true,
-		["Scourge"] = true,
+		["Night Elf"] = true,  -- Display name variant
+		["Scourge"] = true,    -- API name for Undead
+		["Undead"] = true,     -- Display name variant
 		["Gnome"] = true,
 		["HighElf"] = true,
+		["High Elf"] = true,   -- Display name variant
 		["Goblin"] = true,
 
 	}
@@ -2370,21 +2318,6 @@ function Spy:InFilteredZone(subzone)
 		end
 	end
 	return InFilteredZone
-end
-
-local function populateFactionNames(Name, Level, guild, race, Class, lastSeen)
-	if Name then
-		Spy:AddFriendsData(Name)
-		Spy:RemovePlayerFromList(Name)
-		Spy:RemovePlayerData(Name)
-	end
-end
-
-function Spy:GetCensusData()
-	if CensusPlus_ForAllCharacters then
-		local realmName = g_CensusPlusLocale .. GetCVar("realmName");
-		CensusPlus_ForAllCharacters(realmName, UnitFactionGroup("player"), nil, nil, nil, nil, populateFactionNames)
-	end
 end
 
 local playerName = UnitName("player")
@@ -2783,103 +2716,212 @@ end
 -- WorldMapUpdateEvent removed - map display feature removed
 
 function Spy:CommReceived(prefix, message, distribution, source)
-	if Spy.EnabledInZone and Spy.db.profile.UseData then
-		if prefix == Spy.Signature and message and source ~= Spy.CharacterName then
-			local version, player, class, level, race, zone, subZone, mapX, mapY, guild = strsplit(",", message)
-			if player ~= nil and (not Spy.InInstance or zone == GetZoneText()) and not Spy:PlayerIsFriend(player) then
-				if not Spy.PlayerCommList[player] then
-					local upgrade = Spy:VersionCheck(Spy.Version, version)
-					if upgrade and not Spy.UpgradeMessageSent then
-						DEFAULT_CHAT_FRAME:AddMessage(L["UpgradeAvailable"])
-						Spy.UpgradeMessageSent = true
-					end
-					if strlen(class) > 0 then
-						if not Spy.ValidClasses[class] then
-							return
-						end
-					else
-						class = nil
-					end
-					-- ✅ FIXED Level validation (ca. Zeile 24-33 in deinem CommReceived Code)
-					if strlen(level) > 0 then
-						level = tonumber(level)
-						if type(level) == "number" then
-							-- Accept level 0 and -1 (both mean "??")
-							if level < -1 or level > Spy.MaximumPlayerLevel or (level > 0 and math.floor(level) ~= level) then
-								return
-							end
-							-- ✅ Convert negative levels to 0 (= "??")
-							if level < 0 then
-								level = 0
-							end
-							-- ✅ Level 0 now stays 0 (not converted to nil)
-						else
-							return
-						end
-					else
-						level = nil
-					end
-					if strlen(race) > 0 then
-						if not Spy.ValidRaces[race] then
-							return
-						end
-						if (
-							Spy.EnemyFactionName == "Alliance" and race ~= "Dwarf" and race ~= "Gnome" and race ~= "Human" and
-								race ~= "Night Elf" and race ~= "High Elf")
-							or
-							(
-							Spy.EnemyFactionName == "Horde" and race ~= "Orc" and race ~= "Tauren" and race ~= "Troll" and race ~= "Undead"
-								and race ~= "Goblin") then
-							return
-						end
-					else
-						race = nil
-					end
-					if strlen(zone) > 0 then
-						-- Accept zone even if unknown (custom server zones)
-						-- Just validate it's a string, don't check ZoneID table
-					else
-						zone = nil
-					end
-					if strlen(subZone) == 0 then
-						subZone = nil
-					end
-					if strlen(mapX) > 0 then
-						mapX = tonumber(mapX)
-						if type(mapX) == "number" and mapX >= 0 and mapX <= 1 then
-							mapX = math.floor(mapX * 100) / 100
-						else
-							return
-						end
-					else
-						mapX = nil
-					end
-					if strlen(mapY) > 0 then
-						mapY = tonumber(mapY)
-						if type(mapY) == "number" and mapY >= 0 and mapY <= 1 then
-							mapY = math.floor(mapY * 100) / 100
-						else
-							return
-						end
-					else
-						mapY = nil
-					end
-					if strlen(guild) > 0 then
-						if strlen(guild) > 24 then
-							return
-						end
-					else
-						guild = nil
-					end
-
-					local learnt, playerData = Spy:ParseUnitDetails(player, class, level, race, zone, subZone, mapX, mapY, guild)
-					if playerData and playerData.isEnemy and not SpyPerCharDB.IgnoreData[player] then
-						Spy.PlayerCommList[player] = Spy.CurrentMapNote
-						Spy:AddDetected(player, time(), learnt, source)
-						-- Map display removed - don't show map notes
-					end
-				end
+	if not Spy.EnabledInZone or not Spy.db.profile.UseData then
+		return
+	end
+	
+	if prefix ~= Spy.Signature or not message or source == Spy.CharacterName then
+		return
+	end
+	
+	local commDebug = Spy.db.profile.CommDebug
+	local updateInterval = Spy.db.profile.CommUpdateInterval or 5
+	
+	-- Parse message - format: version,player,class,level,race,zone,subZone,mapX,mapY,guild[,guid]
+	local version, player, class, level, race, zone, subZone, mapX, mapY, guild, guid = strsplit(",", message)
+	
+	-- Basic validation
+	if not player or player == "" then
+		if commDebug then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Comm]|r Rejected: empty player name from " .. source)
+		end
+		return
+	end
+	
+	-- Instance check
+	if Spy.InInstance and zone ~= GetZoneText() then
+		if commDebug then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Comm]|r Rejected " .. player .. ": different instance zone")
+		end
+		return
+	end
+	
+	-- Friend check
+	if Spy:PlayerIsFriend(player) then
+		if commDebug then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Comm]|r Rejected " .. player .. ": is friend")
+		end
+		return
+	end
+	
+	-- ✅ NEW: Check if we should accept update (timestamp-based)
+	local now = time()
+	local commData = Spy.PlayerCommList[player]
+	local isUpdate = false
+	
+	if commData then
+		local lastTime = commData.timestamp or 0
+		if (now - lastTime) < updateInterval then
+			-- Too soon for update, skip silently (no spam)
+			return
+		end
+		isUpdate = true
+	end
+	
+	-- Version check (only on first detection)
+	if not isUpdate then
+		local upgrade = Spy:VersionCheck(Spy.Version, version)
+		if upgrade and not Spy.UpgradeMessageSent then
+			DEFAULT_CHAT_FRAME:AddMessage(L["UpgradeAvailable"])
+			Spy.UpgradeMessageSent = true
+		end
+	end
+	
+	-- Validate class
+	if strlen(class) > 0 then
+		if not Spy.ValidClasses[class] then
+			if commDebug then
+				DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Comm]|r Rejected " .. player .. ": invalid class '" .. class .. "'")
 			end
+			return
+		end
+	else
+		class = nil
+	end
+	
+	-- Validate level
+	if strlen(level) > 0 then
+		level = tonumber(level)
+		if type(level) == "number" then
+			if level < -1 or level > Spy.MaximumPlayerLevel or (level > 0 and math.floor(level) ~= level) then
+				if commDebug then
+					DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Comm]|r Rejected " .. player .. ": invalid level " .. tostring(level))
+				end
+				return
+			end
+			if level < 0 then
+				level = 0
+			end
+		else
+			if commDebug then
+				DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Comm]|r Rejected " .. player .. ": level not a number")
+			end
+			return
+		end
+	else
+		level = nil
+	end
+	
+	-- Validate race
+	if strlen(race) > 0 then
+		if not Spy.ValidRaces[race] then
+			if commDebug then
+				DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Comm]|r Rejected " .. player .. ": invalid race '" .. race .. "'")
+			end
+			return
+		end
+		-- ✅ REMOVED: Faction-based race check - causes issues on custom servers
+		-- and with cross-faction data sharing. ValidRaces check is sufficient.
+	else
+		race = nil
+	end
+	
+	-- Validate zone (accept any non-empty string for custom servers)
+	if strlen(zone) == 0 then
+		zone = nil
+	end
+	
+	-- SubZone
+	if strlen(subZone) == 0 then
+		subZone = nil
+	end
+	
+	-- Validate mapX
+	if strlen(mapX) > 0 then
+		mapX = tonumber(mapX)
+		if type(mapX) == "number" and mapX >= 0 and mapX <= 1 then
+			mapX = math.floor(mapX * 100) / 100
+		else
+			if commDebug then
+				DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Comm]|r Rejected " .. player .. ": invalid mapX")
+			end
+			return
+		end
+	else
+		mapX = nil
+	end
+	
+	-- Validate mapY
+	if strlen(mapY) > 0 then
+		mapY = tonumber(mapY)
+		if type(mapY) == "number" and mapY >= 0 and mapY <= 1 then
+			mapY = math.floor(mapY * 100) / 100
+		else
+			if commDebug then
+				DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Comm]|r Rejected " .. player .. ": invalid mapY")
+			end
+			return
+		end
+	else
+		mapY = nil
+	end
+	
+	-- Validate guild
+	if strlen(guild) > 0 then
+		if strlen(guild) > 24 then
+			if commDebug then
+				DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Comm]|r Rejected " .. player .. ": guild name too long")
+			end
+			return
+		end
+	else
+		guild = nil
+	end
+	
+	-- ✅ NEW: Validate GUID if present (SuperWoW)
+	if guid and strlen(guid) > 0 then
+		-- Basic GUID format check (should be hex string like "0x0000000000123456")
+		if strlen(guid) > 20 then
+			guid = nil -- Invalid, ignore
+		end
+	else
+		guid = nil
+	end
+	
+	-- Process the player data
+	local learnt, playerData = Spy:ParseUnitDetails(player, class, level, race, zone, subZone, mapX, mapY, guild)
+	
+	if playerData and playerData.isEnemy and not SpyPerCharDB.IgnoreData[player] then
+		-- ✅ Store GUID in PlayerData if received (SuperWoW)
+		if guid and (not playerData.guid or playerData.guid == "") then
+			playerData.guid = guid
+		end
+		
+		-- ✅ Store timestamp and optional GUID in CommList
+		Spy.PlayerCommList[player] = {
+			timestamp = now,
+			guid = guid,
+			source = source
+		}
+		
+		if commDebug then
+			local updateStr = isUpdate and " (UPDATE)" or " (NEW)"
+			local guidStr = guid and (" GUID:" .. guid) or ""
+			DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy Comm]|r Accepted " .. player .. updateStr .. " from " .. source .. guidStr)
+		end
+		
+		Spy:AddDetected(player, now, learnt, source)
+	else
+		if commDebug then
+			local reason = "unknown"
+			if not playerData then
+				reason = "no playerData"
+			elseif not playerData.isEnemy then
+				reason = "not enemy"
+			elseif SpyPerCharDB.IgnoreData[player] then
+				reason = "on ignore list"
+			end
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Comm]|r Rejected " .. player .. ": " .. reason)
 		end
 	end
 end
