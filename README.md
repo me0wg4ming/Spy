@@ -20,7 +20,7 @@
 
 ---
 
-## 🚀 What's New in Version 4.0.5 (November 10, 2025)
+## 🚀 What's New in Version 4.0.5 (November 25, 2025)
 - ✅ Fixed shared scans missing out on specific classes or races.
 - ✅ Fixed players changing their PvP state to non-pvp to still show the range update on nearby frame.
 - ✅Several performance improvements for the frames.
