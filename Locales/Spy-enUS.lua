@@ -178,21 +178,11 @@ L["ListOptions"] = "Nearby List"
 L["ListOptionsDescription"] = [[
 You can configure how Spy adds and removes enemy players to and from the Nearby list.
 ]]
-L["RemoveUndetected"] = "Remove enemy players from the Nearby list after:"
-L["Always"] = "Always remove"
-L["AlwaysDescription"] = "Always Remove an enemy player who has not been detected nearby."
-L["1Min"] = "1 minute"
-L["1MinDescription"] = "Remove an enemy player who has been undetected for over 1 minute."
-L["2Min"] = "2 minutes"
-L["2MinDescription"] = "Remove an enemy player who has been undetected for over 2 minutes."
-L["5Min"] = "5 minutes"
-L["5MinDescription"] = "Remove an enemy player who has been undetected for over 5 minutes."
-L["10Min"] = "10 minutes"
-L["10MinDescription"] = "Remove an enemy player who has been undetected for over 10 minutes."
-L["15Min"] = "15 minutes"
-L["15MinDescription"] = "Remove an enemy player who has been undetected for over 15 minutes."
-L["Never"] = "Never remove"
-L["NeverDescription"] = "Never remove enemy players. The Nearby list can still be cleared manually."
+L["RemoveUndetected"] = "Remove enemy players from the Nearby list after"
+L["RemoveUndetectedDescription"] = "Slide to set when inactive enemy players are removed. Left (0) = Never remove. Right (121) = Always remove immediately. Middle = minutes until removal."
+L["Minutes"] = "min"
+L["Always"] = "Always"
+L["Never"] = "Never"
 L["ShowNearbyList"] = "Switch to the Nearby list upon enemy player detection"
 L["ShowNearbyListDescription"] = "Set this to display the Nearby list if it is not already visible when enemy players are detected."
 L["PrioritiseKoS"] = "Prioritise Kill On Sight enemy players in the Nearby list"
@@ -396,9 +386,6 @@ L["StatsSeparator"] = "  "
 L["StatsLoses"] = "|cff0070ddLoses: "
 L["Located"] = "located:"
 L["Yards"] = "yards"
-
-L["Get Census Data"] = "Get Census Data"
-L["GetCensusData"] = "Get names of your factions to filter them in player detection."
 
 Spy_KOSReasonListLength = 13
 Spy_KOSReasonList = {
