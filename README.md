@@ -20,6 +20,17 @@
 
 ---
 
+## 🚀 What's New in Version 4.0.5 (November 10, 2025)
+- ✅ Fixed shared scans missing out on specific classes or races.
+- ✅ Fixed players changing their PvP state to non-pvp to still show the range update on nearby frame.
+- ✅ Data Management rework, added a slider to let the player decide after how many minutes non-detected players are removed from the nearby frame.
+<img width="848" height="143" alt="grafik" src="https://github.com/user-attachments/assets/1832b61e-c4e8-4a27-8a1d-1a64c69338e8" />
+- ✅Several performance improvements for the frames.
+
+
+
+---
+
 ## 🚀 What's New in Version 4.0.2 (November 10, 2025)
 - ✅ Fixed shared scans from other Spy users not being shown in the "Statistics" window.:
 - ✅ Different Fonts can be properly changed and applied now to the "Nearby" Window.
