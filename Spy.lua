@@ -933,7 +933,7 @@ Spy.options = {
 				RemoveUndetected = {
 					name = function()
 						local val = Spy.db.profile.RemoveUndetectedTime or 1
-						if val >= 121 then
+						if val == 0 then
 							return L["RemoveUndetected"] .. ": |cffff0000" .. L["Always"] .. "|r"
 						else
 							return L["RemoveUndetected"] .. ": |cffffff00" .. val .. " " .. L["Minutes"] .. "|r"
@@ -943,8 +943,8 @@ Spy.options = {
 					type = "range",
 					order = 2,
 					width = "full",
-					min = 1,
-					max = 121,
+					min = 0,
+					max = 120,
 					step = 1,
 					get = function(info)
 						return Spy.db.profile.RemoveUndetectedTime or 1
@@ -1366,7 +1366,7 @@ local Default_Profile = {
 		EnableSound = true,
 		OnlySoundKoS = false,
 		StopAlertsOnTaxi = true,
-		RemoveUndetectedTime = 121, -- 1-120=Minutes, 121=Always
+		RemoveUndetectedTime = 5,
 		ShowNearbyList = true,
 		PrioritiseKoS = true,
 		PurgeData = "NinetyDays",
@@ -1753,39 +1753,39 @@ function Spy:InitDBIcon()
 end
 
 function Spy:UpdateTimeoutSettings()
-	-- ✅ Migration: Convert old string values to new number format
-	if type(Spy.db.profile.RemoveUndetected) == "string" then
-		local oldValue = Spy.db.profile.RemoveUndetected
-		if oldValue == "Never" then
-			Spy.db.profile.RemoveUndetectedTime = 1  -- Never no longer supported, use 1 minute
-		elseif oldValue == "Always" then
-			Spy.db.profile.RemoveUndetectedTime = 121
-		elseif oldValue == "OneMinute" then
-			Spy.db.profile.RemoveUndetectedTime = 1
-		elseif oldValue == "TwoMinutes" then
-			Spy.db.profile.RemoveUndetectedTime = 2
-		elseif oldValue == "FiveMinutes" then
-			Spy.db.profile.RemoveUndetectedTime = 5
-		elseif oldValue == "TenMinutes" then
-			Spy.db.profile.RemoveUndetectedTime = 10
-		elseif oldValue == "FifteenMinutes" then
-			Spy.db.profile.RemoveUndetectedTime = 15
-		else
-			Spy.db.profile.RemoveUndetectedTime = 5 -- Default
-		end
-		Spy.db.profile.RemoveUndetected = nil -- Clear old value
-	end
-	
-	local timeout = Spy.db.profile.RemoveUndetectedTime or 1
-	Spy.ActiveTimeout = 1
-	
-	if timeout >= 121 then
-		-- Always remove immediately
-		Spy.InactiveTimeout = 0.1
-	else
-		-- Remove after X minutes
-		Spy.InactiveTimeout = timeout * 60
-	end
+    -- Migration: Convert old string values to new number format
+    if type(Spy.db.profile.RemoveUndetected) == "string" then
+        local oldValue = Spy.db.profile.RemoveUndetected
+        if oldValue == "Never" then
+            Spy.db.profile.RemoveUndetectedTime = 1  -- Never no longer supported, use 1 minute
+        elseif oldValue == "Always" then
+            Spy.db.profile.RemoveUndetectedTime = 0  -- Changed from 121 to 0
+        elseif oldValue == "OneMinute" then
+            Spy.db.profile.RemoveUndetectedTime = 1
+        elseif oldValue == "TwoMinutes" then
+            Spy.db.profile.RemoveUndetectedTime = 2
+        elseif oldValue == "FiveMinutes" then
+            Spy.db.profile.RemoveUndetectedTime = 5
+        elseif oldValue == "TenMinutes" then
+            Spy.db.profile.RemoveUndetectedTime = 10
+        elseif oldValue == "FifteenMinutes" then
+            Spy.db.profile.RemoveUndetectedTime = 15
+        else
+            Spy.db.profile.RemoveUndetectedTime = 5 -- Default
+        end
+        Spy.db.profile.RemoveUndetected = nil -- Clear old value
+    end
+    
+    local timeout = Spy.db.profile.RemoveUndetectedTime or 1
+    Spy.ActiveTimeout = 1
+    
+    if timeout == 0 then  -- Changed from >= 121
+        -- Always remove immediately
+        Spy.InactiveTimeout = 0.1
+    else
+        -- Remove after X minutes
+        Spy.InactiveTimeout = timeout * 60
+    end
 end
 
 function Spy:ResetMainWindow()
