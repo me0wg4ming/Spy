@@ -303,8 +303,6 @@ function Spy:RefreshCurrentList(player, source)
 			end
 		end	
 	end
-
-	Spy:ManageBarsDisplayed()
 end
 
 -- ✅ NEW: /spyguid command - Show GUID info for all visible players

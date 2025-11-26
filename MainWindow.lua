@@ -983,10 +983,6 @@ function Spy:AutomaticallyResize()
 	end	
 end
 
-function Spy:ManageBarsDisplayed()
-	-- Previously calculated CurRows which is no longer used
-end
-
 function Spy:ResizeMainWindow()
 	if not Spy.MainWindow then return end
 
@@ -997,8 +993,6 @@ function Spy:ResizeMainWindow()
 	for playerName, frame in pairs(Spy.MainWindow.PlayerFrames) do
 		frame:SetWidth(CurWidth)
 	end
-
-	Spy:ManageBarsDisplayed()
 end
 
 function Spy:SetCurrentList(mode)
