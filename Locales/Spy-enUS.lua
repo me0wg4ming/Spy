@@ -268,7 +268,7 @@ L["TestDescription"] = "Shows a warning so it can be repositioned."
 L["Nearby"] = "Nearby"
 L["LastHour"] = "Last Hour"
 L["Ignore"] = "Ignore"
-L["KillOnSight"] = "Kill On Sight"
+L["KillOnSight"] = "KOS"
 
 --Stats
 L["Show/Hide stats"] = "Show/Hide stats"
