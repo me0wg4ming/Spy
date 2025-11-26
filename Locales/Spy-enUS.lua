@@ -179,7 +179,7 @@ L["ListOptionsDescription"] = [[
 You can configure how Spy adds and removes enemy players to and from the Nearby list.
 ]]
 L["RemoveUndetected"] = "Remove enemy players from the Nearby list after"
-L["RemoveUndetectedDescription"] = "Slide to set when inactive enemy players are removed. Left (0) = Never remove. Right (121) = Always remove immediately. Middle = minutes until removal."
+L["RemoveUndetectedDescription"] = "Slide to set when inactive enemy players are removed. Left/0 = Always remove immediately. Middle = minutes until removal."
 L["Minutes"] = "min"
 L["Always"] = "Always"
 L["ShowNearbyList"] = "Switch to the Nearby list upon enemy player detection"
