@@ -241,11 +241,22 @@ end
 function Spy:DestroyAllPlayerFrames()
 	if not Spy.MainWindow or not Spy.MainWindow.PlayerFrames then return end
 	
+	-- Cleanup all frames (don't call DestroyPlayerFrame to avoid table modification during iteration)
 	for playerName, frame in pairs(Spy.MainWindow.PlayerFrames) do
-		Spy:DestroyPlayerFrame(playerName)
+		frame:UnregisterAllEvents()
+		frame:SetScript("OnEvent", nil)
+		frame:SetScript("OnEnter", nil)
+		frame:SetScript("OnLeave", nil)
+		frame:SetScript("OnClick", nil)
+		frame:SetScript("OnUpdate", nil)
+		frame:Hide()
+		frame.visible = false
+		frame.PlayerGUID = nil
+		frame.PlayerName = nil
+		frame.playerClass = nil
 	end
 	
-	-- Reset table
+	-- Reset table after iteration is complete
 	Spy.MainWindow.PlayerFrames = {}
 	
 	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
@@ -857,7 +868,6 @@ function Spy:CreateMainWindow()
 		theFrame.CloseButton:SetFrameLevel(theFrame.CountButton:GetFrameLevel() + 1)
 
 		Spy.MainWindow.PlayerFrames = {}  -- Tabelle für Player-Frames
-		Spy.MainWindow.CurRows = 0
 
 		Spy:RestoreMainWindowPosition(Spy.db.profile.MainWindow.Position.x, Spy.db.profile.MainWindow.Position.y,
 			Spy.db.profile.MainWindow.Position.w, 34)
@@ -966,7 +976,6 @@ function Spy:AutomaticallyResize()
 	local detected = Spy.ListAmountDisplayed
 	if detected > Spy.db.profile.ResizeSpyLimit then detected = Spy.db.profile.ResizeSpyLimit end
 	local height = 35 + (detected * (Spy.db.profile.MainWindow.RowHeight + Spy.db.profile.MainWindow.RowSpacing))
-	Spy.MainWindow.CurRows = detected
 	if not Spy.db.profile.InvertSpy then
 		Spy:RestoreMainWindowPosition(Spy.MainWindow:GetLeft(), Spy.MainWindow:GetTop(), Spy.MainWindow:GetWidth(), height)
 	else
@@ -975,16 +984,7 @@ function Spy:AutomaticallyResize()
 end
 
 function Spy:ManageBarsDisplayed()
-	local detected = Spy.ListAmountDisplayed
-	local bars = math.floor((Spy.MainWindow:GetHeight() - 34) /
-		(Spy.db.profile.MainWindow.RowHeight + Spy.db.profile.MainWindow.RowSpacing))
-	if bars > detected then 
-		bars = detected 
-	end
-	if bars > Spy.db.profile.ResizeSpyLimit then 
-		bars = Spy.db.profile.ResizeSpyLimit 
-	end
-	Spy.MainWindow.CurRows = bars
+	-- Previously calculated CurRows which is no longer used
 end
 
 function Spy:ResizeMainWindow()

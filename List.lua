@@ -743,17 +743,15 @@ function Spy:RemovePlayerFromList(player)
 end
 
 function Spy:ClearList()
-	if IsShiftKeyDown () then
+	if IsShiftKeyDown() then
 		Spy:EnableSound(not Spy.db.profile.EnableSound, false)
 	else
-		-- ✅ FIX: Destroy all player frames when clearing list
 		Spy:DestroyAllPlayerFrames()
 		Spy.NearbyList = {}
 		Spy.ActiveList = {}
 		Spy.InactiveList = {}
 		Spy.PlayerCommList = {}
 		Spy.ListAmountDisplayed = 0
-		-- Map note cleanup loop removed - MapNoteList no longer exists
 		Spy:SetCurrentList(1)
 		if IsControlKeyDown() then
 			Spy:EnableSpy(not Spy.db.profile.Enabled, false)
