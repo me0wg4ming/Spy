@@ -932,10 +932,8 @@ Spy.options = {
 				},
 				RemoveUndetected = {
 					name = function()
-						local val = Spy.db.profile.RemoveUndetectedTime or 0
-						if val == 0 then
-							return L["RemoveUndetected"] .. ": |cff00ff00" .. L["Never"] .. "|r"
-						elseif val >= 121 then
+						local val = Spy.db.profile.RemoveUndetectedTime or 1
+						if val >= 121 then
 							return L["RemoveUndetected"] .. ": |cffff0000" .. L["Always"] .. "|r"
 						else
 							return L["RemoveUndetected"] .. ": |cffffff00" .. val .. " " .. L["Minutes"] .. "|r"
@@ -945,11 +943,11 @@ Spy.options = {
 					type = "range",
 					order = 2,
 					width = "full",
-					min = 0,
+					min = 1,
 					max = 121,
 					step = 1,
 					get = function(info)
-						return Spy.db.profile.RemoveUndetectedTime or 0
+						return Spy.db.profile.RemoveUndetectedTime or 1
 					end,
 					set = function(info, value)
 						Spy.db.profile.RemoveUndetectedTime = value
@@ -1368,7 +1366,7 @@ local Default_Profile = {
 		EnableSound = true,
 		OnlySoundKoS = false,
 		StopAlertsOnTaxi = true,
-		RemoveUndetectedTime = 121, -- 0=Never, 1-120=Minutes, 121=Always
+		RemoveUndetectedTime = 121, -- 1-120=Minutes, 121=Always
 		ShowNearbyList = true,
 		PrioritiseKoS = true,
 		PurgeData = "NinetyDays",
@@ -1759,7 +1757,7 @@ function Spy:UpdateTimeoutSettings()
 	if type(Spy.db.profile.RemoveUndetected) == "string" then
 		local oldValue = Spy.db.profile.RemoveUndetected
 		if oldValue == "Never" then
-			Spy.db.profile.RemoveUndetectedTime = 0
+			Spy.db.profile.RemoveUndetectedTime = 1  -- Never no longer supported, use 1 minute
 		elseif oldValue == "Always" then
 			Spy.db.profile.RemoveUndetectedTime = 121
 		elseif oldValue == "OneMinute" then
@@ -1778,13 +1776,10 @@ function Spy:UpdateTimeoutSettings()
 		Spy.db.profile.RemoveUndetected = nil -- Clear old value
 	end
 	
-	local timeout = Spy.db.profile.RemoveUndetectedTime or 5
+	local timeout = Spy.db.profile.RemoveUndetectedTime or 1
 	Spy.ActiveTimeout = 1
 	
-	if timeout == 0 then
-		-- Never remove
-		Spy.InactiveTimeout = -1
-	elseif timeout >= 121 then
+	if timeout >= 121 then
 		-- Always remove immediately
 		Spy.InactiveTimeout = 0.1
 	else

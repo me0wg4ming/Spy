@@ -695,16 +695,14 @@ function Spy:ManageNearbyListExpirations()
 			expired = true
 		end
 	end
-	if Spy.db.profile.RemoveUndetected ~= "Never" then
-		for player in pairs(Spy.InactiveList) do
-			if (currentTime - Spy.InactiveList[player]) > Spy.InactiveTimeout then
-				-- Map note cleanup removed - MapNoteList no longer exists
-				Spy.InactiveList[player] = nil
-				Spy.NearbyList[player] = nil
-				-- ✅ FIX: Destroy player frame when removed from Nearby
-				Spy:DestroyPlayerFrame(player)
-				expired = true
-			end
+	for player in pairs(Spy.InactiveList) do
+		if (currentTime - Spy.InactiveList[player]) > Spy.InactiveTimeout then
+			-- Map note cleanup removed - MapNoteList no longer exists
+			Spy.InactiveList[player] = nil
+			Spy.NearbyList[player] = nil
+			-- Destroy player frame when removed from Nearby
+			Spy:DestroyPlayerFrame(player)
+			expired = true
 		end
 	end
 	if expired then
