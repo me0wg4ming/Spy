@@ -36,13 +36,6 @@ function Spy:RefreshCurrentList(player, source)
 		end
 	end
 
-	-- ✅ Also hide old row-based frames if any exist
-	if Spy.MainWindow.Rows then
-		for i, row in pairs(Spy.MainWindow.Rows) do
-			row:Hide()
-		end
-	end
-
 	-- Now iterate through CurrentList and show frames
 	local yOffset = 34
 	local displayCount = 0

@@ -15,24 +15,6 @@ end
 
 -- CreateMapNote function removed - map display feature removed
 
-function Spy:CreateRow(num)
-	local rowmin = 1
-	if num < rowmin or Spy.MainWindow.Rows[num] then
-		return
-	end
-
-	local row = CreateFrame("Button", "Spy_MainWindow_Bar" .. num, Spy.MainWindow, "SpySecureActionButtonTemplate")
-	row:SetPoint("TOPLEFT", Spy.MainWindow, "TOPLEFT", 2,
-		-34 - (Spy.db.profile.MainWindow.RowHeight + Spy.db.profile.MainWindow.RowSpacing) * (num - 1))
-	row:SetHeight(Spy.db.profile.MainWindow.RowHeight)
-	row:SetWidth(Spy.MainWindow:GetWidth() - 4)
-
-	Spy:SetupBar(row)
-	Spy.MainWindow.Rows[num] = row
-	Spy.MainWindow.Rows[num]:Hide()
-	row.id = num
-end
-
 function Spy:SetupBar(row)
 	row.StatusBar = CreateFrame("StatusBar", nil, row)
 	row.StatusBar:SetAllPoints(row)
@@ -273,12 +255,7 @@ end
 
 function Spy:UpdateBarTextures(event, media, key)
 	if media == SM.MediaType.STATUSBAR or not media then
-		-- Update alte Rows
-		for _, v in pairs(Spy.MainWindow.Rows) do
-			v.StatusBar:SetStatusBarTexture(SM:Fetch(SM.MediaType.STATUSBAR, key))
-		end
-		
-		-- NEU: Update PlayerFrames
+		-- Update PlayerFrames
 		if Spy.MainWindow.PlayerFrames then
 			for _, frame in pairs(Spy.MainWindow.PlayerFrames) do
 				if frame.StatusBar then
@@ -297,12 +274,7 @@ function Spy:SetBarTextures(handle)
 	local Texture = SM:Fetch(SM.MediaType.STATUSBAR, handle)
 	Spy.db.profile.BarTexture = handle
 	
-	-- Update alte Rows
-	for _, v in pairs(Spy.MainWindow.Rows) do
-		v.StatusBar:SetStatusBarTexture(Texture)
-	end
-	
-	-- NEU: Update PlayerFrames
+	-- Update PlayerFrames
 	if Spy.MainWindow.PlayerFrames then
 		for _, frame in pairs(Spy.MainWindow.PlayerFrames) do
 			if frame.StatusBar then
@@ -884,13 +856,8 @@ function Spy:CreateMainWindow()
 
 		theFrame.CloseButton:SetFrameLevel(theFrame.CountButton:GetFrameLevel() + 1)
 
-		Spy.MainWindow.Rows = {}
-		Spy.MainWindow.PlayerFrames = {}  -- NEU: Tabelle für permanente Player-Frames
+		Spy.MainWindow.PlayerFrames = {}  -- Tabelle für Player-Frames
 		Spy.MainWindow.CurRows = 0
-
-		for i = 1, Spy.db.profile.ResizeSpyLimit do
-			Spy:CreateRow(i)
-		end
 
 		Spy:RestoreMainWindowPosition(Spy.db.profile.MainWindow.Position.x, Spy.db.profile.MainWindow.Position.y,
 			Spy.db.profile.MainWindow.Position.w, 34)
@@ -960,29 +927,10 @@ function Spy:CreateMainWindow()
 	end
 end
 
-function Spy:UpdateRowWidths()
-	if not Spy.MainWindow or not Spy.MainWindow.Rows then return end
-	
-	for i, row in pairs(Spy.MainWindow.Rows) do
-		if row:IsShown() and row.RightText and row.LeftText then
-			local rightTextWidth = row.RightText:GetStringWidth()
-			local totalWidth = row:GetWidth()
-			local padding = 40  -- Dein Wert von oben
-			row.LeftText:SetWidth(totalWidth - rightTextWidth - padding)
-		end
-	end
-end
-
 function Spy:BarsChanged()
 	if not Spy.MainWindow then return end
-	for k, v in pairs(Spy.MainWindow.Rows) do
-		v:SetHeight(Spy.db.profile.MainWindow.RowHeight)
-		v:SetPoint("TOPLEFT", Spy.MainWindow, "TOPLEFT", 2, -34 - (Spy.db.profile.MainWindow.RowHeight + Spy.db.profile.MainWindow.RowSpacing) * (k - 1))			
-		Spy:SetFontSize(v.LeftText, math.max(Spy.db.profile.MainWindow.RowHeight * 0.85, Spy.db.profile.MainWindow.RowHeight - 1))
-		Spy:SetFontSize(v.RightText, math.max(Spy.db.profile.MainWindow.RowHeight * 0.75, Spy.db.profile.MainWindow.RowHeight - 8))
-	end
 	
-	-- NEU: Update PlayerFrames
+	-- Update PlayerFrames
 	if Spy.MainWindow.PlayerFrames then
 		local fontSize = math.max(Spy.db.profile.MainWindow.RowHeight * 0.85, Spy.db.profile.MainWindow.RowHeight - 1)
 		local fontName = "Fonts\\FRIZQT__.TTF"
@@ -1013,47 +961,6 @@ function Spy:BarsChanged()
 	Spy:RefreshCurrentList()
 end
 
-function Spy:SetBar(num, name, desc, value, colorgroup, colorclass, tooltipData, opacity)
-	local rowmin = 1
-
-	if num < rowmin or not Spy.MainWindow.Rows[num] then
-		return
-	end
-
-	local Row = Spy.MainWindow.Rows[num]
-	Row.StatusBar:SetValue(value)
-	Row.LeftText:SetText(name)
-	Row.RightText:SetText(desc)
-	Row.Name = name
-	Row.TooltipData = tooltipData
-	
-	-- ✅ FIX: Berechne Breite dynamisch mit mehr Puffer
-	local rowWidth = Row:GetWidth()
-	local rightWidth = Row.RightText:GetStringWidth()
-	local padding = 10  -- Mindestabstand
-	local availableWidth = rowWidth - rightWidth - padding
-	
-	-- ✅ Stelle sicher, dass Breite nicht negativ wird
-	if availableWidth < 10 then
-		availableWidth = 10
-	end
-	
-	Row.LeftText:SetWidth(availableWidth)
-	
-	Row:SetFrameLevel(Spy.MainWindow:GetFrameLevel() + num + 1)
-	Row.StatusBar:SetFrameLevel(Spy.MainWindow:GetFrameLevel() + num)
-
-	Row:SetScript("OnClick", function() Spy:ButtonClicked(); end)
-	if colorgroup and colorclass and type(colorclass) == "string" then
-		Spy.Colors:UnregisterItem(Row.StatusBar)
-		local Multi = { r = 1, b = 1, g = 1, a = opacity }
-		Spy.Colors:RegisterTexture(colorgroup, colorclass, Row.StatusBar, Multi)
-	end
-
-	Row.LeftText:SetTextColor(1, 1, 1, opacity)
-	Row.RightText:SetTextColor(1, 1, 1, opacity)
-end
-
 function Spy:AutomaticallyResize()
 	if not Spy.MainWindow then return end  -- Safety check: MainWindow might not be created yet
 	local detected = Spy.ListAmountDisplayed
@@ -1078,37 +985,18 @@ function Spy:ManageBarsDisplayed()
 		bars = Spy.db.profile.ResizeSpyLimit 
 	end
 	Spy.MainWindow.CurRows = bars
-
-	for i,row in pairs(Spy.MainWindow.Rows) do
-		if i <= Spy.MainWindow.CurRows then
-			row:Show()
-		else
-			row:Hide()
-		end
-	end
 end
 
 function Spy:ResizeMainWindow()
 	if not Spy.MainWindow then return end
-	if Spy.MainWindow.Rows[0] then 
-		Spy.MainWindow.Rows[0]:Hide() 
-	end
 
 	local CurWidth = Spy.MainWindow:GetWidth() - 4
 	Spy.MainWindow.Title:SetWidth(CurWidth - 75)
 	
-	-- Update alte Rows
-	for i,row in pairs(Spy.MainWindow.Rows) do
-		row:SetWidth(CurWidth)	
-	end
-	
-	-- NEU: Update PlayerFrames
+	-- Update PlayerFrames
 	for playerName, frame in pairs(Spy.MainWindow.PlayerFrames) do
 		frame:SetWidth(CurWidth)
 	end
-
-	-- ✅ NEU: Update text widths after resize
-	Spy:UpdateRowWidths()
 
 	Spy:ManageBarsDisplayed()
 end
@@ -1182,11 +1070,6 @@ function Spy:RestoreMainWindowPosition(x, y, width, height)
 		Spy.MainWindow:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", x, y)	
 	end
 	Spy.MainWindow:SetWidth(width)
-	if Spy.MainWindow.Rows then
-		for i,row in pairs(Spy.MainWindow.Rows) do
-			row:SetWidth(width - 4)
-		end
-	end
 	Spy.MainWindow:SetHeight(height)
 	--Spy:SaveMainWindowPosition()
 end
