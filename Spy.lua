@@ -2322,6 +2322,11 @@ end
 
 local playerName = UnitName("player")
 function Spy:DeathLogEvent()
+	-- Don't process events if Spy is disabled in this zone
+	if not Spy.EnabledInZone then
+		return
+	end
+	
 	-- Parse death messages from CHAT_MSG_COMBAT_*_DEATH events
 	local message = arg1
 	if not message then return end
@@ -2516,6 +2521,11 @@ end
 local playerName = UnitName("player")
 
 function Spy:RawCombatLogEvent()
+	-- Don't process events if Spy is disabled in this zone
+	if not Spy.EnabledInZone then
+		return
+	end
+	
 	local eventName = arg1
 	local eventText = arg2
 	
