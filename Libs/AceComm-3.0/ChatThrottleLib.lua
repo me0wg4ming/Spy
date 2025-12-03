@@ -31,13 +31,12 @@ local hooksecurefunc = AceCore.hooksecurefunc
 local wipe = AceCore.wipe
 
 if _G.ChatThrottleLib then
-	if _G.ChatThrottleLib.version >= CTL_VERSION then
-		-- There's already a newer (or same) version loaded. Buh-bye.
+	-- v14+ (like aux's Turtle WoW version) is perfectly fine, just use it
+	if _G.ChatThrottleLib.version >= 14 then
 		return
-	elseif not _G.ChatThrottleLib.securelyHooked then
-		print("ChatThrottleLib: Warning: There's an ANCIENT ChatThrottleLib.lua (pre-wow 2.0, <v16) in an addon somewhere. Get the addon updated or copy in a newer ChatThrottleLib.lua (>=v16) in it!")
-		-- ATTEMPT to unhook; this'll behave badly if someone else has hooked...
-		-- ... and if someone has securehooked, they can kiss that goodbye too... >.<
+	end
+	-- Only try to fix truly ancient versions (<14)
+	if not _G.ChatThrottleLib.securelyHooked and _G.ChatThrottleLib.ORIG_SendChatMessage then
 		_G.SendChatMessage = _G.ChatThrottleLib.ORIG_SendChatMessage
 		if _G.ChatThrottleLib.ORIG_SendAddonMessage then
 			_G.SendAddonMessage = _G.ChatThrottleLib.ORIG_SendAddonMessage
