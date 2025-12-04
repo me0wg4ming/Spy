@@ -1,6 +1,6 @@
 # Spy - SuperWoW Edition
 
-[![Version](https://img.shields.io/badge/version-4.0.0-blue.svg)](https://github.com/me0wg4ming/Spy)
+[![Version](https://img.shields.io/badge/version-4.0.7-blue.svg)](https://github.com/me0wg4ming/Spy)
 [![WoW](https://img.shields.io/badge/WoW-1.12.1%20Vanilla-orange.svg)](#)
 [![SuperWoW](https://img.shields.io/badge/SuperWoW-Required-red.svg)](https://github.com/balakethelock/SuperWoW)
 
@@ -17,6 +17,17 @@
 - [KoS System](#-kos-kill-on-sight-system)
 - [Troubleshooting](#️-troubleshooting)
 - [Support](#-support)
+
+---
+
+## 🚀 What's New in Version 4.0.7 (December 4, 2024)
+- ✅ **Major Performance Fix** - Fixed massive lag spikes when 80+ enemies are detected with "Sort by Range" enabled
+- ✅ **Distance Display Toggle** - Added on/off toggle in Data Management to completely disable distance tracking for maximum performance
+- ✅ **Configurable Update Rate** - Added slider (1-5 Hz) to control how often distance values update, allowing players to balance smoothness vs CPU usage
+- ✅ **Lazy Distance Caching** - Distance sorting now uses pre-calculated cache instead of calling expensive UnitXP() during sort operations
+- ✅ **Optimized Cache System** - Global distance cache updates in background for ALL detected players, eliminating sort-time calculations
+
+**Performance Impact:** With 80 detected enemies, sorting by range no longer causes lag spikes. Distance display can now be toggled off entirely for extreme cases.
 
 ---
 
