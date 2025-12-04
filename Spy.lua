@@ -954,6 +954,56 @@ Spy.options = {
 						Spy:UpdateTimeoutSettings()
 					end,
 				},
+				EnableDistanceDisplay = {
+					name = "Enable Distance Display",
+					desc = "Show/hide distance values in the nearby list. Disabling this will improve performance when many enemies are detected.",
+					type = "toggle",
+					order = 6.4,
+					width = "full",
+					get = function(info)
+						return Spy.db.profile.EnableDistanceDisplay
+					end,
+					set = function(info, value)
+						Spy.db.profile.EnableDistanceDisplay = value
+						-- Enable/disable distance updates
+						if Spy.Distance then
+							Spy.Distance.enabled = value
+							-- Force refresh of visible frames
+							if Spy.MainWindow and Spy.MainWindow.PlayerFrames then
+								for playerName, frame in pairs(Spy.MainWindow.PlayerFrames) do
+									if frame.RightText then
+										if not value then
+											frame.RightText:SetText("--")
+										end
+									end
+								end
+							end
+						end
+					end,
+				},
+				DistanceUpdateRate = {
+					name = "Distance Update Rate",
+					desc = "How often to update distance values (1-5 times per second). Lower values reduce CPU usage when many enemies are detected.",
+					type = "range",
+					order = 6.5,
+					width = "full",
+					min = 1,
+					max = 5,
+					step = 1,
+					disabled = function(info)
+						return not Spy.db.profile.EnableDistanceDisplay
+					end,
+					get = function(info)
+						return Spy.db.profile.DistanceUpdateRate or 5
+					end,
+					set = function(info, value)
+						Spy.db.profile.DistanceUpdateRate = value
+						-- Update the interval in SpyDistance
+						if Spy.Distance then
+							Spy.Distance.updateInterval = 1 / value
+						end
+					end,
+				},
 				PurgeData = {
 					name = L["PurgeData"],
 					type = "group",
@@ -1369,6 +1419,8 @@ local Default_Profile = {
 		RemoveUndetectedTime = 5,
 		ShowNearbyList = true,
 		PrioritiseKoS = true,
+		EnableDistanceDisplay = true,  -- Distance display on by default
+		DistanceUpdateRate = 5,  -- Hz: 1-5 (times per second)
 		PurgeData = "NinetyDays",
 		PurgeKoS = false,
 		PurgeWinLossData = false,

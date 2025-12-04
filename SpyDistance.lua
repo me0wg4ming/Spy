@@ -6,7 +6,8 @@ Distance display for PlayerFrames
 -- Distance tracking module
 Spy.Distance = {
     cache = {},
-    updateInterval = 0.1,  -- ✅ Zurück zu 0.1 wie im Original
+    globalDistanceCache = {},  -- ✅ NEW: Global cache for ALL players (used by sorting)
+    updateInterval = 0.2,  -- ✅ Changed from 0.1 to 0.2 (5 Hz instead of 10 Hz)
     lastUpdate = 0,
     debug = false,
     enabled = false,
@@ -155,6 +156,19 @@ function Spy.Distance:GetCachedDistance(playerName)
     return nil
 end
 
+-- ✅ NEW: Get distance from global cache for sorting (NEVER calls UnitXP)
+-- This is used by ManageNearbyList sorting to avoid expensive UnitXP calls
+function Spy.Distance:GetCachedDistanceForSort(playerName)
+    local cached = self.globalDistanceCache[playerName]
+    if cached then
+        -- Use cached value if less than 2 seconds old
+        if (GetTime() - cached.timestamp) < 2 then
+            return cached.distance
+        end
+    end
+    return nil
+end
+
 -- Format distance text (no colors - colors now set by Line of Sight in List.lua)
 function Spy.Distance:FormatDistance(distance)
     if not distance then
@@ -185,12 +199,23 @@ distanceUpdateFrame:SetScript("OnUpdate", function()
     
     distanceTimer = distanceTimer + elapsed
     
-    if distanceTimer < Spy.Distance.updateInterval then
+    -- ✅ Use dynamic updateInterval from config (default 0.2 = 5 Hz)
+    local interval = Spy.Distance.updateInterval
+    if Spy.db and Spy.db.profile.DistanceUpdateRate then
+        interval = 1 / Spy.db.profile.DistanceUpdateRate
+    end
+    
+    if distanceTimer < interval then
         return
     end
     distanceTimer = 0
     
     if not Spy.db or not Spy.db.profile.Enabled then
+        return
+    end
+    
+    -- ✅ Check if distance display is enabled
+    if not Spy.db.profile.EnableDistanceDisplay then
         return
     end
     
@@ -203,24 +228,48 @@ distanceUpdateFrame:SetScript("OnUpdate", function()
         maxButtons = Spy.db.profile.ResizeSpyLimit
     end
     
-    -- Only update distance TEXT, not layout
-    -- ✅ OPTIMIERT: Nur sichtbare PlayerFrames updaten (wie im Original nur 1-maxButtons)
+    -- ✅ PHASE 1: Update globalDistanceCache for ALL active/inactive players
+    -- This cache is used by ManageNearbyList sorting to avoid expensive UnitXP calls
+    local allPlayers = {}
+    
+    -- Collect all players from ActiveList
+    if Spy.ActiveList then
+        for playerName in pairs(Spy.ActiveList) do
+            allPlayers[playerName] = true
+        end
+    end
+    
+    -- Collect all players from InactiveList
+    if Spy.InactiveList then
+        for playerName in pairs(Spy.InactiveList) do
+            allPlayers[playerName] = true
+        end
+    end
+    
+    -- Update globalDistanceCache for all collected players
+    for playerName in pairs(allPlayers) do
+        local distance = Spy.Distance:GetDistance(playerName)
+        if distance then
+            Spy.Distance.globalDistanceCache[playerName] = {
+                distance = distance,
+                timestamp = GetTime(),
+            }
+        end
+    end
+    
+    -- ✅ PHASE 2: Update distance TEXT only for visible frames
     if not Spy.MainWindow.PlayerFrames then return end
     
     for playerName, frame in pairs(Spy.MainWindow.PlayerFrames) do
         if frame.visible and frame:IsVisible() and frame.PlayerName and frame.RightText then
             local distanceText = "--"
             
-            -- ✅ FIX: Nur Distanz aktualisieren, wenn Spieler NICHT in InactiveList ist
-            -- Inaktive Spieler (nicht mehr PVP flagged) sind für nearby list uninteressant
+            -- ✅ Only update distance for active players (not in InactiveList)
             if not Spy.InactiveList[frame.PlayerName] then
-                local distance = Spy.Distance:GetDistance(frame.PlayerName)
-                if not distance then
-                    distance = Spy.Distance:GetCachedDistance(frame.PlayerName)
-                end
-                
-                if distance then
-                    distanceText = Spy.Distance:FormatDistance(distance)
+                -- Use cached value from globalDistanceCache (already updated in Phase 1)
+                local cached = Spy.Distance.globalDistanceCache[frame.PlayerName]
+                if cached then
+                    distanceText = Spy.Distance:FormatDistance(cached.distance)
                 end
             end
             
@@ -228,9 +277,17 @@ distanceUpdateFrame:SetScript("OnUpdate", function()
         end
     end
     
-    -- Cleanup cache occasionally
+    -- Cleanup old cache entries occasionally
     if math.random(1, 10) == 1 then
         Spy.Distance:CleanCache()
+        
+        -- Also cleanup globalDistanceCache
+        local now = GetTime()
+        for name, data in pairs(Spy.Distance.globalDistanceCache) do
+            if (now - data.timestamp) > 5 then
+                Spy.Distance.globalDistanceCache[name] = nil
+            end
+        end
     end
 end)
 

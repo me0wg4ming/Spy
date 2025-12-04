@@ -455,35 +455,38 @@ function Spy:ManageNearbyList()
 	
 	if sortOrder == "range" then
 		-- Sort by distance (closest first) - requires SpyDistance
-		if Spy.Distance and Spy.Distance.enabled and Spy.Distance.GetDistance then
-			-- ✅ STABLE SORT: Use order as tiebreaker
+		-- ✅ PERFORMANCE FIX: Use cached distances to prevent lag with 80+ players
+		-- GetCachedDistanceForSort reads from globalDistanceCache (updated by OnUpdate loop)
+		-- and NEVER calls expensive UnitXP() during sorting
+		if Spy.Distance and Spy.Distance.enabled and Spy.Distance.GetCachedDistanceForSort then
+			-- ✅ STABLE SORT: Use order as tiebreaker for cached distances
 			tsort(activeKoS, function(a, b)
-				local distA = Spy.Distance:GetDistance(a.player) or 999999
-				local distB = Spy.Distance:GetDistance(b.player) or 999999
+				local distA = Spy.Distance:GetCachedDistanceForSort(a.player) or 999999
+				local distB = Spy.Distance:GetCachedDistanceForSort(b.player) or 999999
 				if distA == distB then
 					return a.order < b.order  -- Same distance â†’ use insertion order
 				end
 				return distA < distB
 			end)
 			tsort(inactiveKoS, function(a, b)
-				local distA = Spy.Distance:GetDistance(a.player) or 999999
-				local distB = Spy.Distance:GetDistance(b.player) or 999999
+				local distA = Spy.Distance:GetCachedDistanceForSort(a.player) or 999999
+				local distB = Spy.Distance:GetCachedDistanceForSort(b.player) or 999999
 				if distA == distB then
 					return a.order < b.order
 				end
 				return distA < distB
 			end)
 			tsort(active, function(a, b)
-				local distA = Spy.Distance:GetDistance(a.player) or 999999
-				local distB = Spy.Distance:GetDistance(b.player) or 999999
+				local distA = Spy.Distance:GetCachedDistanceForSort(a.player) or 999999
+				local distB = Spy.Distance:GetCachedDistanceForSort(b.player) or 999999
 				if distA == distB then
 					return a.order < b.order
 				end
 				return distA < distB
 			end)
 			tsort(inactive, function(a, b)
-				local distA = Spy.Distance:GetDistance(a.player) or 999999
-				local distB = Spy.Distance:GetDistance(b.player) or 999999
+				local distA = Spy.Distance:GetCachedDistanceForSort(a.player) or 999999
+				local distB = Spy.Distance:GetCachedDistanceForSort(b.player) or 999999
 				if distA == distB then
 					return a.order < b.order
 				end
