@@ -100,27 +100,11 @@ function Spy.Distance:GetDistance(playerName)
     
     -- Check if unit exists
     if not UnitExists(guid) then
-        -- ✅ FIX: GUID might be stale - try fallback search to find current GUID
-        if SpySW and SpySW.guids then
-            for cachedGuid, timestamp in pairs(SpySW.guids) do
-                if UnitExists(cachedGuid) then
-                    local name = UnitName(cachedGuid)
-                    if name == playerName then
-                        guid = cachedGuid
-                        -- Update nameToGuid map for future lookups
-                        if SpySW.nameToGuid then
-                            SpySW.nameToGuid[playerName] = guid
-                        end
-                        break
-                    end
-                end
-            end
-        end
-        
-        -- Final check after fallback attempt
-        if not UnitExists(guid) then
-            return nil
-        end
+        -- ✅ OPTIMIZATION: Skip expensive fallback iteration
+        -- If GUID doesn't exist, player is likely out of range
+        -- The fallback search is O(n²) and causes major lag with many players
+        -- Instead, return nil immediately and let cache handle stale data
+        return nil
     end
     
     -- Get distance using the stored working method
@@ -228,32 +212,20 @@ distanceUpdateFrame:SetScript("OnUpdate", function()
         maxButtons = Spy.db.profile.ResizeSpyLimit
     end
     
-    -- ✅ PHASE 1: Update globalDistanceCache for ALL active/inactive players
-    -- This cache is used by ManageNearbyList sorting to avoid expensive UnitXP calls
-    local allPlayers = {}
+    -- ✅ PHASE 1: Update globalDistanceCache for ACTIVE players only
+    -- InactiveList players (grayed out, not PVP flagged anymore) don't need distance updates
+    -- This reduces CPU usage significantly when many players timeout but stay in list
     
-    -- Collect all players from ActiveList
+    -- Update globalDistanceCache only for ActiveList
     if Spy.ActiveList then
         for playerName in pairs(Spy.ActiveList) do
-            allPlayers[playerName] = true
-        end
-    end
-    
-    -- Collect all players from InactiveList
-    if Spy.InactiveList then
-        for playerName in pairs(Spy.InactiveList) do
-            allPlayers[playerName] = true
-        end
-    end
-    
-    -- Update globalDistanceCache for all collected players
-    for playerName in pairs(allPlayers) do
-        local distance = Spy.Distance:GetDistance(playerName)
-        if distance then
-            Spy.Distance.globalDistanceCache[playerName] = {
-                distance = distance,
-                timestamp = GetTime(),
-            }
+            local distance = Spy.Distance:GetDistance(playerName)
+            if distance then
+                Spy.Distance.globalDistanceCache[playerName] = {
+                    distance = distance,
+                    timestamp = GetTime(),
+                }
+            end
         end
     end
     
