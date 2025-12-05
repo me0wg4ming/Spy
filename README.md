@@ -20,7 +20,7 @@
 
 ---
 
-## 🚀 What's New in Version 4.0.7 (December 4, 2025)
+## 🚀 What's New in Version 4.0.7 (December 4, 2024)
 - ✅ **Major Performance Fix** - Fixed massive lag spikes when 80+ enemies are detected with "Sort by Range" enabled
 - ✅ **Distance Display Toggle** - Added on/off toggle in Data Management to completely disable distance tracking for maximum performance
 - ✅ **Configurable Update Rate** - Added slider (1-5 Hz) to control how often distance values update, allowing players to balance smoothness vs CPU usage
