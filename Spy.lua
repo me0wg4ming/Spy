@@ -2312,8 +2312,10 @@ function Spy:ZoneChangedEvent()
 		local inInstance, instanceType = IsInInstance()
 		if inInstance then
 			Spy.InInstance = true
-			if instanceType == "party" or instanceType == "raid" or
-				(not Spy.db.profile.EnabledInBattlegrounds and instanceType == "pvp") then
+			-- Exception: Winter Veil Vale is marked as "party" instance but should allow Spy
+			local isWinterVeilVale = (zone == "Winter Veil Vale")
+			if not isWinterVeilVale and (instanceType == "party" or instanceType == "raid" or
+				(not Spy.db.profile.EnabledInBattlegrounds and instanceType == "pvp")) then
 				Spy.EnabledInZone = false
 			end
 
