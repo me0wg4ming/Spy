@@ -2072,6 +2072,7 @@ function Spy:OnDisable()
 		
 		Spy:UnregisterEvent("ZONE_CHANGED")
 		Spy:UnregisterEvent("ZONE_CHANGED_NEW_AREA")
+		Spy:UnregisterEvent("ZONE_CHANGED_INDOORS")
 		Spy:UnregisterEvent("PLAYER_ENTERING_WORLD")
 		Spy:UnregisterEvent("UNIT_FACTION")
 		Spy:UnregisterEvent("RAW_COMBATLOG")
