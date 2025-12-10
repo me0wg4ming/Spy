@@ -47,7 +47,7 @@ local cache = {
         loses = {data = {}},
 		time = {data = {}},
     },
-r}
+}
 
 -- cache pointers to units
 setmetatable(cache.players.time.data, {__mode = "v"})

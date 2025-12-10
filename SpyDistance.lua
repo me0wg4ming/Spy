@@ -297,7 +297,7 @@ SlashCmdList["SPYDIST"] = function(msg)
     
     if isDebugToggle then
         Spy.Distance.debug = not Spy.Distance.debug
-        local debugStatus = Spy.Distance.debug and "|cff00ff00AN|r" or "|cffff0000AUS|r"
+        local debugStatus = Spy.Distance.debug and "|cff00ff00ON|r" or "|cffff0000OFF|r"
         
         DEFAULT_CHAT_FRAME:AddMessage("=== Spy Distance Debugging Toggle ===")
         DEFAULT_CHAT_FRAME:AddMessage("Detailed logging is now " .. debugStatus)
@@ -334,7 +334,7 @@ SlashCmdList["SPYDIST"] = function(msg)
         
         DEFAULT_CHAT_FRAME:AddMessage(string.format("|cff00ff00%s|r: Distance=%s",
             name,
-            distance and Spy.Distance:FormatDistance(distance) or "|cff888888Wird aktualisiert...|r"
+            distance and Spy.Distance:FormatDistance(distance) or "|cff888888Updating...|r"
         ))
     end
     
