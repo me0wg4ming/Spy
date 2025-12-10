@@ -12,7 +12,7 @@ local strsplit, strtrim = AceCore.strsplit, AceCore.strtrim
 local format, strfind, strsub, find = string.format, string.find, string.sub, string.find
 
 Spy = LibStub("AceAddon-3.0"):NewAddon("Spy", "AceConsole-3.0", "AceEvent-3.0", "AceComm-3.0", "AceTimer-3.0")
-Spy.Version = "4.0.6"
+Spy.Version = "4.0.8"
 Spy.DatabaseVersion = "1.1"
 Spy.Signature = "[Spy]"
 Spy.MaximumPlayerLevel = 60
@@ -1971,6 +1971,11 @@ function Spy:OnEnable(first)
 	-- ✅ Update counter immediately after clearing to show grey 0
 	Spy:UpdateActiveCount()
 	
+	-- ✅ FIX: Cancel existing timer before creating new one to prevent timer leak
+	if Spy.timeid then
+		Spy:CancelTimer(Spy.timeid)
+		Spy.timeid = nil
+	end
 	Spy.timeid = Spy:ScheduleRepeatingTimer("ManageExpirations", 1, 1, true)
 	Spy:RegisterEvent("ZONE_CHANGED", "ZoneChangedEvent")
 	Spy:RegisterEvent("ZONE_CHANGED_NEW_AREA", "ZoneChangedEvent")

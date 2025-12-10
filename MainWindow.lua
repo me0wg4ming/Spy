@@ -873,7 +873,7 @@ function Spy:CreateMainWindow()
 			Spy.db.profile.MainWindow.Position.w, 34)
 		Spy:SetupMainWindowButtons()
 		Spy:ResizeMainWindow()
-		Spy:ScheduleRepeatingTimer("ManageExpirations", 10, 1, true)
+		-- Timer removed: ManageExpirations timer is created in Spy:OnEnable()
 		Spy:InitOrder()
 	end
 

@@ -1,6 +1,6 @@
 # Spy - SuperWoW Edition
 
-[![Version](https://img.shields.io/badge/version-4.0.7-blue.svg)](https://github.com/me0wg4ming/Spy)
+[![Version](https://img.shields.io/badge/version-4.0.8-blue.svg)](https://github.com/me0wg4ming/Spy)
 [![WoW](https://img.shields.io/badge/WoW-1.12.1%20Vanilla-orange.svg)](#)
 [![SuperWoW](https://img.shields.io/badge/SuperWoW-Required-red.svg)](https://github.com/balakethelock/SuperWoW)
 
@@ -17,6 +17,14 @@
 - [KoS System](#-kos-kill-on-sight-system)
 - [Troubleshooting](#️-troubleshooting)
 - [Support](#-support)
+
+---
+
+## 🚀 What's New in Version 4.0.8 (December 10, 2025)
+- ✅ **Timer Leak Fix** - Fixed AceTimer leak that caused "146 live timers" warning after multiple enable/disable cycles or zone changes
+- ✅ **Removed Duplicate Timer** - Removed redundant ManageExpirations timer in MainWindow.lua that was never cancelled
+
+**Technical Details:** Previously, each call to `OnEnable()` (via `/spy show`, options toggle, or `ResetMainWindow()`) created a new repeating timer without cancelling the old one. This caused timer accumulation over time, especially for players frequently entering/leaving battlegrounds.
 
 ---
 
