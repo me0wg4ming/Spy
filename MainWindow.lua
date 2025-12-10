@@ -80,8 +80,8 @@ function Spy:CreatePlayerFrame(playerName)
 	
 	-- Create frame (like ShaguScan)
 	local frame = CreateFrame("Button", nil, Spy.MainWindow)
-	frame:EnableMouse(true)  -- ✅ CRITICAL für Klicks
-	frame:RegisterForClicks("LeftButtonUp", "RightButtonUp")  -- ✅ CRITICAL für Klicks
+	frame:EnableMouse(true)  -- CRITICAL for clicks
+	frame:RegisterForClicks("LeftButtonUp", "RightButtonUp")  -- CRITICAL for clicks
 	frame.PlayerName = playerName
 	frame:SetHeight(Spy.db.profile.MainWindow.RowHeight)
 	frame:SetWidth(Spy.MainWindow:GetWidth() - 4)
@@ -867,7 +867,7 @@ function Spy:CreateMainWindow()
 
 		theFrame.CloseButton:SetFrameLevel(theFrame.CountButton:GetFrameLevel() + 1)
 
-		Spy.MainWindow.PlayerFrames = {}  -- Tabelle für Player-Frames
+		Spy.MainWindow.PlayerFrames = {}  -- Table for player frames
 
 		Spy:RestoreMainWindowPosition(Spy.db.profile.MainWindow.Position.x, Spy.db.profile.MainWindow.Position.y,
 			Spy.db.profile.MainWindow.Position.w, 34)
@@ -1390,7 +1390,7 @@ hpUpdateFrame:SetScript("OnUpdate", function()
 		if frame.visible and frame:IsVisible() then
 			local guid = frame.PlayerGUID
 			
-			-- ✅ GUID Nachladen wenn ungültig (aus altem SetupBar OnUpdate)
+			-- Reload GUID if invalid (from old SetupBar OnUpdate)
 			if not guid or not UnitExists(guid) then
 				local playerData = SpyPerCharDB.PlayerData[playerName]
 				if playerData and playerData.guid then
@@ -1421,7 +1421,7 @@ hpUpdateFrame:SetScript("OnUpdate", function()
 					if math.abs(currentValue - barValue) > 1 then
 						frame.StatusBar:SetValue(barValue)
 						
-						-- ✅ Klassenfarbe aktualisieren (aus altem SetupBar OnUpdate)
+						-- Update class color (from old SetupBar OnUpdate)
 						local class = frame.playerClass or "UNKNOWN"
 						local r, g, b = Spy:GetClassColor(class)
 						frame.StatusBar:SetStatusBarColor(r, g, b, 1)

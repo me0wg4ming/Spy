@@ -300,10 +300,10 @@ SlashCmdList["SPYDIST"] = function(msg)
         local debugStatus = Spy.Distance.debug and "|cff00ff00AN|r" or "|cffff0000AUS|r"
         
         DEFAULT_CHAT_FRAME:AddMessage("=== Spy Distance Debugging Toggle ===")
-        DEFAULT_CHAT_FRAME:AddMessage("Detailliertes Logging ist jetzt " .. debugStatus)
+        DEFAULT_CHAT_FRAME:AddMessage("Detailed logging is now " .. debugStatus)
         
         if Spy.Distance.debug then
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[Distance DEBUG]|r **LOGGING AKTIV! Erwarte detaillierte Meldungen bei Gegner-Updates.**")
+            DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[Distance DEBUG]|r **LOGGING ACTIVE! Expect detailed messages on enemy updates.**")
         end
         
         DEFAULT_CHAT_FRAME:AddMessage("==================================")
@@ -317,11 +317,11 @@ SlashCmdList["SPYDIST"] = function(msg)
     end
 
     -- Summary
-    DEFAULT_CHAT_FRAME:AddMessage("=== Spy Distance Zusammenfassung ===")
+    DEFAULT_CHAT_FRAME:AddMessage("=== Spy Distance Summary ===")
     DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00Status:|r ENABLED")
     
     if not SpySW then
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000FEHLER|r: SpySW (Guid-Modul) nicht gefunden! Distanzen funktionieren nicht.")
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000ERROR|r: SpySW (GUID module) not found! Distances will not work.")
         DEFAULT_CHAT_FRAME:AddMessage("==================================")
         return
     end
@@ -332,19 +332,19 @@ SlashCmdList["SPYDIST"] = function(msg)
         
         local distance = Spy.Distance:GetCachedDistance(name) or Spy.Distance:GetDistance(name)
         
-        DEFAULT_CHAT_FRAME:AddMessage(string.format("|cff00ff00%s|r: Distanz=%s",
+        DEFAULT_CHAT_FRAME:AddMessage(string.format("|cff00ff00%s|r: Distance=%s",
             name,
             distance and Spy.Distance:FormatDistance(distance) or "|cff888888Wird aktualisiert...|r"
         ))
     end
     
-    DEFAULT_CHAT_FRAME:AddMessage("Total aktive Feinde: " .. count)
+    DEFAULT_CHAT_FRAME:AddMessage("Total active enemies: " .. count)
     
     if Spy.Distance.debug then
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff(HINWEIS: Debug-Logging ist aktiv. Nutzen Sie '/spydist debug' zum Ausschalten)|r")
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff(NOTE: Debug logging is active. Use '/spydist debug' to disable)|r")
     end
     
     DEFAULT_CHAT_FRAME:AddMessage("==================================")
 end
 
-DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy]|r Distance Display loaded. |cff00ffff/spydist debug|r zum Togglen des detaillierten Loggings.")
+DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy]|r Distance Display loaded. |cff00ffff/spydist debug|r to toggle detailed logging.")

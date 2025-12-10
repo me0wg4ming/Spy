@@ -106,7 +106,7 @@ SpySW.STEALTH_SPELL_IDS = {
 }
 
 --[[===========================================================================
-	GUID-based Faction Check (für Duel-Detection)
+	GUID-based Faction Check (for Duel-Detection)
 =============================================================================]]
 
 -- Cache for player factions (GUID -> Faction)
