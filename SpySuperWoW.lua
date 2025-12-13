@@ -78,7 +78,7 @@ SpySW.guids = {}
 
 -- GUID storage
 SpySW.enemyGuids = {}
-SpySW.friendlyGuids = {}
+-- ✅ PERFORMANCE: friendlyGuids removed - friendlies are skipped entirely
 
 -- ✅ NEW: Name-to-GUID mapping (persistent, doesn't rely on UnitExists)
 SpySW.nameToGuid = {}
@@ -543,21 +543,14 @@ function SpySW:CleanupOldGUIDs(currentTime)
 			local name = UnitName(guid)
 			
 			if name then
-				-- ✅ Check faction to determine cleanup strategy
+				-- ✅ PERFORMANCE: Only enemies are tracked now, no need to check friendly
 				local wasEnemy = self.enemyGuids[guid] ~= nil
-				local wasFriendly = self.friendlyGuids[guid] ~= nil
 				local timeout = Spy.InactiveTimeout or 60
 				
 				local shouldRemove = false
 				
-				if wasFriendly then
-					-- ✅ FRIENDLY: Remove immediately (timeout = 0)
-					shouldRemove = true
-					if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-						DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW Cleanup]|r Removed friendly " .. name .. " (no timeout, gone for " .. math.floor(timeSinceLastSeen) .. "s)")
-					end
-				elseif wasEnemy then
-					-- ✅ ENEMY: Only remove after timeout
+				-- ✅ ENEMY: Only remove after timeout
+				if wasEnemy then
 					if timeout > 0 and timeSinceLastSeen > timeout then
 						shouldRemove = true
 						if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
@@ -1188,11 +1181,8 @@ function SpySW:PrintStatus()
 	for _ in pairs(self.enemyGuids) do
 		enemyCount = enemyCount + 1
 	end
-	local friendlyCount = 0
-	for _ in pairs(self.friendlyGuids) do
-		friendlyCount = friendlyCount + 1
-	end
-	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00  Enemies:|r " .. enemyCount .. " |cff00ff00Friendlies:|r " .. friendlyCount)
+	-- ✅ PERFORMANCE: Friendlies are no longer tracked
+	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00  Enemies:|r " .. enemyCount)
 	
 	-- Statistics
 	DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00Statistics:|r")
