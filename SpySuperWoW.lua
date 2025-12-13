@@ -84,7 +84,7 @@ SpySW.friendlyGuids = {}
 SpySW.nameToGuid = {}
 
 -- Scan interval in seconds
-SpySW.SCAN_INTERVAL = 0.5
+SpySW.SCAN_INTERVAL = 1.0  -- ✅ PERFORMANCE: Reduced from 0.5s for better performance in large battles
 
 -- GUID cleanup interval (check if units still exist)
 SpySW.CLEANUP_INTERVAL = 5  -- Check every 10 seconds if GUIDs still exist
@@ -283,15 +283,16 @@ function SpySW:AddUnit(unit)
 				-- Enemy - in enemy cache
 				self.enemyGuids[guid] = GetTime()
 			else
-				-- Friendly - in friendly cache
-				self.friendlyGuids[guid] = GetTime()
+				-- ✅ PERFORMANCE: Skip friendlies completely - we don't need them
+				return
 			end
 		else
 			-- Faction unknown, fallback to old method
 			if UnitIsEnemy("player", guid) then
 				self.enemyGuids[guid] = GetTime()
 			else
-				self.friendlyGuids[guid] = GetTime()
+				-- ✅ PERFORMANCE: Skip friendlies completely
+				return
 			end
 		end
 		
@@ -416,25 +417,31 @@ local function GetPlayerData(guid)
 	data.isStealthed = false
 	data.stealthType = nil
 	
-	-- Scan buffs with Tooltip Scanner using GUID directly
-	for i = 1, 32 do
-		local buffName = ScanBuffName(guid, i)
-		if buffName then
-			local nameLower = strlower(tostring(buffName))
-			
-			-- Check for stealth buffs (multi-language)
-			if strfind(nameLower, "prowl") or strfind(nameLower, "anschleichen") then
-				data.isStealthed = true
-				data.stealthType = "Prowl"
-				break
-			elseif strfind(nameLower, "stealth") or strfind(nameLower, "schleichen") then
-				data.isStealthed = true
-				data.stealthType = "Stealth"
-				break
-			elseif strfind(nameLower, "shadowmeld") or strfind(nameLower, "schattenhaftigkeit") then
-				data.isStealthed = true
-				data.stealthType = "Shadowmeld"
-				break
+	-- ✅ PERFORMANCE: Only scan buffs for stealth-capable classes
+	-- Rogue, Druid, and Night Elf races can stealth
+	local canStealth = (classToken == "ROGUE" or classToken == "DRUID" or raceToken == "NightElf")
+	
+	if canStealth then
+		-- Scan buffs with Tooltip Scanner using GUID directly
+		for i = 1, 32 do
+			local buffName = ScanBuffName(guid, i)
+			if buffName then
+				local nameLower = strlower(tostring(buffName))
+				
+				-- Check for stealth buffs (multi-language)
+				if strfind(nameLower, "prowl") or strfind(nameLower, "anschleichen") then
+					data.isStealthed = true
+					data.stealthType = "Prowl"
+					break
+				elseif strfind(nameLower, "stealth") or strfind(nameLower, "schleichen") then
+					data.isStealthed = true
+					data.stealthType = "Stealth"
+					break
+				elseif strfind(nameLower, "shadowmeld") or strfind(nameLower, "schattenhaftigkeit") then
+					data.isStealthed = true
+					data.stealthType = "Shadowmeld"
+					break
+				end
 			end
 		end
 	end
@@ -620,12 +627,7 @@ function SpySW:CleanupOldGUIDs(currentTime)
 		end
 	end
 	
-	-- ✅ Cleanup friendly cache (immediate removal)
-	for guid, lastSeen in pairs(self.friendlyGuids) do
-		if not UnitExists(guid) then
-			self.friendlyGuids[guid] = nil
-		end
-	end
+	-- ✅ PERFORMANCE: Removed friendly cleanup - friendlies are now skipped entirely
 	
 	if removed > 0 and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 		DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW Cleanup]|r Cleaned up " .. removed .. " GUIDs")

@@ -12,10 +12,14 @@ local strsplit, strtrim = AceCore.strsplit, AceCore.strtrim
 local format, strfind, strsub, find = string.format, string.find, string.sub, string.find
 
 Spy = LibStub("AceAddon-3.0"):NewAddon("Spy", "AceConsole-3.0", "AceEvent-3.0", "AceComm-3.0", "AceTimer-3.0")
-Spy.Version = "4.0.8"
+Spy.Version = "4.1.0"
 Spy.DatabaseVersion = "1.1"
 Spy.Signature = "[Spy]"
 Spy.MaximumPlayerLevel = 60
+
+-- ✅ PERFORMANCE: Cache debug mode to avoid repeated table lookups
+Spy.DebugEnabled = false
+
 -- Map note variables removed - map display feature removed
 Spy.ZoneID = {}
 Spy.KOSGuild = {}
@@ -1857,13 +1861,18 @@ function Spy:ShowConfig()
 end
 
 function Spy:OnEnable(first)
-	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+	-- ✅ PERFORMANCE: Update debug cache
+	if Spy.db and Spy.db.profile then
+		Spy.DebugEnabled = Spy.db.profile.DebugMode or false
+	end
+	
+	if Spy.DebugEnabled then
 		DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy DEBUG]|r ========== OnEnable START ==========")
 	end
 	
 	-- Safety check: ensure db is initialized before proceeding
 	if not Spy.db or not Spy.db.profile then
-		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+		if Spy.DebugEnabled then
 			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy DEBUG]|r DB not ready, scheduling retry")
 		end
 		-- Schedule retry after a short delay to allow initialization to complete
@@ -1871,44 +1880,44 @@ function Spy:OnEnable(first)
 		return
 	end
 	
-	if Spy.db.profile.DebugMode then
+	if Spy.DebugEnabled then
 		DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy DEBUG]|r DB ready, Enabled=" .. tostring(Spy.db.profile.Enabled))
 	end
 	
 	-- ✅ CRITICAL FIX: Wait for SpySuperWoW.lua to load
 	-- SpySuperWoW.lua is loaded AFTER Spy.lua, but OnEnable can be called before all files are loaded
 	if not SpyModules or not SpyModules.SuperWoW then
-		if Spy.db.profile.DebugMode then
+		if Spy.DebugEnabled then
 			DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy DEBUG]|r SpyModules.SuperWoW not loaded yet, scheduling retry...")
 		end
 		Spy:ScheduleTimer("OnEnable", 0.1)
 		return
 	end
 	
-	if Spy.db.profile.DebugMode then
+	if Spy.DebugEnabled then
 		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy DEBUG]|r SpyModules.SuperWoW is loaded")
 	end
 	
 	-- Initialize SuperWoW module if available (loaded from SpySuperWoW.lua)
 	if not Spy.HasSuperWoW and SpyModules and SpyModules.SuperWoW then
-		if Spy.db.profile.DebugMode then
+		if Spy.DebugEnabled then
 			DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy DEBUG]|r Initializing SuperWoW...")
 		end
 		-- Try to initialize SuperWoW (only once)
 		if SpyModules.SuperWoW:Initialize() then
 			Spy.HasSuperWoW = true
 			Spy.SuperWoW = SpyModules.SuperWoW
-			if Spy.db.profile.DebugMode then
+			if Spy.DebugEnabled then
 				DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy DEBUG]|r SuperWoW initialized OK")
 			end
 		else
 			Spy.HasSuperWoW = false
-			if Spy.db.profile.DebugMode then
+			if Spy.DebugEnabled then
 				DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy DEBUG]|r SuperWoW init FAILED")
 			end
 		end
 	else
-		if Spy.db.profile.DebugMode then
+		if Spy.DebugEnabled then
 			DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy DEBUG]|r SuperWoW already initialized: " .. tostring(Spy.HasSuperWoW))
 		end
 	end
@@ -2580,24 +2589,38 @@ end
 -- Parses raw combat log text to track last attacker
 local playerName = UnitName("player")
 
+-- ✅ PERFORMANCE: Event throttling for large battles
+local lastCombatLogProcess = 0
+local COMBATLOG_THROTTLE = 0.05  -- Process max every 50ms (20 events/sec)
+
+-- ✅ PERFORMANCE: Pre-compile common patterns
+local GUID_PATTERN = "(0x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x)"
+
 function Spy:RawCombatLogEvent()
 	-- Don't process events if Spy is disabled in this zone
 	if not Spy.EnabledInZone then
 		return
 	end
 	
+	-- ✅ PERFORMANCE: Throttle event processing in large battles
+	local now = GetTime()
+	if now - lastCombatLogProcess < COMBATLOG_THROTTLE then
+		return  -- Skip this event to reduce lag
+	end
+	lastCombatLogProcess = now
+	
 	local eventName = arg1
 	local eventText = arg2
 	
-	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+	if Spy.DebugEnabled then
 		DEFAULT_CHAT_FRAME:AddMessage("|cffaaff00[Spy Debug]|r RAW_COMBATLOG: " .. tostring(eventName))
 		DEFAULT_CHAT_FRAME:AddMessage("|cffaaff00[Spy Debug]|r   text=" .. tostring(eventText))
 	end
 	
-	-- ✅ GUID Extractor for SuperWoW
-	if SpySW and eventText then
-		-- Look for GUID pattern: 0x followed by 16 hex digits
-		local _, _, guid = strfind(eventText, "(0x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x)")
+	-- ✅ GUID Extractor for SuperWoW (OPTIMIZED)
+	if SpySW and eventText and strfind(eventText, "0x") then
+		-- Use pre-compiled pattern
+		local _, _, guid = strfind(eventText, GUID_PATTERN)
 		
 		if guid and UnitExists(guid) and UnitIsPlayer(guid) then
 			-- Add GUID to tracking
@@ -2615,12 +2638,11 @@ function Spy:RawCombatLogEvent()
 	-- ✅ IMPROVED: Track LastAttack from damage messages with comprehensive patterns
 	local playerName = UnitName("player")
 	
-	-- Skip self-damage (Hellfire, Life Tap, etc)
-	if eventText and (strfind(eventText, "your own") or strfind(eventText, "You lose")) then
+	-- ✅ PERFORMANCE: Early return for self-damage (skip all pattern matching)
+	if not eventText then return end
+	if strfind(eventText, "your own") or strfind(eventText, "You lose") then
 		return
 	end
-	
-	if not eventText then return end
 	
 	-- ✅ DEBUG: Show all hits/crits to check for pet names
 	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
