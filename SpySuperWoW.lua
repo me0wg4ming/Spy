@@ -269,6 +269,28 @@ function SpySW:AddUnit(unit)
 			return
 		end
 		
+		-- ✅ Separate by faction FIRST (before adding to cache)
+		local playerFaction = UnitFactionGroup("player")
+		local targetFaction = UnitFactionGroup(guid)
+		
+		if playerFaction and targetFaction then
+			if playerFaction ~= targetFaction then
+				-- Enemy - continue processing
+			else
+				-- ✅ PERFORMANCE: Skip friendlies completely - we don't need them
+				return
+			end
+		else
+			-- Faction unknown, fallback to old method
+			if UnitIsEnemy("player", guid) then
+				-- Enemy - continue processing
+			else
+				-- ✅ PERFORMANCE: Skip friendlies completely
+				return
+			end
+		end
+		
+		-- ✅ Only add to cache AFTER confirming it's an enemy
 		local isNew = self.guids[guid] == nil
 		self.guids[guid] = GetTime()
 		
@@ -278,27 +300,8 @@ function SpySW:AddUnit(unit)
 			self.nameToGuid[playerName] = guid
 		end
 		
-		-- ✅ Separate by faction
-		local playerFaction = UnitFactionGroup("player")
-		local targetFaction = UnitFactionGroup(guid)
-		
-		if playerFaction and targetFaction then
-			if playerFaction ~= targetFaction then
-				-- Enemy - in enemy cache
-				self.enemyGuids[guid] = GetTime()
-			else
-				-- ✅ PERFORMANCE: Skip friendlies completely - we don't need them
-				return
-			end
-		else
-			-- Faction unknown, fallback to old method
-			if UnitIsEnemy("player", guid) then
-				self.enemyGuids[guid] = GetTime()
-			else
-				-- ✅ PERFORMANCE: Skip friendlies completely
-				return
-			end
-		end
+		-- Add to enemy cache
+		self.enemyGuids[guid] = GetTime()
 		
 		if isNew then
 			self.Stats.guidsCollected = self.Stats.guidsCollected + 1
