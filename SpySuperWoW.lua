@@ -70,6 +70,10 @@ SpySW.detectedPlayers = {}
 -- Track stealth state per player (to only alert on state change)
 SpySW.lastStealthState = {}
 
+-- ✅ PERFORMANCE: Track which GUIDs have already been buff-scanned
+-- Only scan buffs on FIRST detection, not every scan cycle
+SpySW.buffScannedGuids = {}
+
 -- ✅ Track which GUIDs were present in last scan (to reduce debug spam)
 SpySW.lastScanPresent = {}
 
@@ -421,7 +425,13 @@ local function GetPlayerData(guid)
 	-- Rogue, Druid, and Night Elf races can stealth
 	local canStealth = (classToken == "ROGUE" or classToken == "DRUID" or raceToken == "NightElf")
 	
-	if canStealth then
+	-- ✅ PERFORMANCE OPTIMIZATION: Only scan buffs if:
+	-- 1. Player can stealth (class/race check)
+	-- 2. We haven't already scanned this GUID's buffs
+	-- This prevents repeated tooltip scanning for already-detected players
+	local shouldScanBuffs = canStealth and not SpySW.buffScannedGuids[guid]
+	
+	if shouldScanBuffs then
 		-- Scan buffs with Tooltip Scanner using GUID directly
 		for i = 1, 32 do
 			local buffName = ScanBuffName(guid, i)
@@ -444,6 +454,9 @@ local function GetPlayerData(guid)
 				end
 			end
 		end
+		
+		-- Mark this GUID as buff-scanned (won't scan again)
+		SpySW.buffScannedGuids[guid] = true
 	end
 	
 	-- ✅ CRITICAL: Only return data if we have class (level can be 0 for skull/skull)
@@ -512,13 +525,20 @@ function SpySW:ScanNearbyPlayers(currentTime)
 		end
 	end
 	
-	-- ✅ DEBUG: Log players who LEFT range (were present last scan, not present now)
-	if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-		for guid, _ in pairs(previousScanPresent) do
-			if not self.lastScanPresent[guid] then
+	-- ✅ Clear buff scan cache for players who LEFT range
+	-- This ensures re-scanning when they return (important for stealth re-detection!)
+	for guid, _ in pairs(previousScanPresent) do
+		if not self.lastScanPresent[guid] then
+			-- Player left range - clear buff scan cache so they get re-scanned on return
+			if self.buffScannedGuids[guid] then
+				self.buffScannedGuids[guid] = nil
+			end
+			
+			-- Debug logging
+			if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 				local name = UnitName(guid)
 				if name then
-					DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW SCAN]|r ✗ " .. name .. " left range (timer running)")
+					DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW SCAN]|r ✗ " .. name .. " left range (timer running, buff scan reset)")
 				end
 			end
 		end
@@ -581,6 +601,11 @@ function SpySW:CleanupOldGUIDs(currentTime)
 						self.lastScanPresent[guid] = nil
 					end
 					
+					-- ✅ PERFORMANCE: Clean up buff scan tracking
+					if self.buffScannedGuids[guid] then
+						self.buffScannedGuids[guid] = nil
+					end
+					
 					-- ✅ Clean up nameToGuid mapping
 					if self.nameToGuid[name] == guid then
 						self.nameToGuid[name] = nil
@@ -594,6 +619,7 @@ function SpySW:CleanupOldGUIDs(currentTime)
 				-- ✅ No name = invalid GUID, remove immediately
 				self.guids[guid] = nil
 				self.lastScanPresent[guid] = nil  -- Clean up tracking
+				self.buffScannedGuids[guid] = nil  -- Clean up buff scan tracking
 				removed = removed + 1
 			end
 		end
