@@ -12,7 +12,7 @@ local strsplit, strtrim = AceCore.strsplit, AceCore.strtrim
 local format, strfind, strsub, find = string.format, string.find, string.sub, string.find
 
 Spy = LibStub("AceAddon-3.0"):NewAddon("Spy", "AceConsole-3.0", "AceEvent-3.0", "AceComm-3.0", "AceTimer-3.0")
-Spy.Version = "4.1.0"
+Spy.Version = "4.1.1"
 Spy.DatabaseVersion = "1.1"
 Spy.Signature = "[Spy]"
 Spy.MaximumPlayerLevel = 60
@@ -2612,26 +2612,26 @@ function Spy:RawCombatLogEvent()
 	local eventName = arg1
 	local eventText = arg2
 	
-	if Spy.DebugEnabled then
+	-- ✅ PERFORMANCE: Skip friendly/tradeskill events early (no need to process)
+	if eventName and (strfind(eventName, "FRIENDLY") or strfind(eventName, "TRADESKILLS") or strfind(eventName, "SELF")) then
+		return
+	end
+	
+	-- ✅ DEBUG: Only log hostile combat events (not the spammy friendly stuff)
+	if Spy.DebugEnabled and eventName and strfind(eventName, "HOSTILE") then
 		DEFAULT_CHAT_FRAME:AddMessage("|cffaaff00[Spy Debug]|r RAW_COMBATLOG: " .. tostring(eventName))
 		DEFAULT_CHAT_FRAME:AddMessage("|cffaaff00[Spy Debug]|r   text=" .. tostring(eventText))
 	end
 	
 	-- ✅ GUID Extractor for SuperWoW (OPTIMIZED)
+	-- Debug logging moved to SpySW:AddUnit() - only logs after faction check (enemies only)
 	if SpySW and eventText and strfind(eventText, "0x") then
 		-- Use pre-compiled pattern
 		local _, _, guid = strfind(eventText, GUID_PATTERN)
 		
 		if guid and UnitExists(guid) and UnitIsPlayer(guid) then
-			-- Add GUID to tracking
+			-- Add GUID to tracking (AddUnit handles faction check + debug logging)
 			SpySW:AddUnit(guid)
-			
-			if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-				local name = UnitName(guid)
-				if name then
-					DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[SpySW COMBATLOG]|r GUID extracted: " .. name .. " (" .. guid .. ")")
-				end
-			end
 		end
 	end
 	
@@ -2781,13 +2781,31 @@ function Spy:RawCombatLogEvent()
 			
 			-- Only set if it's not yourself
 			if attacker ~= playerName then
-				-- Store both name and GUID if available
-				Spy.LastAttack = attacker
-				Spy.LastAttackGuid = attackerGuid
+				-- ✅ FACTION CHECK: Only set LastAttack for actual enemies
+				local isEnemy = false
+				if attackerGuid and UnitExists(attackerGuid) then
+					-- GUID available - use faction check
+					local playerFaction = UnitFactionGroup("player")
+					local attackerFaction = UnitFactionGroup(attackerGuid)
+					if playerFaction and attackerFaction and playerFaction ~= attackerFaction then
+						isEnemy = true
+					elseif UnitIsEnemy("player", attackerGuid) then
+						isEnemy = true
+					end
+				else
+					-- No GUID - assume enemy if in our database
+					isEnemy = SpyPerCharDB and SpyPerCharDB.PlayerData and SpyPerCharDB.PlayerData[attacker]
+				end
 				
-				if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-					local guidInfo = attackerGuid and (" [GUID: " .. attackerGuid .. "]") or ""
-					DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy LastAttack]|r Set to: " .. tostring(attacker) .. guidInfo)
+				if isEnemy then
+					-- Store both name and GUID if available
+					Spy.LastAttack = attacker
+					Spy.LastAttackGuid = attackerGuid
+					
+					if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+						local guidInfo = attackerGuid and (" [GUID: " .. attackerGuid .. "]") or ""
+						DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy LastAttack]|r Set to: " .. tostring(attacker) .. guidInfo)
+					end
 				end
 			end
 		end

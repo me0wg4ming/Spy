@@ -107,6 +107,24 @@ function Spy.Distance:GetDistance(playerName)
         return nil
     end
     
+    -- ✅ FIX: Don't show distance for dead players or ghosts
+    -- This prevents the "flash" when a player releases their corpse
+    -- Check multiple conditions because WoW API is inconsistent:
+    -- - Dead player: UnitIsDead=1, CanAttack=1 (!)
+    -- - Ghost: UnitIsDead=nil, CanAttack=nil, UnitIsGhost=1
+    -- - Also check HP=0 as fallback
+    if UnitIsDead(guid) then
+        return nil
+    end
+    if UnitIsGhost and UnitIsGhost(guid) then
+        return nil
+    end
+    local health = UnitHealth(guid) or 0
+    local maxHealth = UnitHealthMax(guid) or 1
+    if health == 0 or maxHealth == 0 then
+        return nil
+    end
+    
     -- Get distance using the stored working method
     local success, distance = pcall(function()
         return UnitXP_GetDistance("player", guid)
@@ -225,6 +243,10 @@ distanceUpdateFrame:SetScript("OnUpdate", function()
                     distance = distance,
                     timestamp = GetTime(),
                 }
+            else
+                -- ✅ FIX: Clear cache if GetDistance returns nil (dead/ghost/out of range)
+                -- This prevents showing stale cached distance for dead players
+                Spy.Distance.globalDistanceCache[playerName] = nil
             end
         end
     end
@@ -348,3 +370,58 @@ SlashCmdList["SPYDIST"] = function(msg)
 end
 
 DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy]|r Distance Display loaded. |cff00ffff/spydist debug|r to toggle detailed logging.")
+
+--[[===========================================================================
+    Dead/Ghost Debug System
+=============================================================================]]
+
+local deadDebugEnabled = false
+local deadDebugFrame = CreateFrame("Frame")
+local deadDebugTimer = 0
+
+deadDebugFrame:SetScript("OnUpdate", function()
+    if not deadDebugEnabled then return end
+    
+    deadDebugTimer = deadDebugTimer + arg1
+    if deadDebugTimer < 0.2 then return end  -- Check every 0.2s
+    deadDebugTimer = 0
+    
+    -- Check all tracked GUIDs
+    if not SpySW or not SpySW.enemyGuids then return end
+    
+    for guid, _ in pairs(SpySW.enemyGuids) do
+        if UnitExists(guid) then
+            local name = UnitName(guid) or "?"
+            local isDead = UnitIsDead(guid)
+            local canAttack = UnitCanAttack("player", guid)
+            local isGhost = UnitIsGhost and UnitIsGhost(guid)
+            local health = UnitHealth(guid) or 0
+            local maxHealth = UnitHealthMax(guid) or 1
+            local healthPct = math.floor((health / maxHealth) * 100)
+            
+            -- Only log if something interesting (dead, ghost, or low health)
+            if isDead or not canAttack or isGhost or healthPct == 0 then
+                DEFAULT_CHAT_FRAME:AddMessage(string.format(
+                    "|cffff6600[SpyDead]|r %s: Dead=%s CanAttack=%s Ghost=%s HP=%d%%",
+                    name,
+                    tostring(isDead),
+                    tostring(canAttack),
+                    tostring(isGhost),
+                    healthPct
+                ))
+            end
+        end
+    end
+end)
+
+SLASH_SPYDEAD1 = "/spydead"
+SlashCmdList["SPYDEAD"] = function(msg)
+    deadDebugEnabled = not deadDebugEnabled
+    
+    if deadDebugEnabled then
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpyDead]|r Debug ENABLED - watching for dead/ghost states")
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpyDead]|r Will log: Dead, CanAttack, Ghost, HP% for tracked enemies")
+    else
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SpyDead]|r Debug DISABLED")
+    end
+end

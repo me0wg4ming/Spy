@@ -304,7 +304,14 @@ function SpySW:AddUnit(unit)
 			end
 		end
 		
-		-- ✅ Only add to cache AFTER confirming it's an enemy
+		-- ✅ PERFORMANCE: Skip non-PvP flagged enemies
+		-- In enemy cities (Orgrimmar, Stormwind) there can be 200+ enemies
+		-- but only 10 are PvP flagged - no need to cache the rest
+		if not UnitIsPVP(guid) then
+			return
+		end
+		
+		-- ✅ Only add to cache AFTER confirming it's an enemy AND PvP flagged
 		local isNew = self.guids[guid] == nil
 		self.guids[guid] = GetTime()
 		
@@ -531,7 +538,14 @@ function SpySW:ScanNearbyPlayers(currentTime)
 			end
 			
 			-- Now check other filters
-			if UnitIsPlayer(guid) and not UnitIsDead(guid) and UnitIsPVP(guid) then
+			-- ✅ Multiple checks because WoW API is inconsistent:
+			-- - Dead player: UnitIsDead=1, CanAttack=1 (!)
+			-- - Ghost: UnitIsDead=nil, CanAttack=nil, UnitIsGhost=1
+			local isDead = UnitIsDead(guid)
+			local isGhost = UnitIsGhost and UnitIsGhost(guid)
+			local health = UnitHealth(guid) or 0
+			
+			if UnitIsPlayer(guid) and not isDead and not isGhost and health > 0 and UnitIsPVP(guid) then
 				local playerData = GetPlayerData(guid)
 				
 				if playerData then

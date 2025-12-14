@@ -1,6 +1,6 @@
 # Spy - SuperWoW Edition
 
-[![Version](https://img.shields.io/badge/version-4.1.0-blue.svg)](https://github.com/me0wg4ming/Spy)
+[![Version](https://img.shields.io/badge/version-4.1.1-blue.svg)](https://github.com/me0wg4ming/Spy)
 [![WoW](https://img.shields.io/badge/WoW-1.12.1%20Vanilla-orange.svg)](#)
 [![SuperWoW](https://img.shields.io/badge/SuperWoW-Required-red.svg)](https://github.com/balakethelock/SuperWoW)
 
@@ -8,7 +8,7 @@
 
 ---
 
-## 📑 Quick Links
+## Quick Links
 
 - [Installation](#-installation)
 - [Commands & Usage](#-commands--usage)
@@ -20,19 +20,31 @@
 
 ---
 
-## 🚀 What's New in Version 4.1.0 (December 13, 2025)
-- ✅ **Massive Performance Fix for Large Battles** - Optimized for 200+ player fights (e.g., 200 Horde vs 200 Alliance)
-- ✅ **Friendly Units Skip** - Friendly players completely ignored (no tracking, no caching) = 50% less GUIDs tracked in faction battles
-- ✅ **Combat Log Throttling** - Limited to 20 events/sec instead of 500+, reducing pattern matching by 95%
-- ✅ **Stealth Detection Optimization** - Buff scanning only for stealth-capable classes (Rogue/Druid/Night Elf) = 80% fewer buff checks
-- ✅ **Scan Interval Increased** - Changed from 0.5s to 1.0s for 50% less CPU usage during scanning
-- ✅ **Debug Mode Caching** - Cached debug mode setting to eliminate repeated table lookups
+## What's New in Version 4.1.1 (December 14, 2025)
+- **Non-PvP Enemy Skip** - Enemies without PvP flag are no longer cached, drastically reducing memory in enemy cities (Orgrimmar/Stormwind with 200 players but only 10 PvP flagged)
+- **Dead/Ghost Player Fix** - Fixed distance display "blinking" when enemy players die or release their corpse
+- **Ghost Detection** - Added UnitIsGhost and HP=0 checks to properly filter dead/ghost players from display
+- **Distance Cache Fix** - Distance cache is now cleared when player dies, preventing stale distance values
+- **Debug Mode Performance** - Cached debug mode check (IsDebugMode function) reduces 100 table lookups/sec to 4/sec
+- **Combat Log Filter** - FRIENDLY/TRADESKILLS/SELF events are now skipped entirely for better performance
+- **LastAttack Faction Check** - LastAttack only tracks actual enemies, not friendly players
+- **New Debug Command** - Added `/spydead` command to debug dead/ghost player states
+
+---
+
+## What's New in Version 4.1.0 (December 13, 2025)
+- **Massive Performance Fix for Large Battles** - Optimized for 200+ player fights (e.g., 200 Horde vs 200 Alliance)
+- **Friendly Units Skip** - Friendly players completely ignored (no tracking, no caching) = 50% less GUIDs tracked in faction battles
+- **Combat Log Throttling** - Limited to 20 events/sec instead of 500+, reducing pattern matching by 95%
+- **Stealth Detection Optimization** - Buff scanning only for stealth-capable classes (Rogue/Druid/Night Elf) = 80% fewer buff checks
+- **Scan Interval Increased** - Changed from 0.5s to 1.0s for 50% less CPU usage during scanning
+- **Debug Mode Caching** - Cached debug mode setting to eliminate repeated table lookups
 
 **Performance Impact:** In 400-player battles (200v200), tracking reduced from 400 to 200 GUIDs, buff checks reduced by 95%, and pattern matching reduced by 95%. Should eliminate lag in massive world PvP scenarios.
 
 ---
 
-## 🚀 What's New in Version 4.0.8 (December 10, 2025)
+## What's New in Version 4.0.8 (December 10, 2025)
 - ✅ **Timer Leak Fix** - Fixed AceTimer leak that caused "146 live timers" warning after multiple enable/disable cycles or zone changes
 - ✅ **Removed Duplicate Timer** - Removed redundant ManageExpirations timer in MainWindow.lua that was never cancelled
 
