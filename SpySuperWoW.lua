@@ -530,7 +530,8 @@ function SpySW:ScanNearbyPlayers(currentTime)
 	for guid, _ in pairs(previousScanPresent) do
 		if not self.lastScanPresent[guid] then
 			-- Player left range - clear buff scan cache so they get re-scanned on return
-			if self.buffScannedGuids[guid] then
+			local hadBuffScan = self.buffScannedGuids[guid] ~= nil
+			if hadBuffScan then
 				self.buffScannedGuids[guid] = nil
 			end
 			
@@ -538,7 +539,11 @@ function SpySW:ScanNearbyPlayers(currentTime)
 			if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 				local name = UnitName(guid)
 				if name then
-					DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW SCAN]|r ✗ " .. name .. " left range (timer running, buff scan reset)")
+					if hadBuffScan then
+						DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW SCAN]|r ✗ " .. name .. " left range (timer running, buff scan reset)")
+					else
+						DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW SCAN]|r ✗ " .. name .. " left range (timer running)")
+					end
 				end
 			end
 		end
@@ -1047,9 +1052,7 @@ function SpySW:OnUnitCastEvent(casterGUID, targetGUID, eventType, spellID, castD
     local casterFaction = UnitFactionGroup(casterGUID)
     
     if playerFaction and casterFaction and playerFaction == casterFaction then
-        if isDebug then
-            DEFAULT_CHAT_FRAME:AddMessage("|cffff7700[SpySW DEBUG]|r IGNORING CAST: " .. playerName .. " has same faction.")
-        end
+        -- Skip same faction (too spammy to log)
         return
     end
     
