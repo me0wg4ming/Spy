@@ -2003,6 +2003,9 @@ function Spy:OnEnable(first)
 		-- Register minimal events for Win/Loss tracking
 		Spy:RegisterEvent("CHAT_MSG_COMBAT_FRIENDLY_DEATH", "DeathLogEvent")
 		Spy:RegisterEvent("CHAT_MSG_COMBAT_HOSTILE_DEATH", "DeathLogEvent")
+		
+		-- ✅ Register UNIT_COMBAT for LastAttack tracking
+		Spy:RegisterEvent("UNIT_COMBAT", "UnitCombatEvent")
 	else
 		-- SuperWoW NOT available - Spy will not function
 		DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy]|r ERROR: SuperWoW is required! Spy is disabled.")
@@ -2407,101 +2410,67 @@ function Spy:DeathLogEvent()
 		DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy Death]|r Message: " .. tostring(message))
 	end
 	
-	-- ✅ CHAT_MSG_COMBAT_HOSTILE_DEATH = Enemy died
+	-- ✅ CHAT_MSG_COMBAT_HOSTILE_DEATH = Enemy died (used for WIN tracking)
 	if event == "CHAT_MSG_COMBAT_HOSTILE_DEATH" then
-		-- Patterns for enemy death:
-		-- "PlayerName dies." - unknown killer
-		-- "PlayerName is slain by PlayerName!" - specific killer
-		-- "You have slain PlayerName!" - YOU are the killer
-		
 		local playerName = UnitName("player")
 		local victim = nil
-		local killer = nil
 		
-		-- Pattern 1: "You have slain PlayerName!"
+		-- Pattern: "You have slain PlayerName!"
 		local _, _, v = strfind(message, "^You have slain (.+)!$")
 		if v then
 			victim = v
-			killer = playerName  -- YOU are the killer
-		end
-		
-		-- Pattern 2: "PlayerName is slain by KillerName!"
-		if not victim then
-			local _, _, v2, k = strfind(message, "^(.+) is slain by (.+)!$")
-			if v2 and k then
-				victim = v2
-				killer = k
-			end
-		end
-		
-		-- Pattern 3: "PlayerName dies." (no killer info)
-		
-		if victim then
+			
 			-- Strip realm name if exists
 			local realmSep = strfind(victim, "-")
 			if realmSep then
 				victim = strsub(victim, 1, realmSep - 1)
 			end
 			
-			-- Only count win if YOU are the killer
-			if killer then
-				-- Strip realm from killer name
-				local killerRealmSep = strfind(killer, "-")
-				if killerRealmSep then
-					killer = strsub(killer, 1, killerRealmSep - 1)
-				end
+			-- Count WIN
+			local playerData = SpyPerCharDB.PlayerData[victim]
+			
+			-- ✅ FIX: Create entry if not exists (player detected but not yet in DB)
+			if not playerData then
+				SpyPerCharDB.PlayerData[victim] = {}
+				playerData = SpyPerCharDB.PlayerData[victim]
 				
-				-- Check if YOU killed the enemy
-				if killer == playerName then
-					local playerData = SpyPerCharDB.PlayerData[victim]
-					if playerData then
-						if not playerData.wins then playerData.wins = 0 end
-						playerData.wins = playerData.wins + 1
-						
-						-- ✅ Try to get and store GUID for victim
-						if SpySW and SpySW.nameToGuid then
-							local victimGuid = SpySW.nameToGuid[victim]
-							if victimGuid and not playerData.guid then
-								playerData.guid = victimGuid
-							end
-						end
-						
-						if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-							local guidInfo = playerData.guid and (" [GUID: " .. playerData.guid .. "]") or ""
-							DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy Death]|r ✓ WIN counted for " .. victim .. guidInfo .. " (total: " .. playerData.wins .. ")")
-						end
-					else
-						if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-							DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy Death]|r ⚠ WIN not counted - " .. victim .. " not in database")
-						end
-					end
-				else
-					if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-						DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy Death]|r ⚠ WIN not counted - " .. victim .. " killed by " .. killer .. " (not you)")
-					end
-				end
-			else
 				if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-					DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy Death]|r ⚠ WIN not counted - " .. victim .. " died (unknown killer)")
+					DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy Death]|r Created new entry for " .. victim)
 				end
+			end
+			
+			if not playerData.wins then playerData.wins = 0 end
+			playerData.wins = playerData.wins + 1
+			
+			-- Store GUID if available
+			if SpySW and SpySW.nameToGuid then
+				local victimGuid = SpySW.nameToGuid[victim]
+				if victimGuid and not playerData.guid then
+					playerData.guid = victimGuid
+				end
+			end
+			
+			if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+				local guidInfo = playerData.guid and (" [GUID: " .. playerData.guid .. "]") or ""
+				DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy Death]|r ✓ WIN counted for " .. victim .. guidInfo .. " (total: " .. playerData.wins .. ")")
 			end
 		end
 	
-	-- ✅ CHAT_MSG_COMBAT_FRIENDLY_DEATH = You or friendly died
+	-- ✅ CHAT_MSG_COMBAT_FRIENDLY_DEATH = You died (used for LOSS tracking)
 	elseif event == "CHAT_MSG_COMBAT_FRIENDLY_DEATH" then
 		-- Check if YOU died
 		if strfind(message, "^You die") or strfind(message, "^You have died") then
-			-- ✅ DELAY death processing by 0.5s to catch late damage events
+			-- ✅ DELAY death processing by 1.0s to catch late damage events
 			-- Combat log events sometimes arrive out of order!
 			if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-				DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy Death]|r Delaying death processing 0.5s to catch late hits...")
+				DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy Death]|r Delaying death processing 1.0s to catch late hits...")
 			end
 			
 			-- ✅ FIX: Set flag to prevent LeftCombatEvent from clearing LastAttack
 			Spy.ProcessingDeath = true
 			
 			-- Schedule delayed processing
-			Spy:ScheduleTimer("ProcessPlayerDeath", 0.5)
+			Spy:ScheduleTimer("ProcessPlayerDeath", 1.0)
 		end
 	end
 end
@@ -2513,6 +2482,33 @@ function Spy:ProcessPlayerDeath()
 	-- YOU died - use LastAttack to find killer
 	local killer = Spy.LastAttack
 	local killerGuid = Spy.LastAttackGuid
+	
+	-- ✅ FALLBACK: If no LastAttack, use the most recently detected enemy from cache
+	if not killer and SpySW and SpySW.enemyGuids then
+		local mostRecentGuid = nil
+		local mostRecentTime = 0
+		
+		for guid, lastSeen in pairs(SpySW.enemyGuids) do
+			if lastSeen > mostRecentTime and UnitExists(guid) and UnitIsPlayer(guid) then
+				-- Verify it's an enemy
+				local playerFaction = UnitFactionGroup("player")
+				local enemyFaction = UnitFactionGroup(guid)
+				if playerFaction and enemyFaction and playerFaction ~= enemyFaction then
+					mostRecentTime = lastSeen
+					mostRecentGuid = guid
+				end
+			end
+		end
+		
+		if mostRecentGuid then
+			killer = UnitName(mostRecentGuid)
+			killerGuid = mostRecentGuid
+			
+			if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+				DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy Death]|r Fallback: Using most recent enemy from cache: " .. tostring(killer))
+			end
+		end
+	end
 	
 	if killer then
 		-- Strip realm name if exists
@@ -2612,26 +2608,26 @@ function Spy:RawCombatLogEvent()
 	local eventName = arg1
 	local eventText = arg2
 	
-	-- ✅ PERFORMANCE: Skip friendly/tradeskill events early (no need to process)
-	if eventName and (strfind(eventName, "FRIENDLY") or strfind(eventName, "TRADESKILLS") or strfind(eventName, "SELF")) then
-		return
-	end
-	
-	-- ✅ DEBUG: Only log hostile combat events (not the spammy friendly stuff)
-	if Spy.DebugEnabled and eventName and strfind(eventName, "HOSTILE") then
+	if Spy.DebugEnabled then
 		DEFAULT_CHAT_FRAME:AddMessage("|cffaaff00[Spy Debug]|r RAW_COMBATLOG: " .. tostring(eventName))
 		DEFAULT_CHAT_FRAME:AddMessage("|cffaaff00[Spy Debug]|r   text=" .. tostring(eventText))
 	end
 	
 	-- ✅ GUID Extractor for SuperWoW (OPTIMIZED)
-	-- Debug logging moved to SpySW:AddUnit() - only logs after faction check (enemies only)
 	if SpySW and eventText and strfind(eventText, "0x") then
 		-- Use pre-compiled pattern
 		local _, _, guid = strfind(eventText, GUID_PATTERN)
 		
 		if guid and UnitExists(guid) and UnitIsPlayer(guid) then
-			-- Add GUID to tracking (AddUnit handles faction check + debug logging)
+			-- Add GUID to tracking
 			SpySW:AddUnit(guid)
+			
+			if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+				local name = UnitName(guid)
+				if name then
+					DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[SpySW COMBATLOG]|r GUID extracted: " .. name .. " (" .. guid .. ")")
+				end
+			end
 		end
 	end
 	
@@ -2781,31 +2777,13 @@ function Spy:RawCombatLogEvent()
 			
 			-- Only set if it's not yourself
 			if attacker ~= playerName then
-				-- ✅ FACTION CHECK: Only set LastAttack for actual enemies
-				local isEnemy = false
-				if attackerGuid and UnitExists(attackerGuid) then
-					-- GUID available - use faction check
-					local playerFaction = UnitFactionGroup("player")
-					local attackerFaction = UnitFactionGroup(attackerGuid)
-					if playerFaction and attackerFaction and playerFaction ~= attackerFaction then
-						isEnemy = true
-					elseif UnitIsEnemy("player", attackerGuid) then
-						isEnemy = true
-					end
-				else
-					-- No GUID - assume enemy if in our database
-					isEnemy = SpyPerCharDB and SpyPerCharDB.PlayerData and SpyPerCharDB.PlayerData[attacker]
-				end
+				-- Store both name and GUID if available
+				Spy.LastAttack = attacker
+				Spy.LastAttackGuid = attackerGuid
 				
-				if isEnemy then
-					-- Store both name and GUID if available
-					Spy.LastAttack = attacker
-					Spy.LastAttackGuid = attackerGuid
-					
-					if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-						local guidInfo = attackerGuid and (" [GUID: " .. attackerGuid .. "]") or ""
-						DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy LastAttack]|r Set to: " .. tostring(attacker) .. guidInfo)
-					end
+				if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+					local guidInfo = attackerGuid and (" [GUID: " .. attackerGuid .. "]") or ""
+					DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy LastAttack]|r Set to: " .. tostring(attacker) .. guidInfo)
 				end
 			end
 		end
@@ -2815,12 +2793,47 @@ end
 function Spy:LeftCombatEvent()
 	-- ✅ FIX: Don't clear LastAttack if we're processing a death
 	-- This prevents the combat-exit event from clearing the killer info
-	-- before the delayed death processing (0.5s timer) completes
+	-- before the delayed death processing (1.0s timer) completes
 	if not Spy.ProcessingDeath then
 		Spy.LastAttack = nil
 		Spy.LastAttackGuid = nil
 	end
 	Spy:RefreshCurrentList()
+end
+
+-- ✅ NEW: UNIT_COMBAT event handler for LastAttack tracking
+-- arg1 = unitID, arg2 = action (WOUND/HEAL/etc), arg3 = critical, arg4 = damage, arg5 = damageType
+function Spy:UnitCombatEvent()
+	-- Only care about damage to the player
+	if arg1 ~= "player" then return end
+	if arg2 ~= "WOUND" then return end
+	if not arg4 or arg4 <= 0 then return end
+	
+	local attackerGuid = nil
+	local attackerName = nil
+	
+	-- Check if our target is attacking us
+	if UnitExists("target") and UnitIsPlayer("target") then
+		local _, targetGuid = UnitExists("target")
+		if targetGuid then
+			local playerFaction = UnitFactionGroup("player")
+			local targetFaction = UnitFactionGroup("target")
+			if playerFaction and targetFaction and playerFaction ~= targetFaction then
+				attackerGuid = targetGuid
+				attackerName = UnitName("target")
+			end
+		end
+	end
+	
+	-- If we found an attacker, set LastAttack
+	if attackerGuid and attackerName then
+		Spy.LastAttack = attackerName
+		Spy.LastAttackGuid = attackerGuid
+		
+		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy LastAttack via UNIT_COMBAT]|r Set to: " .. tostring(attackerName) .. " [GUID: " .. attackerGuid .. "]")
+		end
+	end
 end
 
 -- WorldMapUpdateEvent removed - map display feature removed

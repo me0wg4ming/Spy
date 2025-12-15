@@ -54,20 +54,6 @@ end
 
 -- SpySW already defined at top of file as SpyModules.SuperWoW
 
--- PERFORMANCE: Cached debug mode check (avoids 32x table lookups per cycle)
-local cachedDebugMode = false
-local lastDebugCheck = 0
-
-local function IsDebugMode()
-	local now = GetTime()
-	-- Only recheck every 1 second (debug mode doesn't change often)
-	if now - lastDebugCheck > 1 then
-		lastDebugCheck = now
-		cachedDebugMode = Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode
-	end
-	return cachedDebugMode
-end
-
 -- Statistics
 SpySW.Stats = {
 	guidsCollected = 0,
@@ -265,7 +251,7 @@ function SpySW:AddUnit(unit)
 	
 	if isPet then
 		self.Stats.petsSkipped = self.Stats.petsSkipped + 1
-		if IsDebugMode() then
+		if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 			DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[SpySW]|r SKIPPED PET: " .. (UnitName(guid) or "?"))
 		end
 		return
@@ -277,7 +263,7 @@ function SpySW:AddUnit(unit)
 		local class = UnitClass(guid)
 		if not class then
 			self.Stats.petsSkipped = self.Stats.petsSkipped + 1
-			if IsDebugMode() then
+			if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 				DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[SpySW]|r SKIPPED: " .. (UnitName(guid) or "?") .. " (no class)")
 			end
 			return
@@ -305,8 +291,7 @@ function SpySW:AddUnit(unit)
 		end
 		
 		-- ✅ PERFORMANCE: Skip non-PvP flagged enemies
-		-- In enemy cities (Orgrimmar, Stormwind) there can be 200+ enemies
-		-- but only 10 are PvP flagged - no need to cache the rest
+		-- In enemy cities there can be many enemies but only few are PvP flagged
 		if not UnitIsPVP(guid) then
 			return
 		end
@@ -327,7 +312,7 @@ function SpySW:AddUnit(unit)
 		if isNew then
 			self.Stats.guidsCollected = self.Stats.guidsCollected + 1
 			-- Debug: Log when new GUID is collected
-			if IsDebugMode() then
+			if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 				DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[SpySW]|r GUID collected: " .. (UnitName(guid) or "?") .. " (" .. class .. ") via unit=" .. tostring(unit))
 			end
 		end
@@ -428,7 +413,7 @@ local function GetPlayerData(guid)
 	if not classToken and class then
 		classToken = strupper(class)  -- Convert "Druid" → "DRUID"
 		data.classToken = classToken
-		if IsDebugMode() then
+		if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 			DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[SpySW]|r Fallback: Converted class '" .. class .. "' → '" .. classToken .. "'")
 		end
 	end
@@ -528,7 +513,7 @@ function SpySW:ScanNearbyPlayers(currentTime)
 			self.lastScanPresent[guid] = true
 			
 			-- ✅ DEBUG: Log only when player RETURNS (was not present in previous scan)
-			if IsDebugMode() then
+			if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 				if not previousScanPresent[guid] then
 					local name = UnitName(guid)
 					if name then
@@ -538,14 +523,7 @@ function SpySW:ScanNearbyPlayers(currentTime)
 			end
 			
 			-- Now check other filters
-			-- ✅ Multiple checks because WoW API is inconsistent:
-			-- - Dead player: UnitIsDead=1, CanAttack=1 (!)
-			-- - Ghost: UnitIsDead=nil, CanAttack=nil, UnitIsGhost=1
-			local isDead = UnitIsDead(guid)
-			local isGhost = UnitIsGhost and UnitIsGhost(guid)
-			local health = UnitHealth(guid) or 0
-			
-			if UnitIsPlayer(guid) and not isDead and not isGhost and health > 0 and UnitIsPVP(guid) then
+			if UnitIsPlayer(guid) and not UnitIsDead(guid) and UnitIsPVP(guid) then
 				local playerData = GetPlayerData(guid)
 				
 				if playerData then
@@ -567,7 +545,7 @@ function SpySW:ScanNearbyPlayers(currentTime)
 			end
 			
 			-- Debug logging
-			if IsDebugMode() then
+			if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 				local name = UnitName(guid)
 				if name then
 					if hadBuffScan then
@@ -609,14 +587,14 @@ function SpySW:CleanupOldGUIDs(currentTime)
 				if wasEnemy then
 					if timeout > 0 and timeSinceLastSeen > timeout then
 						shouldRemove = true
-						if IsDebugMode() then
+						if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 							DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW Cleanup]|r Removed enemy " .. name .. " after " .. timeout .. "s timeout (gone for " .. math.floor(timeSinceLastSeen) .. "s)")
 						end
 					end
 				else
 					-- ✅ UNKNOWN: Remove immediately (safety)
 					shouldRemove = true
-					if IsDebugMode() then
+					if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 						DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW Cleanup]|r Removed unknown " .. name .. " (no faction data, gone for " .. math.floor(timeSinceLastSeen) .. "s)")
 					end
 				end
@@ -674,7 +652,7 @@ function SpySW:CleanupOldGUIDs(currentTime)
 			-- ✅ Only remove after individual timeout per GUID
 			if timeout > 0 and timeSinceLastSeen > timeout then
 				self.enemyGuids[guid] = nil
-				if IsDebugMode() then
+				if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 					local name = UnitName(guid) or "Unknown"
 					DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW Cleanup]|r Removed enemy GUID " .. name .. " from cache (gone for " .. math.floor(timeSinceLastSeen) .. "s)")
 				end
@@ -684,7 +662,7 @@ function SpySW:CleanupOldGUIDs(currentTime)
 	
 	-- ✅ PERFORMANCE: Removed friendly cleanup - friendlies are now skipped entirely
 	
-	if removed > 0 and IsDebugMode() then
+	if removed > 0 and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 		DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW Cleanup]|r Cleaned up " .. removed .. " GUIDs")
 	end
 end
@@ -739,7 +717,7 @@ scanFrame:SetScript("OnUpdate", function()
 				-- If player WAS stealthed but is NO LONGER stealthed → reset state
 				if wasStealthed and not isNowStealthed then
 					SpySW.lastStealthState[playerName] = nil
-					if IsDebugMode() then
+					if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 						DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW STEALTH-ONLY]|r " .. playerName .. " left stealth, state reset")
 					end
 				end
@@ -757,7 +735,7 @@ scanFrame:SetScript("OnUpdate", function()
 						
 						-- Only alert on transition: not-stealth → stealth
 						if not wasStealthed then
-							if IsDebugMode() then
+							if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 								DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[SpySW STEALTH-ONLY]|r " .. playerName .. " (" .. (playerData.stealthType or "Unknown") .. ")")
 							end
 							Spy:AlertStealthPlayer(playerName)
@@ -779,7 +757,7 @@ scanFrame:SetScript("OnUpdate", function()
 					-- Check if player is on Ignore list
 					if SpyPerCharDB and SpyPerCharDB.IgnoreData and SpyPerCharDB.IgnoreData[playerName] then
 						-- Player is ignored, skip detection
-						if IsDebugMode() then
+						if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 							DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW]|r IGNORED: " .. playerName .. " (on Ignore list)")
 						end
 						-- Mark as detected to prevent spam, but don't add to Spy
@@ -787,7 +765,7 @@ scanFrame:SetScript("OnUpdate", function()
 					-- ✅ CRITICAL FIX: Check if player passes faction/PvP filters
 					elseif not PassesSpyFilters(playerData.guid) then
 						-- Player is friendly faction, not PvP flagged, or dead - skip
-						if IsDebugMode() then
+						if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 							local faction = UnitFactionGroup(playerData.guid) or "?"
 							local pvp = IsPvPFlagged(playerData.guid) and "YES" or "NO"
 							DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW]|r FILTERED: " .. playerName .. " (Faction: " .. faction .. ", PvP: " .. pvp .. ")")
@@ -797,7 +775,7 @@ scanFrame:SetScript("OnUpdate", function()
 					else
 						-- Player NOT ignored - proceed with normal detection
 						-- Debug output (uses Spy's debug system)
-						if IsDebugMode() then
+						if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 							local stealthStatus = playerData.isStealthed and (" [" .. (playerData.stealthType or "STEALTH") .. "]") or ""
 							DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r NEW: " .. playerName .. " Lvl" .. level .. " " .. (playerData.class or "?") .. stealthStatus)
 							DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r   Race: " .. (playerData.race or "?") .. " | PvP: " .. tostring(IsPvPFlagged(playerData.guid)) .. " | Hostile: " .. tostring(IsHostile(playerData.guid)))
@@ -830,7 +808,7 @@ scanFrame:SetScript("OnUpdate", function()
 							)
 							
 							-- Debug: Scanner added player to Nearby
-							if IsDebugMode() then
+							if Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 								DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW SCAN]|r ✓ Added to Nearby (Scanner): " .. playerName)
 							end
 							
@@ -841,7 +819,7 @@ scanFrame:SetScript("OnUpdate", function()
 								
 								if Spy.InInstance and not Spy.db.profile.EnabledInBattlegrounds then
 									allowAlert = false
-									if IsDebugMode() then
+									if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 										DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW]|r Stealth alert skipped: Battlegrounds disabled")
 									end
 								end
@@ -850,14 +828,14 @@ scanFrame:SetScript("OnUpdate", function()
 								if allowAlert and Spy.db and Spy.db.profile and Spy.db.profile.DisableWhenPVPUnflagged then
 									if not UnitIsPVP("player") then
 										allowAlert = false
-										if IsDebugMode() then
+										if Spy.db.profile.DebugMode then
 											DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW]|r Stealth alert skipped: Player not PvP flagged")
 										end
 									end
 								end
 								
 								if allowAlert then
-									if IsDebugMode() then
+									if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 										DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SpySW]|r ✔ STEALTH ALERT: " .. playerName .. " (" .. (playerData.stealthType or "Unknown") .. ")")
 									end
 									Spy:AlertStealthPlayer(playerName)
@@ -869,7 +847,7 @@ scanFrame:SetScript("OnUpdate", function()
 							
 							-- ✅ Reset stealth state if player is no longer stealthed
 							if not isNowStealthed and wasStealthed then
-								if IsDebugMode() then
+								if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 									DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW]|r " .. playerName .. " left stealth, state reset")
 								end
 							end
@@ -888,7 +866,7 @@ scanFrame:SetScript("OnUpdate", function()
 								
 								if Spy.InInstance and not Spy.db.profile.EnabledInBattlegrounds then
 									allowAlert = false
-									if IsDebugMode() then
+									if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 										DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW]|r Stealth alert skipped: Battlegrounds disabled")
 									end
 								end
@@ -897,14 +875,14 @@ scanFrame:SetScript("OnUpdate", function()
 								if allowAlert and Spy.db and Spy.db.profile and Spy.db.profile.DisableWhenPVPUnflagged then
 									if not UnitIsPVP("player") then
 										allowAlert = false
-										if IsDebugMode() then
+										if Spy.db.profile.DebugMode then
 											DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[SpySW]|r Stealth alert skipped: Player not PvP flagged")
 										end
 									end
 								end
 								
 								if allowAlert then
-									if IsDebugMode() then
+									if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 										DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SpySW SCAN]|r ✔ STEALTH ALERT (already detected): " .. playerName .. " (" .. (playerData.stealthType or "Unknown") .. ")")
 									end
 									Spy:AlertStealthPlayer(playerName)
@@ -1028,7 +1006,7 @@ function SpySW:OnUnitCastEvent(casterGUID, targetGUID, eventType, spellID, castD
         return
     end
 
-    local isDebug = IsDebugMode()
+    local isDebug = Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode
     local isEnabled = Spy and Spy.db and Spy.db.profile and Spy.db.profile.Enabled and Spy.EnabledInZone
     local stealthOnlyMode = Spy and Spy.db and Spy.db.profile and Spy.db.profile.WarnOnStealthEvenIfDisabled and not isEnabled
 
