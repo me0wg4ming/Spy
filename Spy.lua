@@ -2608,9 +2608,26 @@ function Spy:RawCombatLogEvent()
 	local eventName = arg1
 	local eventText = arg2
 	
+	-- ✅ PERFORMANCE: Skip friendly/tradeskill events early (no need to process)
+	if eventName then
+		if strfind(eventName, "TRADESKILLS") then
+			return
+		end
+		if strfind(eventName, "FRIENDLY") then
+			return
+		end
+		-- Skip SELF events (our own actions) except VS_SELF (damage TO us)
+		if strfind(eventName, "SELF") and not strfind(eventName, "VS_SELF") then
+			return
+		end
+	end
+	
 	if Spy.DebugEnabled then
-		DEFAULT_CHAT_FRAME:AddMessage("|cffaaff00[Spy Debug]|r RAW_COMBATLOG: " .. tostring(eventName))
-		DEFAULT_CHAT_FRAME:AddMessage("|cffaaff00[Spy Debug]|r   text=" .. tostring(eventText))
+		-- Only log hostile events
+		if eventName and strfind(eventName, "HOSTILE") then
+			DEFAULT_CHAT_FRAME:AddMessage("|cffaaff00[Spy Debug]|r RAW_COMBATLOG: " .. tostring(eventName))
+			DEFAULT_CHAT_FRAME:AddMessage("|cffaaff00[Spy Debug]|r   text=" .. tostring(eventText))
+		end
 	end
 	
 	-- ✅ GUID Extractor for SuperWoW (OPTIMIZED)
@@ -2777,13 +2794,25 @@ function Spy:RawCombatLogEvent()
 			
 			-- Only set if it's not yourself
 			if attacker ~= playerName then
-				-- Store both name and GUID if available
-				Spy.LastAttack = attacker
-				Spy.LastAttackGuid = attackerGuid
+				-- ✅ FIX: Only track actual enemies, not friendly players
+				local isEnemy = true
+				if attackerGuid and UnitExists(attackerGuid) then
+					local playerFaction = UnitFactionGroup("player")
+					local attackerFaction = UnitFactionGroup(attackerGuid)
+					if playerFaction and attackerFaction and playerFaction == attackerFaction then
+						isEnemy = false
+					end
+				end
 				
-				if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-					local guidInfo = attackerGuid and (" [GUID: " .. attackerGuid .. "]") or ""
-					DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy LastAttack]|r Set to: " .. tostring(attacker) .. guidInfo)
+				if isEnemy then
+					-- Store both name and GUID if available
+					Spy.LastAttack = attacker
+					Spy.LastAttackGuid = attackerGuid
+					
+					if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+						local guidInfo = attackerGuid and (" [GUID: " .. attackerGuid .. "]") or ""
+						DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy LastAttack]|r Set to: " .. tostring(attacker) .. guidInfo)
+					end
 				end
 			end
 		end

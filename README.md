@@ -21,6 +21,7 @@
 ---
 
 ## What's New in Version 4.1.1 (December 14, 2025)
+- **Win/Loss Statistics Fix** - Fixed Win/Loss tracking for deaths caused by melee attacks or stealth openers. Uses 1.0s delay + enemy cache fallback to reliably detect the killer.
 - **Non-PvP Enemy Skip** - Enemies without PvP flag are no longer cached, drastically reducing memory in enemy cities (Orgrimmar/Stormwind with 200 players but only 10 PvP flagged)
 - **Dead/Ghost Player Fix** - Fixed distance display "blinking" when enemy players die or release their corpse
 - **Ghost Detection** - Added UnitIsGhost and HP=0 checks to properly filter dead/ghost players from display

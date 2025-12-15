@@ -107,6 +107,19 @@ function Spy.Distance:GetDistance(playerName)
         return nil
     end
     
+    -- ✅ FIX: Skip dead/ghost players - they cause distance "blinking"
+    -- Dead players still "exist" but their distance becomes invalid
+    local isDead = UnitIsDead(guid)
+    local isGhost = UnitIsGhost and UnitIsGhost(guid)
+    local health = UnitHealth(guid) or 0
+    
+    if isDead or isGhost or health == 0 then
+        -- ✅ Clear cache for this player to prevent stale distance values
+        self.cache[playerName] = nil
+        self.globalDistanceCache[playerName] = nil
+        return nil
+    end
+    
     -- Get distance using the stored working method
     local success, distance = pcall(function()
         return UnitXP_GetDistance("player", guid)
@@ -345,6 +358,44 @@ SlashCmdList["SPYDIST"] = function(msg)
     end
     
     DEFAULT_CHAT_FRAME:AddMessage("==================================")
+end
+
+--[[===========================================================================
+	DEBUG: /spydead command to debug dead/ghost player states
+=============================================================================]]
+SLASH_SPYDEAD1 = "/spydead"
+SlashCmdList["SPYDEAD"] = function()
+    DEFAULT_CHAT_FRAME:AddMessage("========== DEAD/GHOST DEBUG ==========")
+    
+    if not SpySW or not SpySW.enemyGuids then
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000SpySW not available|r")
+        return
+    end
+    
+    local count = 0
+    for guid, lastSeen in pairs(SpySW.enemyGuids) do
+        if UnitExists(guid) then
+            count = count + 1
+            local name = UnitName(guid) or "?"
+            local isDead = UnitIsDead(guid)
+            local isGhost = UnitIsGhost and UnitIsGhost(guid)
+            local health = UnitHealth(guid) or 0
+            local maxHealth = UnitHealthMax(guid) or 1
+            local isPvP = UnitIsPVP(guid)
+            
+            local status = ""
+            if isDead then status = status .. "|cffff0000DEAD|r " end
+            if isGhost then status = status .. "|cffff00ffGHOST|r " end
+            if health == 0 then status = status .. "|cffff8800HP=0|r " end
+            if not isPvP then status = status .. "|cff888888!PvP|r " end
+            if status == "" then status = "|cff00ff00ALIVE|r" end
+            
+            DEFAULT_CHAT_FRAME:AddMessage(string.format("%s: %s (HP: %d/%d)", name, status, health, maxHealth))
+        end
+    end
+    
+    DEFAULT_CHAT_FRAME:AddMessage("Total cached enemies: " .. count)
+    DEFAULT_CHAT_FRAME:AddMessage("=======================================")
 end
 
 DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy]|r Distance Display loaded. |cff00ffff/spydist debug|r to toggle detailed logging.")

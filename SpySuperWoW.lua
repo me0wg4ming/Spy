@@ -26,6 +26,20 @@ local tinsert = table.insert
 local tgetn = table.getn
 local tconcat = table.concat
 
+-- ✅ PERFORMANCE: Cache debug mode check to avoid 100 table lookups/sec
+local debugModeCache = false
+local debugModeCacheTime = 0
+
+local function IsDebugMode()
+    local now = GetTime()
+    -- Only check every 0.25 seconds
+    if now - debugModeCacheTime > 0.25 then
+        debugModeCacheTime = now
+        debugModeCache = Spy and Spy.db and Spy.db.profile and Spy.db.profile.DebugMode
+    end
+    return debugModeCache
+end
+
 --[[===========================================================================
 	Tooltip Scanner (for reading buff names)
 =============================================================================]]
@@ -523,7 +537,14 @@ function SpySW:ScanNearbyPlayers(currentTime)
 			end
 			
 			-- Now check other filters
-			if UnitIsPlayer(guid) and not UnitIsDead(guid) and UnitIsPVP(guid) then
+			-- ✅ Multiple checks because WoW API is inconsistent:
+			-- - Dead player: UnitIsDead=1, CanAttack=1 (!)
+			-- - Ghost: UnitIsDead=nil, CanAttack=nil, UnitIsGhost=1
+			local isDead = UnitIsDead(guid)
+			local isGhost = UnitIsGhost and UnitIsGhost(guid)
+			local health = UnitHealth(guid) or 0
+			
+			if UnitIsPlayer(guid) and not isDead and not isGhost and health > 0 and UnitIsPVP(guid) then
 				local playerData = GetPlayerData(guid)
 				
 				if playerData then
