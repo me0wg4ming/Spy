@@ -12,7 +12,7 @@ local strsplit, strtrim = AceCore.strsplit, AceCore.strtrim
 local format, strfind, strsub, find = string.format, string.find, string.sub, string.find
 
 Spy = LibStub("AceAddon-3.0"):NewAddon("Spy", "AceConsole-3.0", "AceEvent-3.0", "AceComm-3.0", "AceTimer-3.0")
-Spy.Version = "4.1.1"
+Spy.Version = "4.1.2"
 Spy.DatabaseVersion = "1.1"
 Spy.Signature = "[Spy]"
 Spy.MaximumPlayerLevel = 60
@@ -1875,8 +1875,11 @@ function Spy:OnEnable(first)
 		if Spy.DebugEnabled then
 			DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy DEBUG]|r DB not ready, scheduling retry")
 		end
-		-- Schedule retry after a short delay to allow initialization to complete
-		Spy:ScheduleTimer("OnEnable", 0.5)
+		-- ✅ FIX: Cancel existing retry timer before scheduling new one
+		if Spy.onEnableRetryTimer then
+			Spy:CancelTimer(Spy.onEnableRetryTimer)
+		end
+		Spy.onEnableRetryTimer = Spy:ScheduleTimer("OnEnable", 0.5)
 		return
 	end
 	
@@ -1890,9 +1893,16 @@ function Spy:OnEnable(first)
 		if Spy.DebugEnabled then
 			DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy DEBUG]|r SpyModules.SuperWoW not loaded yet, scheduling retry...")
 		end
-		Spy:ScheduleTimer("OnEnable", 0.1)
+		-- ✅ FIX: Cancel existing retry timer before scheduling new one
+		if Spy.onEnableRetryTimer then
+			Spy:CancelTimer(Spy.onEnableRetryTimer)
+		end
+		Spy.onEnableRetryTimer = Spy:ScheduleTimer("OnEnable", 0.1)
 		return
 	end
+	
+	-- ✅ Clear retry timer reference since we're proceeding
+	Spy.onEnableRetryTimer = nil
 	
 	if Spy.DebugEnabled then
 		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy DEBUG]|r SpyModules.SuperWoW is loaded")
@@ -2165,6 +2175,10 @@ function Spy:OnInitialize()
 		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 			DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[Spy DEBUG]|r FactionName nil, scheduling retry")
 		end
+		-- ✅ FIX: Cancel existing retry timer before scheduling new one
+		if Spy.initTimer then
+			Spy:CancelTimer(Spy.initTimer)
+		end
 		Spy.initTimer = Spy:ScheduleTimer("OnInitialize", 1)
 		return
 	end
@@ -2284,9 +2298,16 @@ function Spy:ZoneChangedEvent()
 		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 			DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy DEBUG]|r MainWindow not ready, scheduling retry")
 		end
-		Spy:ScheduleTimer("ZoneChangedEvent", 1)
+		-- ✅ FIX: Cancel existing retry timer before scheduling new one
+		if Spy.zoneChangedRetryTimer then
+			Spy:CancelTimer(Spy.zoneChangedRetryTimer)
+		end
+		Spy.zoneChangedRetryTimer = Spy:ScheduleTimer("ZoneChangedEvent", 1)
 		return
 	end
+	
+	-- ✅ Clear retry timer reference since we're proceeding
+	Spy.zoneChangedRetryTimer = nil
 	
 	-- ✅ FIX: Initialize WorldMap on first PLAYER_ENTERING_WORLD
 	-- This ensures GetPlayerMapPosition() works correctly
@@ -2469,8 +2490,11 @@ function Spy:DeathLogEvent()
 			-- ✅ FIX: Set flag to prevent LeftCombatEvent from clearing LastAttack
 			Spy.ProcessingDeath = true
 			
-			-- Schedule delayed processing
-			Spy:ScheduleTimer("ProcessPlayerDeath", 1.0)
+			-- ✅ FIX: Cancel existing death timer before scheduling new one
+			if Spy.deathProcessTimer then
+				Spy:CancelTimer(Spy.deathProcessTimer)
+			end
+			Spy.deathProcessTimer = Spy:ScheduleTimer("ProcessPlayerDeath", 1.0)
 		end
 	end
 end

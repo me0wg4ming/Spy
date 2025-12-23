@@ -2,7 +2,7 @@
 ## Title: |CFF00FF00Spy |CFFFF0000[SuperWoW]
 ## Notes: Detects and alerts you to the presence of nearby enemy players.
 ## Author: SuperWoW modification by @me0wg4ming
-## Version: 4.1.1
+## Version: 4.1.2
 ## OptionalDeps:  Ace3, LibSharedMedia-3.0, LibBabble-Class-3.0
 ## SavedVariables: SpyDB
 ## SavedVariablesPerCharacter: SpyPerCharDB
