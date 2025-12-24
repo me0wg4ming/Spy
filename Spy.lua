@@ -1595,9 +1595,11 @@ function SlashCmdList.SPYDEBUG()
 	
 	if not Spy.db.profile.DebugMode then
 		Spy.db.profile.DebugMode = true
+		Spy.DebugEnabled = true  -- ✅ FIX: Also update the cached variable
 		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy]|r Debug mode |cff00ff00ENABLED|r - Will show stealth events")
 	else
 		Spy.db.profile.DebugMode = false
+		Spy.DebugEnabled = false  -- ✅ FIX: Also update the cached variable
 		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy]|r Debug mode |cffff0000DISABLED|r")
 	end
 end
