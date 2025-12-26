@@ -875,13 +875,8 @@ function Spy:UpdatePlayerData(name, class, level, race, guild, isEnemy, isGuess)
 		-- Get map coordinates (your current position)
 		local mapX, mapY = 0, 0
 		
-		if WorldMapFrame:IsVisible() then
-			SetMapToCurrentZone()
-			mapX, mapY = GetPlayerMapPosition("player")
-		else
-			-- Try to get position without showing WorldMap
-			mapX, mapY = GetPlayerMapPosition("player")
-		end
+		-- Get position without changing map zoom/location
+		mapX, mapY = GetPlayerMapPosition("player")
 		
 		if mapX ~= 0 and mapY ~= 0 then
 			mapX = math.floor(tonumber(mapX) * 100) / 100
