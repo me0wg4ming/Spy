@@ -620,7 +620,7 @@ function Spy:CreateMainWindow()
 			theFrame.DragBottomRight:SetScript("OnMouseDown", function() 
 				if (((not this:GetParent().isLocked) or (this:GetParent().isLocked == 0)) and (arg1 == "LeftButton")) then 
 					this:GetParent().isResizing = true; 
-					this:GetParent():StartSizing("BOTTOMRIGHT") 
+					this:GetParent():StartSizing("RIGHT") 
 				end 
 			end)
 			theFrame.DragBottomRight:SetScript("OnMouseUp", function() 
@@ -650,7 +650,7 @@ function Spy:CreateMainWindow()
 			theFrame.DragBottomLeft:SetScript("OnMouseDown", function() 
 				if (((not this:GetParent().isLocked) or (this:GetParent().isLocked == 0)) and (arg1 == "LeftButton")) then 
 					this:GetParent().isResizing = true; 
-					this:GetParent():StartSizing("BOTTOMLEFT") 
+					this:GetParent():StartSizing("LEFT") 
 				end 
 			end)
 			theFrame.DragBottomLeft:SetScript("OnMouseUp", function() 
@@ -673,7 +673,7 @@ function Spy:CreateMainWindow()
 			theFrame.DragTopRight:SetWidth(16)
 			theFrame.DragTopRight:SetHeight(16)
 			theFrame.DragTopRight:SetAlpha(0)
-			theFrame.DragTopRight:SetPoint("TOPRIGHT", theFrame, "TOPRIGHT", 0, -32)
+			theFrame.DragTopRight:SetPoint("TOPRIGHT", theFrame, "TOPRIGHT", 0, 0)
 			theFrame.DragTopRight:EnableMouse(true)
 			theFrame.DragTopRight:SetScript("OnEnter", function()
 				this:SetAlpha(1)
@@ -681,7 +681,7 @@ function Spy:CreateMainWindow()
 			theFrame.DragTopRight:SetScript("OnMouseDown", function()
 				if (((not this:GetParent().isLocked) or (this:GetParent().isLocked == 0)) and (arg1 == "LeftButton")) then
 					this:GetParent().isResizing = true;
-					this:GetParent():StartSizing("TOPRIGHT")
+					this:GetParent():StartSizing("RIGHT")
 				end
 			end)
 			theFrame.DragTopRight:SetScript("OnMouseUp", function()
@@ -704,7 +704,7 @@ function Spy:CreateMainWindow()
 			theFrame.DragTopLeft:SetWidth(16)
 			theFrame.DragTopLeft:SetHeight(16)
 			theFrame.DragTopLeft:SetAlpha(0)		
-			theFrame.DragTopLeft:SetPoint("TOPLEFT", theFrame, "TOPLEFT", 0, -32)
+			theFrame.DragTopLeft:SetPoint("TOPLEFT", theFrame, "TOPLEFT", 0, 0)
 			theFrame.DragTopLeft:EnableMouse(true)
 			theFrame.DragTopLeft:SetScript("OnEnter", function()
 				this:SetAlpha(1)
@@ -712,7 +712,7 @@ function Spy:CreateMainWindow()
 			theFrame.DragTopLeft:SetScript("OnMouseDown", function()
 				if (((not this:GetParent().isLocked) or (this:GetParent().isLocked == 0)) and (arg1 == "LeftButton")) then
 					this:GetParent().isResizing = true;
-					this:GetParent():StartSizing("TOPLEFT")
+					this:GetParent():StartSizing("LEFT")
 				end
 			end)
 			theFrame.DragTopLeft:SetScript("OnMouseUp", function()
@@ -737,7 +737,7 @@ function Spy:CreateMainWindow()
 		if not Spy.db.profile.InvertSpy then 		
 			theFrame.RightButton:SetPoint("TOPRIGHT", theFrame, "TOPRIGHT", -23, -14.5)
 		else
-			theFrame.RightButton:SetPoint("BOTTOMRIGHT", theFrame, "BOTTOMRIGHT", -23, -16.5)
+			theFrame.RightButton:SetPoint("BOTTOMRIGHT", theFrame, "BOTTOMRIGHT", -23, 14.5)
 		end
 		theFrame.RightButton:SetScript("OnEnter", function()
 			GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
@@ -974,12 +974,17 @@ function Spy:AutomaticallyResize()
 	if not Spy.MainWindow then return end  -- Safety check: MainWindow might not be created yet
 	local detected = Spy.ListAmountDisplayed
 	if detected > Spy.db.profile.ResizeSpyLimit then detected = Spy.db.profile.ResizeSpyLimit end
-	local height = 35 + (detected * (Spy.db.profile.MainWindow.RowHeight + Spy.db.profile.MainWindow.RowSpacing))
-	if not Spy.db.profile.InvertSpy then
+	
+	if Spy.db.profile.InvertSpy then
+		-- Invert: Keep MainWindow at constant 35px height
+		-- Players are positioned OUTSIDE the frame (above it)
+		local height = 35
 		Spy:RestoreMainWindowPosition(Spy.MainWindow:GetLeft(), Spy.MainWindow:GetTop(), Spy.MainWindow:GetWidth(), height)
 	else
-		Spy:RestoreMainWindowPosition(Spy.MainWindow:GetLeft(), Spy.MainWindow:GetBottom(), Spy.MainWindow:GetWidth(), height)
-	end	
+		-- Normal: Frame grows downward to contain players
+		local height = 35 + (detected * (Spy.db.profile.MainWindow.RowHeight + Spy.db.profile.MainWindow.RowSpacing))
+		Spy:RestoreMainWindowPosition(Spy.MainWindow:GetLeft(), Spy.MainWindow:GetTop(), Spy.MainWindow:GetWidth(), height)
+	end
 end
 
 function Spy:ResizeMainWindow()
@@ -1046,22 +1051,15 @@ end
 
 function Spy:SaveMainWindowPosition()
 	Spy.db.profile.MainWindow.Position.x = Spy.MainWindow:GetLeft()
-	if not Spy.db.profile.InvertSpy then 
-		Spy.db.profile.MainWindow.Position.y = Spy.MainWindow:GetTop()
-    else 
-		Spy.db.profile.MainWindow.Position.y = Spy.MainWindow:GetBottom()
-    end
+	Spy.db.profile.MainWindow.Position.y = Spy.MainWindow:GetTop()
 	Spy.db.profile.MainWindow.Position.w = Spy.MainWindow:GetWidth()
 	Spy.db.profile.MainWindow.Position.h = Spy.MainWindow:GetHeight()
 end
 
 function Spy:RestoreMainWindowPosition(x, y, width, height)
 	Spy.MainWindow:ClearAllPoints()
-	if not Spy.db.profile.InvertSpy then 	
-		Spy.MainWindow:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x, y)
-	else		
-		Spy.MainWindow:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", x, y)	
-	end
+	-- Always use TOPLEFT - for Invert, frame stays constant size, players are outside
+	Spy.MainWindow:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x, y)
 	Spy.MainWindow:SetWidth(width)
 	Spy.MainWindow:SetHeight(height)
 	--Spy:SaveMainWindowPosition()

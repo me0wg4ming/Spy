@@ -434,20 +434,6 @@ Spy.options = {
 						ReloadUI()
 					end
 				},
-				ResizeSpy = {
-					name = L["ResizeSpy"],
-					desc = L["ResizeSpyDescription"],
-					type = "toggle",
-					order = 10,
-					width = "full",
-					get = function(info)
-						return Spy.db.profile.ResizeSpy
-					end,
-					set = function(info, value)
-						Spy.db.profile.ResizeSpy = value
-						if value then Spy:RefreshCurrentList() end
-					end,
-				},
 				ResizeSpyLimit = {
 					type = "range",
 					order = 11,

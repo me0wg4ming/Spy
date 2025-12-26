@@ -38,6 +38,9 @@ function Spy:RefreshCurrentList(player, source)
 
 	-- Now iterate through CurrentList and show frames
 	local yOffset = 34
+	if Spy.db.profile.InvertSpy then
+		yOffset = 2  -- Start just above the title bar
+	end
 	local displayCount = 0
 	
 	for index, data in ipairs(Spy.CurrentList) do
@@ -259,8 +262,16 @@ function Spy:RefreshCurrentList(player, source)
 			
 			-- Position frame
 			frame:ClearAllPoints()
-			frame:SetPoint("TOPLEFT", MainWindow, "TOPLEFT", 2, -yOffset)
-			yOffset = yOffset + Spy.db.profile.MainWindow.RowHeight + Spy.db.profile.MainWindow.RowSpacing
+			frame:ClearAllPoints()
+			if Spy.db.profile.InvertSpy then
+				-- Invert: Position above the title bar, going upward
+				frame:SetPoint("BOTTOMLEFT", MainWindow, "TOPLEFT", 2, yOffset)
+				yOffset = yOffset + Spy.db.profile.MainWindow.RowHeight + Spy.db.profile.MainWindow.RowSpacing
+			else
+				-- Normal: Position below title bar, going downward
+				frame:SetPoint("TOPLEFT", MainWindow, "TOPLEFT", 2, -yOffset)
+				yOffset = yOffset + Spy.db.profile.MainWindow.RowHeight + Spy.db.profile.MainWindow.RowSpacing
+			end
 			
 			-- ✅ Show frame and mark as visible
 			frame:Show()
@@ -289,20 +300,26 @@ function Spy:RefreshCurrentList(player, source)
 	
 	Spy.ListAmountDisplayed = displayCount
 
-	-- Auto-resize if enabled
-	if Spy.db.profile.ResizeSpy then
-		Spy:AutomaticallyResize()
-	else
-		if not Spy.db.profile.InvertSpy then
-			if Spy.MainWindow:GetHeight() < 34 then
-				Spy:RestoreMainWindowPosition(Spy.MainWindow:GetLeft(), Spy.MainWindow:GetTop(), Spy.MainWindow:GetWidth(), 34)
-			end
-		else
-			if Spy.MainWindow:GetHeight() < 34 then 
-				Spy:RestoreMainWindowPosition(Spy.MainWindow:GetLeft(), Spy.MainWindow:GetBottom(), Spy.MainWindow:GetWidth(), 34)
-			end
-		end	
+	-- Update Background height and resize grips for Invert mode
+	if Spy.db.profile.InvertSpy and Spy.MainWindow.Background then
+		local bgHeight = displayCount * (Spy.db.profile.MainWindow.RowHeight + Spy.db.profile.MainWindow.RowSpacing)
+		if bgHeight < 1 then bgHeight = 1 end
+		Spy.MainWindow.Background:SetHeight(bgHeight)
+		
+		-- Reposition resize grips to top corners of player list
+		local gripOffset = bgHeight + 2
+		if Spy.MainWindow.DragTopRight then
+			Spy.MainWindow.DragTopRight:ClearAllPoints()
+			Spy.MainWindow.DragTopRight:SetPoint("BOTTOMRIGHT", Spy.MainWindow, "TOPRIGHT", 0, gripOffset)
+		end
+		if Spy.MainWindow.DragTopLeft then
+			Spy.MainWindow.DragTopLeft:ClearAllPoints()
+			Spy.MainWindow.DragTopLeft:SetPoint("BOTTOMLEFT", Spy.MainWindow, "TOPLEFT", 0, gripOffset)
+		end
 	end
+
+	-- Always auto-resize (width is manually adjustable, height is automatic)
+	Spy:AutomaticallyResize()
 end
 
 -- ✅ NEW: /spyguid command - Show GUID info for all visible players

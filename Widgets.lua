@@ -9,10 +9,19 @@ function Spy:CreateFrame(Name, Title, Height, Width, ShowFunc, HideFunc)
 	theFrame:SetHeight(Height)
 	theFrame:SetWidth(Width)
 
+	-- Select texture based on InvertSpy setting
+	local titleTexture = "Interface\\AddOns\\Spy\\Textures\\title-industrial.tga"
+	local backdropInsets = {left = 0, right = 0, top = 31, bottom = 0}
+	
+	if Spy.db.profile.InvertSpy then
+		titleTexture = "Interface\\AddOns\\Spy\\Textures\\title-industrial2.tga"
+		backdropInsets = {left = 0, right = 0, top = 0, bottom = 31}
+	end
+
 	theFrame:SetBackdrop({
 		bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", tile = true, tileSize = 16,
-		edgeFile = "Interface\\AddOns\\Spy\\Textures\\title-industrial.tga", edgeSize = 32,
-		insets = {left = 0, right = 0, top = 31, bottom = 0},
+		edgeFile = titleTexture, edgeSize = 32,
+		insets = backdropInsets,
 	})
 
 	if Name == "Spy_MainWindow" then
@@ -68,11 +77,13 @@ function Spy:CreateFrame(Name, Title, Height, Width, ShowFunc, HideFunc)
 	if not Spy.db.profile.InvertSpy then
 		theFrame.Background:SetPoint("TOPLEFT", theFrame, "TOPLEFT", 0, -32)
 		theFrame.Background:SetPoint("BOTTOMRIGHT", theFrame, "BOTTOMRIGHT", 0, 2)
+		theFrame.Background:SetHeight(Height)
 	else
-		theFrame.Background:SetPoint("TOPLEFT", theFrame, "TOPLEFT", 0, -34)
-		theFrame.Background:SetPoint("BOTTOMRIGHT", theFrame, "BOTTOMRIGHT", 0, 0)
+		-- Invert: Background goes ABOVE the frame (players are above)
+		theFrame.Background:SetPoint("BOTTOMLEFT", theFrame, "TOPLEFT", 0, 1)
+		theFrame.Background:SetPoint("BOTTOMRIGHT", theFrame, "TOPRIGHT", 0, 0)
+		theFrame.Background:SetHeight(1) -- Will be resized dynamically in List.lua
 	end
-	theFrame.Background:SetHeight(Height)
 	theFrame.Background:SetWidth(Width)	
 	theFrame.Background:SetAlpha(1)
 
@@ -82,8 +93,8 @@ function Spy:CreateFrame(Name, Title, Height, Width, ShowFunc, HideFunc)
 		theFrame.TitleBar:SetPoint("TOPLEFT", theFrame, "TOPLEFT", 0, -11)
 		theFrame.TitleBar:SetPoint("TOPRIGHT", theFrame, "TOPRIGHT", 0, -11)
 	else
-		theFrame.TitleBar:SetPoint("BOTTOMLEFT", theFrame, "BOTTOMLEFT", 0, -21)
-		theFrame.TitleBar:SetPoint("BOTTOMRIGHT", theFrame, "BOTTOMRIGHT", 0, -21)
+		theFrame.TitleBar:SetPoint("BOTTOMLEFT", theFrame, "BOTTOMLEFT", 0, 11)
+		theFrame.TitleBar:SetPoint("BOTTOMRIGHT", theFrame, "BOTTOMRIGHT", 0, 11)
 	end
 	theFrame.TitleBar:SetHeight(22)
 	theFrame.TitleBar:SetBackdrop({
@@ -96,9 +107,9 @@ function Spy:CreateFrame(Name, Title, Height, Width, ShowFunc, HideFunc)
 
 	theFrame.Title = theFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	if not Spy.db.profile.InvertSpy then 	
-	theFrame.Title:SetPoint("TOPLEFT", theFrame, "TOPLEFT", 8, -18.25)
+		theFrame.Title:SetPoint("TOPLEFT", theFrame, "TOPLEFT", 8, -18.25)
 	else
-		theFrame.Title:SetPoint("BOTTOMLEFT", theFrame, "BOTTOMLEFT", 8, -21)
+		theFrame.Title:SetPoint("BOTTOMLEFT", theFrame, "BOTTOMLEFT", 8, 18.25)
 	end	
 	theFrame.Title:SetJustifyH("LEFT")
 	theFrame.Title:SetTextColor(1.0, 1.0, 1.0, 1.0)
@@ -121,9 +132,9 @@ function Spy:CreateFrame(Name, Title, Height, Width, ShowFunc, HideFunc)
 	theFrame.CloseButton:SetWidth(20)
 	theFrame.CloseButton:SetHeight(20)
 	if not Spy.db.profile.InvertSpy then
-	theFrame.CloseButton:SetPoint("TOPRIGHT", theFrame, "TOPRIGHT", -4, -12)
+		theFrame.CloseButton:SetPoint("TOPRIGHT", theFrame, "TOPRIGHT", -4, -12)
 	else
-		theFrame.CloseButton:SetPoint("BOTTOMRIGHT", theFrame, "BOTTOMRIGHT", -4, -19)
+		theFrame.CloseButton:SetPoint("BOTTOMRIGHT", theFrame, "BOTTOMRIGHT", -4, 12)
 	end		
 	theFrame.CloseButton:SetScript("OnEnter", function()
 		GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
