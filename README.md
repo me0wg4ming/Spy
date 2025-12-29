@@ -1,6 +1,6 @@
 # Spy - SuperWoW Edition
 
-[![Version](https://img.shields.io/badge/version-4.1.1-blue.svg)](https://github.com/me0wg4ming/Spy)
+[![Version](https://img.shields.io/badge/version-4.2.0-blue.svg)](https://github.com/me0wg4ming/Spy)
 [![WoW](https://img.shields.io/badge/WoW-1.12.1%20Vanilla-orange.svg)](#)
 [![SuperWoW](https://img.shields.io/badge/SuperWoW-Required-red.svg)](https://github.com/balakethelock/SuperWoW)
 
@@ -17,6 +17,27 @@
 - [KoS System](#-kos-kill-on-sight-system)
 - [Troubleshooting](#️-troubleshooting)
 - [Support](#-support)
+
+---
+
+## What's New in Version 4.2.0 (December 29, 2025)
+
+### 🆕 New Feature: InvertSpy Mode
+- **Inverted Player List** - Players now display ABOVE the "Nearby" title bar instead of below
+- **Mirrored Title Texture** - Uses `title-industrial2.tga` for proper visual appearance when inverted
+- **Dynamic Resize Grips** - Resize arrows reposition to top corners of player list and move with list growth
+- **Background Texture** - Automatically adjusts height based on player count in inverted mode
+
+### 🐛 Bugfixes
+- **Map Jump Fix** - Map no longer automatically jumps to current zone when players are detected (SetMapToCurrentZone only runs once on initialization)
+
+### 🔧 Technical Changes
+- **Invert Player Positioning** - Players anchor from BOTTOMLEFT of MainWindow going upward
+- **Grip Offset Calculation** - Resize grips dynamically reposition based on `bgHeight + 2` offset
+
+**Version:** 4.2.0  
+**Release Date:** December 29, 2025  
+**Requirements:** SuperWoW 1.12.1+ (MANDATORY), UnitXP (OPTIONAL for Distance Display)
 
 ---
 
