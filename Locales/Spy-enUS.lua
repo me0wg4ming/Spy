@@ -8,7 +8,7 @@ L["Version"] = "Version"
 L["LoadDescription"] = "|cff9933ffSpy addon loaded. Type |cffffffff/spy|cff9933ff for options."
 L["SpyEnabled"] = "|cff9933ffSpy addon enabled."
 L["SpyDisabled"] = "|cff9933ffSpy addon disabled. Type |cffffffff/spy show|cff9933ff to enable."
-L["UpgradeAvailable"] = "|cff9933ffA new version of Spy is available. It can be downloaded from:\n|cffffffffhttps://github.com/laytya/Spy"
+L["UpgradeAvailable"] = "|cff9933ffA new version of Spy is available. It can be downloaded from:\n|cffffffffhttps://github.com/me0wg4ming/Spy"
 L["Show Minimap Icon"] = "Show Minimap Icon"
 L["Show/Hide Spy"] = "Show/Hide Spy"
 
@@ -47,8 +47,8 @@ The Statistics Window contains a list of all enemy encounters which can be sorte
 |cffffd000 Kill On Sight Button |cffffffff
 If enabled, this button will be located on the enemy players target frame. Clicking on this button will add/remove the enemy target to/from the Kill On Sight list. Right clicking on the button will allow you to enter Kill on Sight reasons.
 
-|cffffd000 Author:|cffffffff Slipjack
-|cffffd000 Modified for SuperWoW by:|cffffffff Meow [me0wg4ming]
+|cffffd000 Author:|cffffffff Meow [me0wg4ming]
+|cffffd000 Original Spy by:|cffffffff Slipjack
 ]]
 
 -- General Settings
