@@ -22,7 +22,7 @@
 
 ## What's New in Version 4.2.0 (December 29, 2025)
 
-### 🆕 New Feature: InvertSpy Mode
+### 🆕 Fixed: InvertSpy Mode
 - **Inverted Player List** - Players now display ABOVE the "Nearby" title bar instead of below
 - **Mirrored Title Texture** - Uses `title-industrial2.tga` for proper visual appearance when inverted
 - **Dynamic Resize Grips** - Resize arrows reposition to top corners of player list and move with list growth
