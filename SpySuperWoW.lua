@@ -696,7 +696,25 @@ local scanFrame = CreateFrame("Frame")
 local scanTimer = 0
 local cleanupTimer = 0
 
+-- Shutdown flag to prevent processing during logout
+SpySW.isShuttingDown = false
+
+-- Register PLAYER_LOGOUT for clean shutdown
+scanFrame:RegisterEvent("PLAYER_LOGOUT")
+scanFrame:SetScript("OnEvent", function()
+	if event == "PLAYER_LOGOUT" then
+		-- Set shutdown flag immediately
+		SpySW.isShuttingDown = true
+		-- Unregister all events and clear scripts
+		this:UnregisterAllEvents()
+		this:SetScript("OnUpdate", nil)
+		this:SetScript("OnEvent", nil)
+	end
+end)
+
 scanFrame:SetScript("OnUpdate", function()
+	-- Stop processing during shutdown to prevent crash 132
+	if SpySW.isShuttingDown then return end
 	-- ✅ PERFORMANCE: Cache GetTime() once per frame tick
 	local currentTime = GetTime()
 	
@@ -961,6 +979,7 @@ local guidFrame = CreateFrame("Frame")
 guidFrame:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
 guidFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
 guidFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+guidFrame:RegisterEvent("PLAYER_LOGOUT")
 
 -- Unit events (arg1 contains unit)
 guidFrame:RegisterEvent("UNIT_COMBAT")
@@ -974,6 +993,19 @@ guidFrame:RegisterEvent("UNIT_HEALTH")
 guidFrame:RegisterEvent("UNIT_CASTEVENT")
 
 guidFrame:SetScript("OnEvent", function()
+	-- Handle shutdown to prevent crash 132
+	if event == "PLAYER_LOGOUT" then
+		SpySW.isShuttingDown = true
+		this:UnregisterAllEvents()
+		this:SetScript("OnEvent", nil)
+		-- Clear caches
+		for k in pairs(SpySW.guids) do SpySW.guids[k] = nil end
+		for k in pairs(SpySW.enemyGuids) do SpySW.enemyGuids[k] = nil end
+		for k in pairs(SpySW.nameToGuid) do SpySW.nameToGuid[k] = nil end
+		for k in pairs(SpySW.detectedPlayers) do SpySW.detectedPlayers[k] = nil end
+		for k in pairs(SpySW.factionCache) do SpySW.factionCache[k] = nil end
+		return
+	end
 	-- Check if we should collect GUIDs
 	local isEnabled = Spy.db and Spy.db.profile and Spy.db.profile.Enabled and Spy.EnabledInZone
 	local stealthOnlyMode = Spy.db and Spy.db.profile and Spy.db.profile.WarnOnStealthEvenIfDisabled and not isEnabled
@@ -1739,9 +1771,12 @@ end
 local castLogger = CreateFrame("Frame")
 local isLogging = false
 
+-- Register PLAYER_LOGOUT for clean shutdown
+castLogger:RegisterEvent("PLAYER_LOGOUT")
+
 local function ToggleCastLogger()
     isLogging = not isLogging
-    
+
     if isLogging then
         castLogger:RegisterEvent("UNIT_CASTEVENT")
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpySW]|r Cast Logger ENABLED - all casts will be logged!")
@@ -1752,6 +1787,13 @@ local function ToggleCastLogger()
 end
 
 castLogger:SetScript("OnEvent", function()
+    -- Handle shutdown to prevent crash 132
+    if event == "PLAYER_LOGOUT" then
+        this:UnregisterAllEvents()
+        this:SetScript("OnEvent", nil)
+        return
+    end
+
     local casterGUID, targetGUID, eventType, spellID, castDuration = arg1, arg2, arg3, arg4, arg5
     if eventType == "CAST" or eventType == "CHANNEL" then
         local casterName = UnitName(casterGUID) or "Unknown"
