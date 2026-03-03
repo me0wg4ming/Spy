@@ -2434,33 +2434,37 @@ function Spy:DeathLogEvent()
 				victim = strsub(victim, 1, realmSep - 1)
 			end
 			
-			-- Count WIN
-			local playerData = SpyPerCharDB.PlayerData[victim]
-			
-			-- ✅ FIX: Create entry if not exists (player detected but not yet in DB)
-			if not playerData then
-				SpyPerCharDB.PlayerData[victim] = {}
-				playerData = SpyPerCharDB.PlayerData[victim]
-				
+			-- Count WIN only for known players (not NPCs)
+			-- A victim is a player if tracked in nameToGuid OR already in PlayerData
+			local isKnownPlayer = (SpyPerCharDB.PlayerData[victim] ~= nil)
+				or (SpySW and SpySW.nameToGuid and SpySW.nameToGuid[victim] ~= nil)
+
+			if not isKnownPlayer then
 				if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-					DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy Death]|r Created new entry for " .. victim)
+					DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[Spy Death]|r Skipped WIN for " .. victim .. " (not a known player)")
 				end
-			end
-			
-			if not playerData.wins then playerData.wins = 0 end
-			playerData.wins = playerData.wins + 1
-			
-			-- Store GUID if available
-			if SpySW and SpySW.nameToGuid then
-				local victimGuid = SpySW.nameToGuid[victim]
-				if victimGuid and not playerData.guid then
-					playerData.guid = victimGuid
+			else
+				local playerData = SpyPerCharDB.PlayerData[victim]
+				if not playerData then
+					SpyPerCharDB.PlayerData[victim] = {}
+					playerData = SpyPerCharDB.PlayerData[victim]
 				end
-			end
-			
-			if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-				local guidInfo = playerData.guid and (" [GUID: " .. playerData.guid .. "]") or ""
-				DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy Death]|r ✓ WIN counted for " .. victim .. guidInfo .. " (total: " .. playerData.wins .. ")")
+
+				if not playerData.wins then playerData.wins = 0 end
+				playerData.wins = playerData.wins + 1
+
+				-- Store GUID if available
+				if SpySW and SpySW.nameToGuid then
+					local victimGuid = SpySW.nameToGuid[victim]
+					if victimGuid and not playerData.guid then
+						playerData.guid = victimGuid
+					end
+				end
+
+				if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+					local guidInfo = playerData.guid and (" [GUID: " .. playerData.guid .. "]") or ""
+					DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy Death]|r ✓ WIN counted for " .. victim .. guidInfo .. " (total: " .. playerData.wins .. ")")
+				end
 			end
 		end
 	
@@ -2632,7 +2636,7 @@ function Spy:SpellGoOtherLastAttack()
 
 	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 		DEFAULT_CHAT_FRAME:AddMessage(
-			"|cffff9900[Spy LastAttack via SPELL_GO]|r Set to: "
+			"|cffff9900[Spy LastAttack via SPELL_START]|r Set to: "
 			.. attackerName .. " [spellId=" .. tostring(spellId) .. "]"
 		)
 	end

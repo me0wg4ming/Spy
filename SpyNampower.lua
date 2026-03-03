@@ -5,7 +5,7 @@ Replaces SpySuperWoW.lua entirely. Requires Nampower >= 3.0.0.
 No SuperWoW dependency whatsoever.
 
 Detection sources:
-  - SPELL_GO_OTHER     → enemy cast (incl. instant Stealth alert via spell IDs)
+  - SPELL_START_OTHER  → enemy cast (incl. instant Stealth alert via spell IDs)
   - UNIT_AURA_GUID     → aura change on any tracked GUID (Nampower GUID event)
   - UNIT_FLAGS_GUID    → flags change (PvP, combat)
   - UNIT_HEALTH_GUID   → health change
@@ -21,7 +21,7 @@ GUID handling:
   - UnitExists(guid) works because Nampower supports raw GUIDs as unit tokens.
   - Stealth detection uses GetUnitField(guid, "aura") to scan aura slots.
 
-Requires NP_EnableSpellGoEvents=1 (set automatically on Initialize).
+Requires NP_EnableSpellStartEvents=1 (set automatically on Initialize).
 ]]
 
 -- Register SpyModules.Nampower IMMEDIATELY as very first line of code.
@@ -57,7 +57,7 @@ end
     Stealth Spell / Aura ID tables
 =============================================================================]]
 
--- Spell IDs that represent entering stealth (used in SPELL_GO_OTHER)
+-- Spell IDs that represent entering stealth (used in SPELL_START_OTHER)
 SpyNP.STEALTH_SPELL_IDS = {
     [1784]  = "Stealth",
     [1785]  = "Stealth",
@@ -511,7 +511,7 @@ local function IsFullyEnabled()
 end
 
 --[[===========================================================================
-    Stealth alert logic (shared between scan loop and SPELL_GO_OTHER)
+    Stealth alert logic (shared between scan loop and SPELL_START_OTHER)
 =============================================================================]]
 
 local function TriggerStealthAlert(playerName, stealthType)
@@ -803,10 +803,10 @@ guidFrame:SetScript("OnEvent", function()
 end)
 
 --[[===========================================================================
-    SPELL_GO_OTHER frame
+    SPELL_START_OTHER frame
     Instant detection + stealth alerting when an enemy casts a spell.
 
-    Nampower SPELL_GO_OTHER parameters:
+    Nampower SPELL_START_OTHER parameters:
       arg1 = itemId       arg2 = spellId     arg3 = casterGuid
       arg4 = targetGuid   arg5 = castFlags   arg6 = numHit
       arg7 = numMissed    arg8 = corpseOwnerGuid
@@ -814,7 +814,7 @@ end)
 
 local spellGoFrame = CreateFrame("Frame")
 spellGoFrame:RegisterEvent("PLAYER_LOGOUT")
-spellGoFrame:RegisterEvent("SPELL_GO_OTHER")
+spellGoFrame:RegisterEvent("SPELL_START_OTHER")
 
 spellGoFrame:SetScript("OnEvent", function()
     if event == "PLAYER_LOGOUT" then
@@ -825,7 +825,7 @@ spellGoFrame:SetScript("OnEvent", function()
     end
 
     if SpyNP.isShuttingDown  then return end
-    if event ~= "SPELL_GO_OTHER" then return end
+    if event ~= "SPELL_START_OTHER" then return end
 
     local fullEnabled = IsFullyEnabled()
     local stealthOnly = IsStealthOnlyMode()
@@ -833,8 +833,7 @@ spellGoFrame:SetScript("OnEvent", function()
 
     local spellId    = arg2
     local casterGuid = arg3
-    local numHit     = arg6 or 0
-    local numMissed  = arg7 or 0
+
 
     if not casterGuid or not spellId then return end
 
@@ -851,9 +850,6 @@ spellGoFrame:SetScript("OnEvent", function()
         end
         return
     end
-
-    -- Spell went nowhere (all missed, none hit) → skip
-    if numMissed > 0 and numHit == 0 then return end
 
     -- Must be an existing player
     if not UnitExists(casterGuid)    then return end
@@ -916,7 +912,7 @@ spellGoFrame:SetScript("OnEvent", function()
         Spy:AddDetected(playerName, time(), false, nil)
         if IsDebugMode() then
             DEFAULT_CHAT_FRAME:AddMessage(
-                "|cff00ff00[SpyNP SPELL_GO]|r ✓ "
+                TS() .. "|cff00ff00[SpyNP " .. event .. "]|r ✓ "
                 .. playerName
                 .. " (spellId=" .. spellId .. ")"
             )
@@ -939,7 +935,7 @@ spellGoFrame:SetScript("OnEvent", function()
 
         if IsDebugMode() then
             DEFAULT_CHAT_FRAME:AddMessage(
-                "|cffff00ff[SpyNP SPELL_GO]|r "
+                "|cffff00ff[SpyNP SPELL_START]|r "
                 .. playerName .. " → " .. stealthType
             )
         end
@@ -1171,12 +1167,12 @@ function SpyNP:Initialize()
         return false
     end
 
-    -- Enable required CVar
+    -- Enable required CVars
     if SetCVar then
-        if GetCVar("NP_EnableSpellGoEvents") ~= "1" then
-            SetCVar("NP_EnableSpellGoEvents", "1")
+        if GetCVar("NP_EnableSpellStartEvents") ~= "1" then
+            SetCVar("NP_EnableSpellStartEvents", "1")
             DEFAULT_CHAT_FRAME:AddMessage(
-                TS() .. "|cff00ff00[SpyNP]|r NP_EnableSpellGoEvents → 1"
+                TS() .. "|cff00ff00[SpyNP]|r NP_EnableSpellStartEvents → 1"
             )
         end
     end
@@ -1283,7 +1279,7 @@ SlashCmdList["SPYPETTEST"] = function()
     DEFAULT_CHAT_FRAME:AddMessage("GUID:         " .. tostring(guid))
 end
 
--- SPELL_GO_OTHER cast logger (toggleable, /spyevent)
+-- SPELL_START_OTHER cast logger (toggleable, /spyevent)
 local castLogger = CreateFrame("Frame")
 local isLogging  = false
 castLogger:RegisterEvent("PLAYER_LOGOUT")
@@ -1293,7 +1289,7 @@ castLogger:SetScript("OnEvent", function()
         this:SetScript("OnEvent", nil)
         return
     end
-    if event ~= "SPELL_GO_OTHER" then return end
+    if event ~= "SPELL_START_OTHER" then return end
     local spellId    = arg2
     local casterGuid = arg3
     local casterName = (casterGuid and UnitExists(casterGuid)
@@ -1312,12 +1308,12 @@ SLASH_SPYEVENT1 = "/spyevent"
 SlashCmdList["SPYEVENT"] = function()
     isLogging = not isLogging
     if isLogging then
-        castLogger:RegisterEvent("SPELL_GO_OTHER")
+        castLogger:RegisterEvent("SPELL_START_OTHER")
         DEFAULT_CHAT_FRAME:AddMessage(
-            TS() .. "|cff00ff00[SpyNP]|r Cast Logger ENABLED (SPELL_GO_OTHER)"
+            TS() .. "|cff00ff00[SpyNP]|r Cast Logger ENABLED (SPELL_START_OTHER)"
         )
     else
-        castLogger:UnregisterEvent("SPELL_GO_OTHER")
+        castLogger:UnregisterEvent("SPELL_START_OTHER")
         DEFAULT_CHAT_FRAME:AddMessage(
             TS() .. "|cffff0000[SpyNP]|r Cast Logger DISABLED"
         )
