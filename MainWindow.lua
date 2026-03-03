@@ -1407,22 +1407,54 @@ hpUpdateFrame:SetScript("OnUpdate", function()
 			if not guid or not UnitExists(guid) then
 				-- No valid GUID - skip this frame
 			else
-				local currentHP = UnitHealth(guid)
-				local maxHP = UnitHealthMax(guid)
-				
-				if maxHP > 0 then
-					local healthPercent = currentHP / maxHP
-					local barValue = healthPercent * 100
-					
+				-- Use GetUnitField (Nampower) for accurate HP values.
+				-- More reliable than UnitHealth/UnitHealthMax which can return
+				-- stale data after Feign Death or during the release animation.
+				local currentHP, maxHP
+				if GetUnitField then
+					currentHP = GetUnitField(guid, "health")
+					maxHP     = GetUnitField(guid, "maxHealth")
+				else
+					currentHP = UnitHealth(guid)
+					maxHP     = UnitHealthMax(guid)
+				end
+
+				if maxHP and maxHP > 0 and currentHP ~= nil then
+					local barValue = (currentHP / maxHP) * 100
+
 					local currentValue = frame.StatusBar:GetValue()
 					-- Only update if difference is significant (avoid micro-updates)
 					if math.abs(currentValue - barValue) > 1 then
 						frame.StatusBar:SetValue(barValue)
-						
-						-- Update class color (from old SetupBar OnUpdate)
+
+						-- Update class color
 						local class = frame.playerClass or "UNKNOWN"
 						local r, g, b = Spy:GetClassColor(class)
 						frame.StatusBar:SetStatusBarColor(r, g, b, 1)
+					end
+
+					-- hp=0: immediately move to InactiveList without waiting for scan tick
+					-- This gives instant visual feedback (grayed out) on death or Feign Death.
+					-- UNIT_DIED (Nampower) will do the real removal later.
+					if currentHP == 0 then
+						if Spy.ActiveList[playerName] then
+							Spy.InactiveList[playerName] = Spy.ActiveList[playerName]
+							Spy.ActiveList[playerName]   = nil
+							Spy:RefreshCurrentList()
+							Spy:UpdateActiveCount()
+						end
+					-- hp>0: move back to ActiveList only if truly alive (FD hunter stood up)
+					-- Block if: ghost, or player already pressed Release (spell 8326 seen)
+					elseif Spy.InactiveList[playerName] and not Spy.ActiveList[playerName] then
+						local isGhost    = UnitIsGhost and UnitIsGhost(guid)
+						local isReleased = SpySW and SpySW.releasedGuids and SpySW.releasedGuids[guid]
+						if not isGhost and not isReleased then
+							-- Feign Death hunter stood up → back to Active
+							Spy.ActiveList[playerName]   = GetTime()
+							Spy.InactiveList[playerName] = nil
+							Spy:RefreshCurrentList()
+							Spy:UpdateActiveCount()
+						end
 					end
 				end
 			end

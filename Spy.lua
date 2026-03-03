@@ -1875,11 +1875,11 @@ function Spy:OnEnable(first)
 		DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy DEBUG]|r DB ready, Enabled=" .. tostring(Spy.db.profile.Enabled))
 	end
 	
-	-- ✅ CRITICAL FIX: Wait for SpySuperWoW.lua to load
-	-- SpySuperWoW.lua is loaded AFTER Spy.lua, but OnEnable can be called before all files are loaded
-	if not SpyModules or not SpyModules.SuperWoW then
+	-- ✅ CRITICAL FIX: Wait for SpyNampower.lua to load
+	-- SpyNampower.lua is loaded AFTER Spy.lua, but OnEnable can be called before all files are loaded
+	if not SpyModules or not SpyModules.Nampower then
 		if Spy.DebugEnabled then
-			DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy DEBUG]|r SpyModules.SuperWoW not loaded yet, scheduling retry...")
+			DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy DEBUG]|r SpyModules.Nampower not loaded yet, scheduling retry...")
 		end
 		-- ✅ FIX: Cancel existing retry timer before scheduling new one
 		if Spy.onEnableRetryTimer then
@@ -1893,30 +1893,30 @@ function Spy:OnEnable(first)
 	Spy.onEnableRetryTimer = nil
 	
 	if Spy.DebugEnabled then
-		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy DEBUG]|r SpyModules.SuperWoW is loaded")
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy DEBUG]|r SpyModules.Nampower is loaded")
 	end
 	
-	-- Initialize SuperWoW module if available (loaded from SpySuperWoW.lua)
-	if not Spy.HasSuperWoW and SpyModules and SpyModules.SuperWoW then
+	-- Initialize Nampower module if available (loaded from SpyNampower.lua)
+	if not Spy.HasNampower and SpyModules and SpyModules.Nampower then
 		if Spy.DebugEnabled then
-			DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy DEBUG]|r Initializing SuperWoW...")
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy DEBUG]|r Initializing Nampower...")
 		end
-		-- Try to initialize SuperWoW (only once)
-		if SpyModules.SuperWoW:Initialize() then
-			Spy.HasSuperWoW = true
-			Spy.SuperWoW = SpyModules.SuperWoW
+		-- Try to initialize Nampower (only once)
+		if SpyModules.Nampower:Initialize() then
+			Spy.HasNampower = true
+			Spy.SuperWoW = SpyModules.Nampower  -- alias kept for internal references
 			if Spy.DebugEnabled then
-				DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy DEBUG]|r SuperWoW initialized OK")
+				DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spy DEBUG]|r Nampower initialized OK")
 			end
 		else
-			Spy.HasSuperWoW = false
+			Spy.HasNampower = false
 			if Spy.DebugEnabled then
-				DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy DEBUG]|r SuperWoW init FAILED")
+				DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy DEBUG]|r Nampower init FAILED")
 			end
 		end
 	else
 		if Spy.DebugEnabled then
-			DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy DEBUG]|r SuperWoW already initialized: " .. tostring(Spy.HasSuperWoW))
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy DEBUG]|r Nampower already initialized: " .. tostring(Spy.HasNampower))
 		end
 	end
 	
@@ -1950,7 +1950,7 @@ function Spy:OnEnable(first)
 	
 	-- ✅ FIX: Clear all lists on startup to prevent showing stale data from last session
 	-- Old players from SavedVariables are no longer nearby after a reload
-	-- Clear SpySW detected players cache
+	-- Clear SpyNP detected players cache
 	if SpySW and SpySW.detectedPlayers then
 		for k in pairs(SpySW.detectedPlayers) do
 			SpySW.detectedPlayers[k] = nil
@@ -1990,13 +1990,13 @@ function Spy:OnEnable(first)
 	Spy:RegisterEvent("PLAYER_ENTERING_WORLD", "ZoneChangedEvent")
 	Spy:RegisterEvent("UNIT_FACTION", "ZoneChangedEvent")
 	
-	-- SuperWoW is REQUIRED - no fallback to classic detection
-	if Spy.HasSuperWoW and Spy.SuperWoW then
-		-- SuperWoW is available - use modern GUID-based scanning
+	-- Nampower is REQUIRED - no fallback to classic detection
+	if Spy.HasNampower and Spy.SuperWoW then
+		-- Nampower is available - use GUID-based scanning
 		Spy.SuperWoW:Enable()
 		
-		-- Register RAW_COMBATLOG for direct combat log parsing (SuperWoW feature)
-		Spy:RegisterEvent("RAW_COMBATLOG", "RawCombatLogEvent")
+		-- Register SPELL_GO_OTHER for LastAttack tracking (replaces RAW_COMBATLOG)
+		Spy:RegisterEvent("SPELL_GO_OTHER", "SpellGoOtherLastAttack")
 		
 		-- Register minimal events for Win/Loss tracking
 		Spy:RegisterEvent("CHAT_MSG_COMBAT_FRIENDLY_DEATH", "DeathLogEvent")
@@ -2005,8 +2005,8 @@ function Spy:OnEnable(first)
 		-- ✅ Register UNIT_COMBAT for LastAttack tracking
 		Spy:RegisterEvent("UNIT_COMBAT", "UnitCombatEvent")
 	else
-		-- SuperWoW NOT available - Spy will not function
-		DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy]|r ERROR: SuperWoW is required! Spy is disabled.")
+		-- Nampower NOT available - Spy will not function
+		DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy]|r ERROR: Nampower is required! Spy is disabled.")
 		return
 	end
 	
@@ -2064,9 +2064,9 @@ function Spy:OnDisable()
 		Spy.timeid = nil
 	end
 	
-	-- ✅ FIX: Only disable SuperWoW if Stealth-Only mode is NOT active
+	-- ✅ FIX: Only disable Nampower if Stealth-Only mode is NOT active
 	if not stealthOnlyMode then
-		if Spy.HasSuperWoW and Spy.SuperWoW then
+		if Spy.HasNampower and Spy.SuperWoW then
 			Spy.SuperWoW:Disable()
 		end
 		
@@ -2085,20 +2085,19 @@ function Spy:OnDisable()
 		Spy:UnregisterEvent("ZONE_CHANGED_INDOORS")
 		Spy:UnregisterEvent("PLAYER_ENTERING_WORLD")
 		Spy:UnregisterEvent("UNIT_FACTION")
-		Spy:UnregisterEvent("RAW_COMBATLOG")
+		Spy:UnregisterEvent("SPELL_GO_OTHER")
 		Spy:UnregisterEvent("CHAT_MSG_COMBAT_FRIENDLY_DEATH")
 		Spy:UnregisterEvent("CHAT_MSG_COMBAT_HOSTILE_DEATH")
 		Spy:UnregisterEvent("PLAYER_REGEN_ENABLED")
 		Spy:UnregisterEvent("PLAYER_DEAD")
 		Spy:UnregisterComm(Spy.Signature)
 	else
-		-- Stealth-Only mode: Keep SuperWoW active but minimal events
+		-- Stealth-Only mode: Keep Nampower active but minimal events
 		if Spy.db.profile.DebugMode then
-			DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy]|r Stealth-Only mode: SuperWoW stays active")
+			DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy]|r Stealth-Only mode: Nampower stays active")
 		end
 		
 		-- Unregister only non-essential events
-		Spy:UnregisterEvent("RAW_COMBATLOG")
 		Spy:UnregisterEvent("CHAT_MSG_COMBAT_FRIENDLY_DEATH")
 		Spy:UnregisterEvent("CHAT_MSG_COMBAT_HOSTILE_DEATH")
 		Spy:UnregisterEvent("PLAYER_REGEN_ENABLED")
@@ -2593,241 +2592,49 @@ function Spy:ProcessPlayerDeath()
 	end
 end
 
--- RAW_COMBATLOG Event Handler (SuperWoW feature)
--- Parses raw combat log text to track last attacker
-local playerName = UnitName("player")
-
--- ✅ PERFORMANCE: Event throttling for large battles
+-- LastAttack tracking via SPELL_GO_OTHER (Nampower)
+-- Replaces RAW_COMBATLOG which was a SuperWoW-only event.
+-- arg1=itemId  arg2=spellId  arg3=casterGuid  arg4=targetGuid  arg6=numHit  arg7=numMissed
+local COMBATLOG_THROTTLE = 0.05
 local lastCombatLogProcess = 0
-local COMBATLOG_THROTTLE = 0.05  -- Process max every 50ms (20 events/sec)
 
--- ✅ PERFORMANCE: Pre-compile common patterns
-local GUID_PATTERN = "(0x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x)"
+function Spy:SpellGoOtherLastAttack()
+	if not Spy.EnabledInZone then return end
 
-function Spy:RawCombatLogEvent()
-	-- Don't process events if Spy is disabled in this zone
-	if not Spy.EnabledInZone then
-		return
-	end
-	
-	-- ✅ PERFORMANCE: Throttle event processing in large battles
 	local now = GetTime()
-	if now - lastCombatLogProcess < COMBATLOG_THROTTLE then
-		return  -- Skip this event to reduce lag
-	end
+	if now - lastCombatLogProcess < COMBATLOG_THROTTLE then return end
 	lastCombatLogProcess = now
-	
-	local eventName = arg1
-	local eventText = arg2
-	
-	-- ✅ PERFORMANCE: Skip friendly/tradeskill events early (no need to process)
-	if eventName then
-		if strfind(eventName, "TRADESKILLS") then
-			return
-		end
-		if strfind(eventName, "FRIENDLY") then
-			return
-		end
-		-- Skip SELF events (our own actions) except VS_SELF (damage TO us)
-		if strfind(eventName, "SELF") and not strfind(eventName, "VS_SELF") then
-			return
-		end
-	end
-	
-	if Spy.DebugEnabled then
-		-- Only log hostile events
-		if eventName and strfind(eventName, "HOSTILE") then
-			DEFAULT_CHAT_FRAME:AddMessage("|cffaaff00[Spy Debug]|r RAW_COMBATLOG: " .. tostring(eventName))
-			DEFAULT_CHAT_FRAME:AddMessage("|cffaaff00[Spy Debug]|r   text=" .. tostring(eventText))
-		end
-	end
-	
-	-- ✅ GUID Extractor for SuperWoW (OPTIMIZED)
-	if SpySW and eventText and strfind(eventText, "0x") then
-		-- Use pre-compiled pattern
-		local _, _, guid = strfind(eventText, GUID_PATTERN)
-		
-		if guid and UnitExists(guid) and UnitIsPlayer(guid) then
-			-- Add GUID to tracking
-			SpySW:AddUnit(guid)
-			
-			if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-				local name = UnitName(guid)
-				if name then
-					DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[SpySW COMBATLOG]|r GUID extracted: " .. name .. " (" .. guid .. ")")
-				end
-			end
-		end
-	end
-	
-	-- ✅ IMPROVED: Track LastAttack from damage messages with comprehensive patterns
-	local playerName = UnitName("player")
-	
-	-- ✅ PERFORMANCE: Early return for self-damage (skip all pattern matching)
-	if not eventText then return end
-	if strfind(eventText, "your own") or strfind(eventText, "You lose") then
-		return
-	end
-	
-	-- ✅ DEBUG: Show all hits/crits to check for pet names
+
+	local spellId    = arg2
+	local casterGuid = arg3
+	local numHit     = arg6 or 0
+	local numMissed  = arg7 or 0
+
+	if not casterGuid then return end
+	if numMissed > 0 and numHit == 0 then return end  -- spell missed entirely
+
+	if not UnitExists(casterGuid) then return end
+	if not UnitIsPlayer(casterGuid) then return end
+
+	-- Enemy faction only
+	local playerFaction  = UnitFactionGroup("player")
+	local attackerFaction = UnitFactionGroup(casterGuid)
+	if playerFaction and attackerFaction and playerFaction == attackerFaction then return end
+
+	local attackerName = UnitName(casterGuid)
+	if not attackerName then return end
+
+	local localPlayerName = UnitName("player")
+	if attackerName == localPlayerName then return end
+
+	Spy.LastAttack     = attackerName
+	Spy.LastAttackGuid = casterGuid
+
 	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-		if strfind(eventText, " hits you") or strfind(eventText, " crits you") then
-			DEFAULT_CHAT_FRAME:AddMessage("|cffff00ff[Spy Pet Debug]|r HIT TEXT: " .. tostring(eventText))
-		end
-	end
-	
-	-- ✅ Track attacker from COMPREHENSIVE damage patterns
-	local attacker = nil
-	local attackerGuid = nil
-	
-	-- === GUID-based patterns (SuperWoW) ===
-	-- Pattern: "GUID hits you"
-	if not attacker then
-		local _, _, guid = strfind(eventText, "^(0x%x+) hits you")
-		if guid and UnitExists(guid) then
-			attackerGuid = guid
-			attacker = UnitName(guid)
-		end
-	end
-	
-	-- Pattern: "GUID crits you"
-	if not attacker then
-		local _, _, guid = strfind(eventText, "^(0x%x+) crits you")
-		if guid and UnitExists(guid) then
-			attackerGuid = guid
-			attacker = UnitName(guid)
-		end
-	end
-	
-	-- Pattern: "GUID's Spell hits/crits you"
-	if not attacker then
-		local _, _, guid = strfind(eventText, "^(0x%x+)'s .+ (%a+) you")
-		if guid and UnitExists(guid) then
-			attackerGuid = guid
-			attacker = UnitName(guid)
-		end
-	end
-	
-	-- === Name-based patterns ===
-	-- ✅ WICHTIG: Spezifische Patterns mit "'s" ZUERST, sonst matched "Name crits you" zu viel!
-	
-	-- Pattern: "Name's Spell hits you"
-	if not attacker then
-		_, _, attacker = strfind(eventText, "^([^']+)'s .+ hits you")
-	end
-	
-	-- Pattern: "Name's Spell crits you"
-	if not attacker then
-		_, _, attacker = strfind(eventText, "^([^']+)'s .+ crits you")
-	end
-	
-	-- Pattern: "Name hits you" (generisch, kommt NACH den spezifischen)
-	if not attacker then
-		_, _, attacker = strfind(eventText, "^(.+) hits you")
-	end
-	
-	-- Pattern: "Name crits you" (generisch, kommt NACH den spezifischen)
-	if not attacker then
-		_, _, attacker = strfind(eventText, "^(.+) crits you")
-	end
-	
-	-- === DoT patterns (Moonfire, etc) ===
-	-- Pattern: "You suffer X damage from Name's Spell"
-	if not attacker then
-		_, _, attacker = strfind(eventText, "damage from ([^']+)'s")
-	end
-	
-	-- Pattern: "Name's Spell hits you for X Y damage"
-	if not attacker then
-		_, _, attacker = strfind(eventText, "^([^']+)'s .+ hits you for %d+")
-	end
-	
-	-- === Afflict/Absorb patterns ===
-	-- Pattern: "You are afflicted by Name's Spell"
-	if not attacker then
-		_, _, attacker = strfind(eventText, "afflicted by ([^']+)'s")
-	end
-	
-	-- Pattern: "Name's Spell was absorbed"
-	if not attacker then
-		_, _, attacker = strfind(eventText, "^([^']+)'s .+ was absorbed")
-	end
-	
-	-- === Reflect/Thorns patterns ===
-	-- Pattern: "GUID reflects X damage to you" (Thorns, Fire Shield, etc)
-	if not attacker then
-		local _, _, guid = strfind(eventText, "^(0x%x+) reflects %d+ .+ damage to you")
-		if guid and UnitExists(guid) then
-			attackerGuid = guid
-			attacker = UnitName(guid)
-		end
-	end
-	
-	-- Pattern: "Name reflects X damage to you"
-	if not attacker then
-		_, _, attacker = strfind(eventText, "^(.+) reflects %d+ .+ damage to you")
-	end
-	
-	-- === Drain/Leech patterns ===
-	-- Pattern: "Name gains X from Spell" (Life Drain, Mana Drain that damages you)
-	if not attacker then
-		_, _, attacker = strfind(eventText, "^(.+) gains %d+ .- from")
-	end
-	
-	-- Process attacker if found
-	if attacker then
-		-- ✅ If attacker is a GUID string, resolve to name
-		if strfind(tostring(attacker), "^0x") then
-			local guid = attacker
-			attackerGuid = guid
-			
-			-- Try to resolve GUID to name
-			if UnitExists(guid) then
-				attacker = UnitName(guid)
-			elseif SpySW and SpySW.GetNameFromGUID then
-				attacker = SpySW:GetNameFromGUID(guid)
-			end
-			
-			-- If we still can't resolve, skip this attacker
-			if not attacker or strfind(tostring(attacker), "^0x") then
-				if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-					DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00[Spy LastAttack]|r Could not resolve GUID: " .. tostring(guid))
-				end
-				attacker = nil
-			end
-		end
-		
-		-- Strip realm name if exists
-		if attacker then
-			local realmSep = strfind(attacker, "%-")
-			if realmSep then
-				attacker = strsub(attacker, 1, realmSep - 1)
-			end
-			
-			-- Only set if it's not yourself
-			if attacker ~= playerName then
-				-- ✅ FIX: Only track actual enemies, not friendly players
-				local isEnemy = true
-				if attackerGuid and UnitExists(attackerGuid) then
-					local playerFaction = UnitFactionGroup("player")
-					local attackerFaction = UnitFactionGroup(attackerGuid)
-					if playerFaction and attackerFaction and playerFaction == attackerFaction then
-						isEnemy = false
-					end
-				end
-				
-				if isEnemy then
-					-- Store both name and GUID if available
-					Spy.LastAttack = attacker
-					Spy.LastAttackGuid = attackerGuid
-					
-					if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-						local guidInfo = attackerGuid and (" [GUID: " .. attackerGuid .. "]") or ""
-						DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy LastAttack]|r Set to: " .. tostring(attacker) .. guidInfo)
-					end
-				end
-			end
-		end
+		DEFAULT_CHAT_FRAME:AddMessage(
+			"|cffff9900[Spy LastAttack via SPELL_GO]|r Set to: "
+			.. attackerName .. " [spellId=" .. tostring(spellId) .. "]"
+		)
 	end
 end
 
@@ -2849,31 +2656,31 @@ function Spy:UnitCombatEvent()
 	if arg1 ~= "player" then return end
 	if arg2 ~= "WOUND" then return end
 	if not arg4 or arg4 <= 0 then return end
-	
-	local attackerGuid = nil
-	local attackerName = nil
-	
-	-- Check if our target is attacking us
-	if UnitExists("target") and UnitIsPlayer("target") then
-		local _, targetGuid = UnitExists("target")
-		if targetGuid then
-			local playerFaction = UnitFactionGroup("player")
-			local targetFaction = UnitFactionGroup("target")
-			if playerFaction and targetFaction and playerFaction ~= targetFaction then
-				attackerGuid = targetGuid
-				attackerName = UnitName("target")
-			end
-		end
-	end
-	
-	-- If we found an attacker, set LastAttack
-	if attackerGuid and attackerName then
-		Spy.LastAttack = attackerName
-		Spy.LastAttackGuid = attackerGuid
-		
-		if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-			DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy LastAttack via UNIT_COMBAT]|r Set to: " .. tostring(attackerName) .. " [GUID: " .. attackerGuid .. "]")
-		end
+
+	-- Check if our target is an enemy player attacking us
+	if not UnitExists("target") then return end
+	if not UnitIsPlayer("target") then return end
+
+	local playerFaction = UnitFactionGroup("player")
+	local targetFaction = UnitFactionGroup("target")
+	if not playerFaction or not targetFaction then return end
+	if playerFaction == targetFaction then return end
+
+	-- Use GetUnitGUID (Nampower) instead of SuperWoW second-return from UnitExists
+	local targetGuid = GetUnitGUID and GetUnitGUID("target")
+	if not targetGuid then return end
+
+	local attackerName = UnitName("target")
+	if not attackerName then return end
+
+	Spy.LastAttack     = attackerName
+	Spy.LastAttackGuid = targetGuid
+
+	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+		DEFAULT_CHAT_FRAME:AddMessage(
+			"|cffff9900[Spy LastAttack via UNIT_COMBAT]|r Set to: "
+			.. attackerName .. " [GUID: " .. targetGuid .. "]"
+		)
 	end
 end
 

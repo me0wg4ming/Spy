@@ -125,15 +125,20 @@ function Spy:RefreshCurrentList(player, source)
 				opacity = 0.5
 			end
 			
-			-- HP-Bar: Try to get initial HP value
+			-- HP-Bar: initial value via GetUnitField (Nampower), fallback to UnitHealth
 			local currentBarValue = 100
-			
-			-- Try to get HP immediately if GUID available
+
 			local guid = frame.PlayerGUID
 			if guid and UnitExists(guid) then
-				local currentHP = UnitHealth(guid)
-				local maxHP = UnitHealthMax(guid)
-				if maxHP > 0 then
+				local currentHP, maxHP
+				if GetUnitField then
+					currentHP = GetUnitField(guid, "health")
+					maxHP     = GetUnitField(guid, "maxHealth")
+				else
+					currentHP = UnitHealth(guid)
+					maxHP     = UnitHealthMax(guid)
+				end
+				if maxHP and maxHP > 0 and currentHP then
 					currentBarValue = (currentHP / maxHP) * 100
 				end
 			end
