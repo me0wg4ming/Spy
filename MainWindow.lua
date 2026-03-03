@@ -1355,6 +1355,14 @@ end
 	Updates HP bars for all visible player frames every 0.1 seconds
 =============================================================================]]
 
+-- GuidInRange: works for FD hunters where UnitExists returns false.
+-- GetUnitGUID(guid) succeeds as long as the unit is in the client object list.
+local function GuidInRange(guid)
+    if not guid then return false end
+    if GetUnitGUID then return GetUnitGUID(guid) ~= nil end
+    return UnitExists(guid)
+end
+
 local hpUpdateFrame = CreateFrame("Frame")
 local hpUpdateTimer = 0
 local HP_UPDATE_INTERVAL = 0.1  -- Update every 0.1 seconds (smooth & efficient)
@@ -1389,7 +1397,7 @@ hpUpdateFrame:SetScript("OnUpdate", function()
 			local guid = frame.PlayerGUID
 			
 			-- Reload GUID if invalid (from old SetupBar OnUpdate)
-			if not guid or not UnitExists(guid) then
+			if not guid or not GuidInRange(guid) then
 				local playerData = SpyPerCharDB.PlayerData[playerName]
 				if playerData and playerData.guid then
 					guid = playerData.guid
@@ -1398,13 +1406,13 @@ hpUpdateFrame:SetScript("OnUpdate", function()
 				end
 				
 				-- Update frame GUID if we found a valid one
-				if guid and UnitExists(guid) then
+				if guid and GuidInRange(guid) then
 					frame.PlayerGUID = guid
 				end
 			end
 			
 			-- Skip if still no valid GUID
-			if not guid or not UnitExists(guid) then
+			if not guid or not GuidInRange(guid) then
 				-- No valid GUID - skip this frame
 			else
 				-- Use GetUnitField (Nampower) for accurate HP values.
@@ -1438,7 +1446,7 @@ hpUpdateFrame:SetScript("OnUpdate", function()
 					-- UNIT_DIED (Nampower) will do the real removal later.
 					if currentHP == 0 then
 						if Spy.ActiveList[playerName] then
-							Spy.InactiveList[playerName] = Spy.ActiveList[playerName]
+							Spy.InactiveList[playerName] = time()  -- fresh timestamp so InactiveTimeout counts from now
 							Spy.ActiveList[playerName]   = nil
 							Spy:RefreshCurrentList()
 							Spy:UpdateActiveCount()
@@ -1449,7 +1457,11 @@ hpUpdateFrame:SetScript("OnUpdate", function()
 						local isGhost    = UnitIsGhost and UnitIsGhost(guid)
 						local isReleased = SpySW and SpySW.releasedGuids and SpySW.releasedGuids[guid]
 						if not isGhost and not isReleased then
-							-- Feign Death hunter stood up → back to Active
+							-- Player is alive again (resurrected, or FD hunter stood up)
+							-- Clear deadGuids flag so scan loop treats them as alive again
+							if SpySW and SpySW.deadGuids then
+								SpySW.deadGuids[playerName] = nil
+							end
 							Spy.ActiveList[playerName]   = GetTime()
 							Spy.InactiveList[playerName] = nil
 							Spy:RefreshCurrentList()

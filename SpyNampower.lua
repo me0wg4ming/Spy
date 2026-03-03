@@ -49,6 +49,10 @@ local function IsDebugMode()
     return debugModeCache
 end
 
+local function TS()
+    return strformat("[%.2f] ", GetTime())
+end
+
 --[[===========================================================================
     Stealth Spell / Aura ID tables
 =============================================================================]]
@@ -94,6 +98,7 @@ SpyNP.auraScannedGuids  = {}   -- guid  → bool (aura scanned this range-cycle)
 SpyNP.lastScanPresent   = {}   -- guid  → bool (present in last OnUpdate scan)
 SpyNP.factionCache      = {}   -- guid  → faction string
 SpyNP.releasedGuids     = {}   -- guid  → true (pressed Release Spirit, spell 8326)
+SpyNP.deadGuids         = {}   -- name  → true (UNIT_DIED fired = real death, no distance)
 
 SpyNP.SCAN_INTERVAL    = 1.0
 SpyNP.CLEANUP_INTERVAL = 5
@@ -132,12 +137,22 @@ end
     Filter helpers
 =============================================================================]]
 
+-- GuidExists: checks if a GUID is known to the client.
+-- Uses GetUnitGUID(guid) instead of UnitExists(guid) because UnitExists returns
+-- false for Feign Death hunters (client hides them), while GetUnitGUID still
+-- resolves the GUID as long as the unit is in the client's object list.
+local function GuidExists(guid)
+    if not guid then return false end
+    if GetUnitGUID then return GetUnitGUID(guid) ~= nil end
+    return UnitExists(guid)  -- fallback if Nampower somehow unavailable
+end
+
 local function IsGhost(guid)
     return UnitIsGhost and UnitIsGhost(guid)
 end
 
 local function PassesSpyFilters(guid)
-    if not UnitExists(guid)   then return false end
+    if not GuidExists(guid)   then return false end
     if not UnitIsPlayer(guid) then return false end
     -- Ghosts are truly gone (spirit form after death), FD hunters are NOT ghosts
     if IsGhost(guid)          then return false end
@@ -155,7 +170,7 @@ end
 
 function SpyNP:AddGUID(guid)
     if not guid then return end
-    if not UnitExists(guid) then return end
+    if not GuidExists(guid) then return end
 
     local isPlayer     = UnitIsPlayer(guid)
     local isControlled = UnitPlayerControlled(guid)
@@ -188,6 +203,14 @@ function SpyNP:AddGUID(guid)
     -- Must be PvP flagged
     if not UnitIsPVP(guid) then return end
 
+    -- ✅ FIX: Skip dead players via GetUnitField (no frame delay, no FD false-positive)
+    -- UNIT_DIED already removed them from cache; this prevents re-entry from
+    -- trailing events (UNIT_HEALTH_GUID, UNIT_AURA_GUID) that fire after death.
+    if GetUnitField then
+        local hp = GetUnitField(guid, "health")
+        if hp ~= nil and hp == 0 then return end
+    end
+
     local isNew = (self.guids[guid] == nil)
     local now   = GetTime()
     self.guids[guid]      = now
@@ -195,13 +218,23 @@ function SpyNP:AddGUID(guid)
     if tf then self.factionCache[guid] = tf end
 
     local name = UnitName(guid)
-    if name then self.nameToGuid[name] = guid end
+    if name then
+        self.nameToGuid[name] = guid
+        -- ✅ FIX: Clear dead flag when player is alive again (respawned)
+        if self.deadGuids[name] then
+            self.deadGuids[name]       = nil
+            self.detectedPlayers[name] = nil  -- force re-detection → ActiveList
+            if Spy.InactiveList[name] then
+                Spy.InactiveList[name] = nil
+            end
+        end
+    end
 
     if isNew then
         self.Stats.guidsCollected = self.Stats.guidsCollected + 1
         if IsDebugMode() then
             DEFAULT_CHAT_FRAME:AddMessage(
-                "|cffff00ff[SpyNP]|r GUID collected: "
+                TS() .. "|cffff00ff[SpyNP]|r GUID collected: "
                 .. (name or "?") .. " (" .. class .. ")"
             )
         end
@@ -220,7 +253,7 @@ end
 
 function SpyNP:GetNameFromGUID(guid)
     if not guid then return nil end
-    if self.guids[guid] and UnitExists(guid) then
+    if self.guids[guid] and GuidExists(guid) then
         return UnitName(guid)
     end
     return nil
@@ -231,7 +264,7 @@ function SpyNP:GetGUIDFromName(playerName)
     local g = self.nameToGuid[playerName]
     if g then return g end
     for guid in pairs(self.guids) do
-        if UnitExists(guid) then
+        if GuidExists(guid) then
             local n = UnitName(guid)
             if n == playerName then
                 self.nameToGuid[playerName] = guid
@@ -245,7 +278,7 @@ end
 function SpyNP:GetFactionByGUID(guid)
     if not guid then return nil end
     if self.factionCache[guid] then return self.factionCache[guid] end
-    if UnitExists(guid) then
+    if GuidExists(guid) then
         local f = UnitFactionGroup(guid)
         if f then self.factionCache[guid] = f; return f end
     end
@@ -268,7 +301,7 @@ end
 =============================================================================]]
 
 local function GetPlayerData(guid)
-    if not UnitExists(guid)              then return nil end
+    if not GuidExists(guid)              then return nil end
     if not UnitIsPlayer(guid)            then return nil end
     if UnitIsGhost and UnitIsGhost(guid) then return nil end  -- spirit = truly gone
     if not UnitCanAttack("player", guid) then return nil end
@@ -351,7 +384,7 @@ function SpyNP:ScanNearbyPlayers(currentTime)
     self.lastScanPresent = {}
 
     for guid in pairs(self.enemyGuids) do
-        if UnitExists(guid) then
+        if GuidExists(guid) then
             self.enemyGuids[guid]      = currentTime
             self.guids[guid]           = currentTime
             self.lastScanPresent[guid] = true
@@ -360,7 +393,7 @@ function SpyNP:ScanNearbyPlayers(currentTime)
                 local n = UnitName(guid)
                 if n then
                     DEFAULT_CHAT_FRAME:AddMessage(
-                        "|cff00ffff[SpyNP SCAN]|r ✓ " .. n .. " returned to range"
+                        TS() .. "|cff00ffff[SpyNP SCAN]|r ✓ " .. n .. " returned to range"
                     )
                 end
             end
@@ -387,7 +420,7 @@ function SpyNP:ScanNearbyPlayers(currentTime)
                 local n = UnitName(guid)
                 if n then
                     DEFAULT_CHAT_FRAME:AddMessage(
-                        "|cffaaaaaa[SpyNP SCAN]|r ✗ " .. n .. " left range"
+                        TS() .. "|cffaaaaaa[SpyNP SCAN]|r ✗ " .. n .. " left range"
                     )
                 end
             end
@@ -406,7 +439,7 @@ function SpyNP:CleanupOldGUIDs(currentTime)
     local timeout = Spy.InactiveTimeout or 60
 
     for guid, lastSeen in pairs(self.guids) do
-        if not UnitExists(guid) then
+        if not GuidExists(guid) then
             local age = currentTime - lastSeen
             local shouldRemove = false
 
@@ -440,7 +473,7 @@ function SpyNP:CleanupOldGUIDs(currentTime)
 
                 if IsDebugMode() then
                     DEFAULT_CHAT_FRAME:AddMessage(
-                        "|cffaaaaaa[SpyNP Cleanup]|r Removed "
+                        TS() .. "|cffaaaaaa[SpyNP Cleanup]|r Removed "
                         .. (playerName or guid)
                         .. " after " .. math.floor(age) .. "s"
                     )
@@ -456,7 +489,7 @@ function SpyNP:CleanupOldGUIDs(currentTime)
 
     if removed > 0 and IsDebugMode() then
         DEFAULT_CHAT_FRAME:AddMessage(
-            "|cffaaaaaa[SpyNP Cleanup]|r Total removed: " .. removed
+            TS() .. "|cffaaaaaa[SpyNP Cleanup]|r Total removed: " .. removed
         )
     end
 end
@@ -499,7 +532,7 @@ local function TriggerStealthAlert(playerName, stealthType)
     if Spy and Spy.AlertStealthPlayer then
         if IsDebugMode() then
             DEFAULT_CHAT_FRAME:AddMessage(
-                "|cffff0000[SpyNP]|r ✔ STEALTH ALERT: "
+                TS() .. "|cffff0000[SpyNP]|r ✔ STEALTH ALERT: "
                 .. playerName
                 .. " (" .. (stealthType or "?") .. ")"
             )
@@ -563,7 +596,7 @@ local function ReportPlayerToSpy(playerData, currentTime)
         -- First detection
         if IsDebugMode() then
             DEFAULT_CHAT_FRAME:AddMessage(
-                "|cff00ff00[SpyNP]|r NEW: " .. playerName
+                TS() .. "|cff00ff00[SpyNP]|r NEW: " .. playerName
                 .. " Lvl" .. level
                 .. " " .. (playerData.class or "?")
                 .. (isNowDead and " [hp=0]" or "")
@@ -620,7 +653,7 @@ local function ReportPlayerToSpy(playerData, currentTime)
         elseif wasStealthed and not isNowStealthed then
             if IsDebugMode() then
                 DEFAULT_CHAT_FRAME:AddMessage(
-                    "|cffaaaaaa[SpyNP]|r " .. playerName .. " left stealth"
+                    TS() .. "|cffaaaaaa[SpyNP]|r " .. playerName .. " left stealth"
                 )
             end
         end
@@ -715,6 +748,7 @@ guidFrame:SetScript("OnEvent", function()
         this:SetScript("OnEvent", nil)
         for k in pairs(SpyNP.guids)           do SpyNP.guids[k]           = nil end
         for k in pairs(SpyNP.releasedGuids)   do SpyNP.releasedGuids[k]   = nil end
+        for k in pairs(SpyNP.deadGuids)         do SpyNP.deadGuids[k]         = nil end
         for k in pairs(SpyNP.enemyGuids)      do SpyNP.enemyGuids[k]      = nil end
         for k in pairs(SpyNP.nameToGuid)      do SpyNP.nameToGuid[k]      = nil end
         for k in pairs(SpyNP.detectedPlayers) do SpyNP.detectedPlayers[k] = nil end
@@ -803,6 +837,21 @@ spellGoFrame:SetScript("OnEvent", function()
     local numMissed  = arg7 or 0
 
     if not casterGuid or not spellId then return end
+
+    -- Release Spirit (spell 8326) must be checked first, before ANY other filters.
+    -- Ghosts fail UnitExists, UnitIsPlayer, UnitCanAttack — so we can't filter first.
+    -- We just set the flag and return; no list manipulation here.
+    if spellId == 8326 then
+        SpyNP.releasedGuids[casterGuid] = true
+        if IsDebugMode() then
+            DEFAULT_CHAT_FRAME:AddMessage(
+                TS() .. "|cffaaaaaa[SpyNP]|r " .. (UnitName(casterGuid) or casterGuid)
+                .. " pressed Release (8326) → stays Inactive"
+            )
+        end
+        return
+    end
+
     -- Spell went nowhere (all missed, none hit) → skip
     if numMissed > 0 and numHit == 0 then return end
 
@@ -840,20 +889,6 @@ spellGoFrame:SetScript("OnEvent", function()
 
     -- Must be attackable (range / protection zone)
     if not UnitCanAttack("player", casterGuid) then return end
-
-    -- Release Spirit (spell 8326): player pressed Release after death.
-    -- Mark GUID so the hp>0 check in MainWindow won't flip them back to Active.
-    -- UNIT_DIED will do the final cleanup.
-    if spellId == 8326 then
-        SpyNP.releasedGuids[casterGuid] = true
-        if IsDebugMode() then
-            DEFAULT_CHAT_FRAME:AddMessage(
-                "|cffaaaaaa[SpyNP]|r " .. (UnitName(casterGuid) or casterGuid)
-                .. " pressed Release (8326) → stays Inactive"
-            )
-        end
-        return
-    end
 
     -- Add to GUID tracking
     SpyNP:AddGUID(casterGuid)
@@ -941,6 +976,10 @@ diedFrame:SetScript("OnEvent", function()
     SpyNP.releasedGuids[guid] = nil
     if not SpyNP.guids[guid] then return end  -- not our concern
 
+    -- Remove from GUID tracking so scan loop stops processing this unit.
+    -- Do NOT touch NearbyList/ActiveList/InactiveList here -
+    -- the normal Cleanup timer handles removal from Nearby.
+    -- We only move them to Inactive so they appear grayed out.
     SpyNP.guids[guid]            = nil
     SpyNP.enemyGuids[guid]       = nil
     SpyNP.auraScannedGuids[guid] = nil
@@ -949,16 +988,30 @@ diedFrame:SetScript("OnEvent", function()
 
     for name, g in pairs(SpyNP.nameToGuid) do
         if g == guid then
-            SpyNP.detectedPlayers[name]  = nil
+            SpyNP.deadGuids[name]        = true  -- blocks reactivation + hides distance
+            SpyNP.detectedPlayers[name]  = nil   -- stop scan loop from re-reporting
             SpyNP.lastStealthState[name] = nil
             SpyNP.nameToGuid[name]       = nil
+
+            -- Move to Inactive (grayed out), let normal cleanup timer remove from Nearby.
+            -- Use time() as the Inactive timestamp so InactiveTimeout counts from NOW,
+            -- not from when they were last seen active (which could be old).
+            if Spy.ActiveList[name] then
+                Spy.InactiveList[name] = time()
+                Spy.ActiveList[name]   = nil
+                Spy:RefreshCurrentList()
+                Spy:UpdateActiveCount()
+            elseif not Spy.InactiveList[name] then
+                -- Already inactive (e.g. hp=0 path got there first) - ensure timestamp is fresh
+                Spy.InactiveList[name] = time()
+            end
             break
         end
     end
 
     if IsDebugMode() then
         DEFAULT_CHAT_FRAME:AddMessage(
-            "|cffaaaaaa[SpyNP]|r UNIT_DIED → removed " .. tostring(guid)
+            TS() .. "|cffaaaaaa[SpyNP]|r UNIT_DIED -> Inactive " .. tostring(guid)
         )
     end
 end)
@@ -1064,7 +1117,7 @@ end
 =============================================================================]]
 
 function SpyNP:Initialize()
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpyNP]|r Initializing...")
+    DEFAULT_CHAT_FRAME:AddMessage(TS() .. "|cff00ff00[SpyNP]|r Initializing...")
 
     -- Require Nampower (checks for GetNampowerVersion as capability marker)
     if not GetNampowerVersion then
@@ -1111,7 +1164,7 @@ function SpyNP:Initialize()
              or (maj == 3 and min == 0 and pat >= 0)
     if not ok then
         DEFAULT_CHAT_FRAME:AddMessage(
-            "|cffff0000[SpyNP]|r Nampower v"
+            TS() .. "|cffff0000[SpyNP]|r Nampower v"
             .. maj .. "." .. min .. "." .. pat
             .. " is too old – need 3.0.0+"
         )
@@ -1123,7 +1176,7 @@ function SpyNP:Initialize()
         if GetCVar("NP_EnableSpellGoEvents") ~= "1" then
             SetCVar("NP_EnableSpellGoEvents", "1")
             DEFAULT_CHAT_FRAME:AddMessage(
-                "|cff00ff00[SpyNP]|r NP_EnableSpellGoEvents → 1"
+                TS() .. "|cff00ff00[SpyNP]|r NP_EnableSpellGoEvents → 1"
             )
         end
     end
@@ -1132,7 +1185,7 @@ function SpyNP:Initialize()
     local testGuid = GetUnitGUID and GetUnitGUID("player")
     if testGuid then
         DEFAULT_CHAT_FRAME:AddMessage(
-            "|cff00ff00[SpyNP]|r Nampower v"
+            TS() .. "|cff00ff00[SpyNP]|r Nampower v"
             .. maj .. "." .. min .. "." .. pat
             .. " |cff00ff00[OK]|r  playerGUID=" .. testGuid
         )
@@ -1143,13 +1196,13 @@ function SpyNP:Initialize()
     end
 
     DEFAULT_CHAT_FRAME:AddMessage(
-        "|cff00ff00[SpyNP]|r GUID-based detection: |cff00ff00ACTIVE|r"
+        TS() .. "|cff00ff00[SpyNP]|r GUID-based detection: |cff00ff00ACTIVE|r"
     )
     DEFAULT_CHAT_FRAME:AddMessage(
-        "|cff00ff00[SpyNP]|r Proactive scanning:   |cff00ff00ACTIVE|r"
+        TS() .. "|cff00ff00[SpyNP]|r Proactive scanning:   |cff00ff00ACTIVE|r"
     )
     DEFAULT_CHAT_FRAME:AddMessage(
-        "|cff00ff00[SpyNP]|r Commands: /spystatus  /spybuff  /spypet  /spyevent"
+        TS() .. "|cff00ff00[SpyNP]|r Commands: /spystatus  /spybuff  /spypet  /spyevent"
     )
 
     return true
@@ -1164,23 +1217,23 @@ SlashCmdList["SPYSWSTATUS"] = function()
     if SpyModules and SpyModules.Nampower then
         SpyModules.Nampower:PrintStatus()
     else
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SpyNP]|r Module not loaded!")
+        DEFAULT_CHAT_FRAME:AddMessage(TS() .. "|cffff0000[SpyNP]|r Module not loaded!")
     end
 end
 
 SLASH_SPYBUFF1 = "/spybuff"
 SlashCmdList["SPYBUFF"] = function()
     DEFAULT_CHAT_FRAME:AddMessage(
-        "|cff00ff00[SpyNP]|r === AURA SCAN TEST (target) ==="
+        TS() .. "|cff00ff00[SpyNP]|r === AURA SCAN TEST (target) ==="
     )
     if not UnitExists("target") then
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SpyNP]|r No target selected!")
+        DEFAULT_CHAT_FRAME:AddMessage(TS() .. "|cffff0000[SpyNP]|r No target selected!")
         return
     end
     local name = UnitName("target")
     local guid = GUIDOf("target")
     DEFAULT_CHAT_FRAME:AddMessage(
-        "|cff00ff00[SpyNP]|r Target: " .. tostring(name)
+        TS() .. "|cff00ff00[SpyNP]|r Target: " .. tostring(name)
         .. "  GUID: " .. tostring(guid)
     )
     if guid and GetUnitField then
@@ -1194,34 +1247,34 @@ SlashCmdList["SPYBUFF"] = function()
                     local st = SpyModules.Nampower.STEALTH_AURA_IDS[sid]
                     local mark = st and (" |cffff0000<-- STEALTH: " .. st .. "|r") or ""
                     DEFAULT_CHAT_FRAME:AddMessage(
-                        "|cff00ff00[SpyNP]|r  aura[" .. i .. "] = " .. sid .. mark
+                        TS() .. "|cff00ff00[SpyNP]|r  aura[" .. i .. "] = " .. sid .. mark
                     )
                 end
             end
             DEFAULT_CHAT_FRAME:AddMessage(
-                "|cff00ff00[SpyNP]|r Total auras: " .. count
+                TS() .. "|cff00ff00[SpyNP]|r Total auras: " .. count
             )
         else
             DEFAULT_CHAT_FRAME:AddMessage(
-                "|cffffcc00[SpyNP]|r GetUnitField returned nil"
+                TS() .. "|cffffcc00[SpyNP]|r GetUnitField returned nil"
             )
         end
     else
         DEFAULT_CHAT_FRAME:AddMessage(
-            "|cffffcc00[SpyNP]|r GetUnitField / GetUnitGUID not available"
+            TS() .. "|cffffcc00[SpyNP]|r GetUnitField / GetUnitGUID not available"
         )
     end
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpyNP]|r === TEST COMPLETE ===")
+    DEFAULT_CHAT_FRAME:AddMessage(TS() .. "|cff00ff00[SpyNP]|r === TEST COMPLETE ===")
 end
 
 SLASH_SPYPETTEST1 = "/spypet"
 SlashCmdList["SPYPETTEST"] = function()
     if not UnitExists("target") then
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SpyNP]|r No target!")
+        DEFAULT_CHAT_FRAME:AddMessage(TS() .. "|cffff0000[SpyNP]|r No target!")
         return
     end
     local guid = GUIDOf("target")
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SpyNP]|r === PET TEST ===")
+    DEFAULT_CHAT_FRAME:AddMessage(TS() .. "|cff00ff00[SpyNP]|r === PET TEST ===")
     DEFAULT_CHAT_FRAME:AddMessage("Name:         " .. tostring(UnitName("target")))
     DEFAULT_CHAT_FRAME:AddMessage("IsPlayer:     " .. tostring(UnitIsPlayer("target")))
     DEFAULT_CHAT_FRAME:AddMessage("IsControlled: " .. tostring(UnitPlayerControlled("target")))
@@ -1261,12 +1314,12 @@ SlashCmdList["SPYEVENT"] = function()
     if isLogging then
         castLogger:RegisterEvent("SPELL_GO_OTHER")
         DEFAULT_CHAT_FRAME:AddMessage(
-            "|cff00ff00[SpyNP]|r Cast Logger ENABLED (SPELL_GO_OTHER)"
+            TS() .. "|cff00ff00[SpyNP]|r Cast Logger ENABLED (SPELL_GO_OTHER)"
         )
     else
         castLogger:UnregisterEvent("SPELL_GO_OTHER")
         DEFAULT_CHAT_FRAME:AddMessage(
-            "|cffff0000[SpyNP]|r Cast Logger DISABLED"
+            TS() .. "|cffff0000[SpyNP]|r Cast Logger DISABLED"
         )
     end
 end

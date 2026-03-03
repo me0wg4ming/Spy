@@ -98,35 +98,26 @@ function Spy.Distance:GetDistance(playerName)
         return nil
     end
     
-    -- Check if unit exists
-    if not UnitExists(guid) then
-        -- ✅ OPTIMIZATION: Skip expensive fallback iteration
-        -- If GUID doesn't exist, player is likely out of range
-        -- The fallback search is O(n²) and causes major lag with many players
-        -- Instead, return nil immediately and let cache handle stale data
-        return nil
-    end
-    
-    -- ✅ FIX: Don't show distance for dead players or ghosts
-    -- This prevents the "flash" when a player releases their corpse
-    -- Check multiple conditions because WoW API is inconsistent:
-    -- - Dead player: UnitIsDead=1, CanAttack=1 (!)
-    -- - Ghost: UnitIsDead=nil, CanAttack=nil, UnitIsGhost=1
-    -- - Also check HP=0 as fallback
-    if UnitIsDead(guid) then
-        -- ✅ Clear cache to prevent stale distance values
+    -- Real death: UNIT_DIED fired in SpyNampower → deadGuids[name] set.
+    -- Clear cache and skip distance display.
+    if SpySW and SpySW.deadGuids and SpySW.deadGuids[playerName] then
         self.cache[playerName] = nil
         self.globalDistanceCache[playerName] = nil
         return nil
     end
+
+    -- Check if unit is known to client (use GetUnitGUID, not UnitExists).
+    -- UnitExists returns false for Feign Death hunters even though they are
+    -- still in range. GetUnitGUID works as long as the unit is in object list.
+    local guidCheck = GetUnitGUID and GetUnitGUID(guid)
+    if not guidCheck then
+        return nil
+    end
+
+    -- Ghost = truly gone (released and now in spirit form). Skip.
+    -- Do NOT check UnitIsDead or hp=0: both are true for FD hunters.
+    -- Real death is signalled by UNIT_DIED which removes the GUID entirely.
     if UnitIsGhost and UnitIsGhost(guid) then
-        self.cache[playerName] = nil
-        self.globalDistanceCache[playerName] = nil
-        return nil
-    end
-    local health = UnitHealth(guid) or 0
-    local maxHealth = UnitHealthMax(guid) or 1
-    if health == 0 or maxHealth == 0 then
         self.cache[playerName] = nil
         self.globalDistanceCache[playerName] = nil
         return nil
@@ -393,7 +384,7 @@ deadDebugFrame:SetScript("OnUpdate", function()
     if not SpySW or not SpySW.enemyGuids then return end
     
     for guid, _ in pairs(SpySW.enemyGuids) do
-        if UnitExists(guid) then
+        if (GetUnitGUID and GetUnitGUID(guid) ~= nil or UnitExists(guid)) then
             local name = UnitName(guid) or "?"
             local isDead = UnitIsDead(guid)
             local canAttack = UnitCanAttack("player", guid)

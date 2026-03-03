@@ -719,8 +719,13 @@ function Spy:ManageNearbyListExpirations()
 		end
 	end
 	for player in pairs(Spy.InactiveList) do
-		if (currentTime - Spy.InactiveList[player]) > Spy.InactiveTimeout then
+		-- Dead players (UNIT_DIED fired) get a minimum 30s display time
+		-- so they remain visible in Nearby regardless of 'Remove Undetected' setting.
+		local isDead = SpySW and SpySW.deadGuids and SpySW.deadGuids[player]
+		local effectiveTimeout = isDead and math.max(Spy.InactiveTimeout, 30) or Spy.InactiveTimeout
+		if (currentTime - Spy.InactiveList[player]) > effectiveTimeout then
 			-- Map note cleanup removed - MapNoteList no longer exists
+			if SpySW and SpySW.deadGuids then SpySW.deadGuids[player] = nil end
 			Spy.InactiveList[player] = nil
 			Spy.NearbyList[player] = nil
 			-- Destroy player frame when removed from Nearby
@@ -1590,6 +1595,28 @@ function Spy:AddDetected(player, timestamp, learnt, source)
 end
 
 function Spy:AddDetectedToLists(player, timestamp, learnt, source)
+	-- If SpyNampower flagged this player as really dead (UNIT_DIED fired),
+	-- or if their hp is 0, never put them in ActiveList.
+	local function IsTrulyDead(playerName)
+		if SpySW and SpySW.deadGuids and SpySW.deadGuids[playerName] then
+			return true
+		end
+		-- Also check hp via GUID if available
+		local guid = SpySW and SpySW.nameToGuid and SpySW.nameToGuid[playerName]
+		if guid and GetUnitField then
+			local hp = GetUnitField(guid, "health")
+			if hp ~= nil and hp == 0 then
+				-- Only treat as dead if also released or ghost (not FD)
+				if (SpySW and SpySW.releasedGuids and SpySW.releasedGuids[guid])
+				   or (UnitIsGhost and UnitIsGhost(guid))
+				then
+					return true
+				end
+			end
+		end
+		return false
+	end
+
 	if not Spy.NearbyList[player] then
 		if Spy.db.profile.ShowOnDetection and not Spy.db.profile.MainWindowVis then
 			Spy:SetCurrentList(1)
@@ -1619,9 +1646,13 @@ function Spy:AddDetectedToLists(player, timestamp, learnt, source)
 		else
 			Spy.NearbyList[player] = timestamp
 			Spy.LastHourList[player] = timestamp
-			Spy.ActiveList[player] = timestamp
-			Spy.InactiveList[player] = nil
-			Spy:UpdateActiveCount()
+			if IsTrulyDead(player) then
+				Spy.InactiveList[player] = time()  -- fresh so InactiveTimeout counts from now
+			else
+				Spy.ActiveList[player] = timestamp
+				Spy.InactiveList[player] = nil
+				Spy:UpdateActiveCount()
+			end
 		end
 
 		if Spy.db.profile.CurrentList == 1 then
@@ -1650,9 +1681,11 @@ function Spy:AddDetectedToLists(player, timestamp, learnt, source)
 		-- DetectionTimestamp should only be set on BRAND NEW detection
 		
 		Spy.LastHourList[player] = timestamp
-		Spy.ActiveList[player] = timestamp
-		Spy.InactiveList[player] = nil
-		Spy:UpdateActiveCount()
+		if not IsTrulyDead(player) then
+			Spy.ActiveList[player] = timestamp
+			Spy.InactiveList[player] = nil
+			Spy:UpdateActiveCount()
+		end
 
 		-- ✅ ALWAYS refresh the UI to update opacity (grayed out -> active)
 		if Spy.db.profile.CurrentList == 1 then
@@ -1684,9 +1717,11 @@ function Spy:AddDetectedToLists(player, timestamp, learnt, source)
 		-- Updating it here causes players to "jump around" in the list on HP updates
 		
 		Spy.NearbyList[player] = timestamp
-		Spy.ActiveList[player] = timestamp
 		Spy.LastHourList[player] = timestamp
-		Spy:UpdateActiveCount()
+		if not IsTrulyDead(player) then
+			Spy.ActiveList[player] = timestamp
+			Spy:UpdateActiveCount()
+		end
 		
 		-- ✅ CRITICAL FIX: Always refresh the UI when in Nearby list mode
 		-- Even if no new information was learned (learnt == false)
