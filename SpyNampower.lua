@@ -5,14 +5,29 @@ Replaces SpySuperWoW.lua entirely. Requires Nampower >= 3.0.0.
 No SuperWoW dependency whatsoever.
 
 Detection sources:
-  - SPELL_START_OTHER  → enemy cast (incl. instant Stealth alert via spell IDs)
-  - UNIT_AURA_GUID     → aura change on any tracked GUID (Nampower GUID event)
-  - UNIT_FLAGS_GUID    → flags change (PvP, combat)
-  - UNIT_HEALTH_GUID   → health change
-  - UNIT_COMBAT_GUID   → combat feedback
-  - UNIT_DIED          → real death → immediate GUID cleanup
+  - SPELL_START_OTHER      → enemy cast begin (incl. instant Stealth alert via spell IDs)
+  - SPELL_GO_OTHER         → enemy cast completed / instant spells missed by START
+  - AUTO_ATTACK_OTHER      → melee auto-attacks (Warriors, Rogues who never cast)
+  - SPELL_DAMAGE_EVENT_OTHER → spell/DoT damage without a preceding GO event
+  - SPELL_MISS_OTHER       → missed/dodged/resisted attacks reveal attacker GUID
+  - SPELL_HEAL_BY_OTHER    → enemy healer healing someone
+  - BUFF_ADDED_OTHER       → aura applied (catches stealth going UP)
+  - BUFF_REMOVED_OTHER     → aura removed (catches stealth dropping)
+  - DEBUFF_ADDED_OTHER     → enemy gains a debuff (in combat signal)
+  - DEBUFF_REMOVED_OTHER   → debuff removed
+  - DAMAGE_SHIELD_OTHER    → Thorns/Fire Shield proc reveals attacker GUID
+  - UNIT_AURA_GUID         → aura change on any tracked GUID (Nampower GUID event)
+  - UNIT_FLAGS_GUID        → flags change (PvP, combat)
+  - UNIT_HEALTH_GUID       → health change
+  - UNIT_COMBAT_GUID       → combat feedback
+  - UNIT_DIED              → real death → immediate GUID cleanup
   - UPDATE_MOUSEOVER_UNIT, PLAYER_TARGET_CHANGED, PLAYER_ENTERING_WORLD
     → opportunistic collection via GetUnitGUID(token)
+
+Required CVars (set automatically on Initialize):
+  NP_EnableSpellStartEvents = 1
+  NP_EnableSpellGoEvents    = 1
+  NP_EnableAutoAttackEvents = 1
 
 GUID handling:
   - GetUnitGUID(token) is the primary source for GUIDs.
@@ -21,7 +36,8 @@ GUID handling:
   - UnitExists(guid) works because Nampower supports raw GUIDs as unit tokens.
   - Stealth detection uses GetUnitField(guid, "aura") to scan aura slots.
 
-Requires NP_EnableSpellStartEvents=1 (set automatically on Initialize).
+Required CVars set automatically on Initialize:
+  NP_EnableSpellStartEvents, NP_EnableSpellGoEvents, NP_EnableAutoAttackEvents
 ]]
 
 -- Register SpyModules.Nampower IMMEDIATELY as very first line of code.
@@ -99,6 +115,41 @@ SpyNP.lastScanPresent   = {}   -- guid  → bool (present in last OnUpdate scan)
 SpyNP.factionCache      = {}   -- guid  → faction string
 SpyNP.releasedGuids     = {}   -- guid  → true (pressed Release Spirit, spell 8326)
 SpyNP.deadGuids         = {}   -- name  → true (UNIT_DIED fired = real death, no distance)
+
+--[[
+    Hook tables — external code (e.g. Spy.lua) registers callbacks here
+    instead of listening to Nampower events directly.
+
+    Usage:
+        SpyNP.hooks.on_spell_go[myKey] = function(spellId, casterGuid, targetGuid, numHit, numMissed) end
+        SpyNP.hooks.on_auto_attack[myKey] = function(attackerGuid, targetGuid, damage, hitInfo) end
+        SpyNP.hooks.on_unit_died[myKey] = function(guid) end
+
+    Remove by setting the key to nil.
+]]
+SpyNP.hooks = {
+    on_spell_go    = {},   -- SPELL_GO_OTHER  (spellId, casterGuid, targetGuid, numHit, numMissed)
+    on_spell_start = {},   -- SPELL_START_OTHER (spellId, casterGuid, targetGuid)
+    on_auto_attack = {},   -- AUTO_ATTACK_OTHER (attackerGuid, targetGuid, damage, hitInfo)
+    on_spell_dmg   = {},   -- SPELL_DAMAGE_EVENT_OTHER (casterGuid, targetGuid, spellId, amount)
+    on_spell_miss  = {},   -- SPELL_MISS_OTHER  (casterGuid, targetGuid, spellId, missInfo)
+    on_spell_heal  = {},   -- SPELL_HEAL_BY_OTHER (casterGuid, targetGuid, spellId, amount)
+    on_buff_added  = {},   -- BUFF_ADDED_OTHER  (guid, spellId, stackCount)
+    on_buff_removed= {},   -- BUFF_REMOVED_OTHER (guid, spellId)
+    on_debuff_added= {},   -- DEBUFF_ADDED_OTHER (guid, spellId, stackCount)
+    on_debuff_removed={},  -- DEBUFF_REMOVED_OTHER (guid, spellId)
+    on_dmg_shield  = {},   -- DAMAGE_SHIELD_OTHER (shieldOwnerGuid, attackerGuid, damage)
+    on_energize    = {},   -- SPELL_ENERGIZE_BY_OTHER (casterGuid, targetGuid, spellId, powerType, amount)
+    on_aura_cast   = {},   -- AURA_CAST_ON_OTHER (spellId, casterGuid, targetGuid)
+    on_unit_died   = {},   -- UNIT_DIED  (guid)
+    on_guid_seen   = {},   -- fires whenever any GUID event reveals an enemy player (guid)
+}
+
+local function FireHooks(hookTable, a, b, c, d, e)
+    for _, fn in pairs(hookTable) do
+        fn(a, b, c, d, e)
+    end
+end
 
 SpyNP.SCAN_INTERVAL    = 1.0
 SpyNP.CLEANUP_INTERVAL = 5
@@ -798,15 +849,27 @@ guidFrame:SetScript("OnEvent", function()
                 SpyNP.auraScannedGuids[guid] = nil
             end
             SpyNP:AddGUID(guid)
+            FireHooks(SpyNP.hooks.on_guid_seen, guid)
         end
     end
 end)
 
 --[[===========================================================================
-    SPELL_START_OTHER frame
+    SPELL_START_OTHER / SPELL_GO_OTHER frame
     Instant detection + stealth alerting when an enemy casts a spell.
 
+    SPELL_START_OTHER fires on cast begin (has castTime, covers channeling).
+    SPELL_GO_OTHER    fires on cast complete / instant spells (no START fires
+                      for instants, so GO is the only signal for those).
+
+    Both share the same handler logic — casterGuid is arg3 in both.
+
     Nampower SPELL_START_OTHER parameters:
+      arg1 = itemId       arg2 = spellId     arg3 = casterGuid
+      arg4 = targetGuid   arg5 = castFlags   arg6 = castTime
+      arg7 = duration     arg8 = spellType   arg9 = corpseOwnerGuid
+
+    Nampower SPELL_GO_OTHER parameters:
       arg1 = itemId       arg2 = spellId     arg3 = casterGuid
       arg4 = targetGuid   arg5 = castFlags   arg6 = numHit
       arg7 = numMissed    arg8 = corpseOwnerGuid
@@ -815,6 +878,7 @@ end)
 local spellGoFrame = CreateFrame("Frame")
 spellGoFrame:RegisterEvent("PLAYER_LOGOUT")
 spellGoFrame:RegisterEvent("SPELL_START_OTHER")
+spellGoFrame:RegisterEvent("SPELL_GO_OTHER")
 
 spellGoFrame:SetScript("OnEvent", function()
     if event == "PLAYER_LOGOUT" then
@@ -825,7 +889,7 @@ spellGoFrame:SetScript("OnEvent", function()
     end
 
     if SpyNP.isShuttingDown  then return end
-    if event ~= "SPELL_START_OTHER" then return end
+    if event ~= "SPELL_START_OTHER" and event ~= "SPELL_GO_OTHER" then return end
 
     local fullEnabled = IsFullyEnabled()
     local stealthOnly = IsStealthOnlyMode()
@@ -889,6 +953,17 @@ spellGoFrame:SetScript("OnEvent", function()
     -- Add to GUID tracking
     SpyNP:AddGUID(casterGuid)
 
+    -- Fire hooks so external code (Spy.lua) can react without registering events directly
+    local targetGuid = arg4
+    local numHit     = arg6 or 0
+    local numMissed  = arg7 or 0
+    if event == "SPELL_GO_OTHER" then
+        FireHooks(SpyNP.hooks.on_spell_go, spellId, casterGuid, targetGuid, numHit, numMissed)
+    else
+        FireHooks(SpyNP.hooks.on_spell_start, spellId, casterGuid, targetGuid)
+    end
+    FireHooks(SpyNP.hooks.on_guid_seen, casterGuid)
+
     -- Build player data
     local _, classToken = UnitClass(casterGuid)
     if not classToken then
@@ -944,6 +1019,201 @@ spellGoFrame:SetScript("OnEvent", function()
             TriggerStealthAlert(playerName, stealthType)
         end
         SpyNP.lastStealthState[playerName] = true
+    end
+end)
+
+--[[===========================================================================
+    combatFrame
+    Catches all remaining combat signals that reveal enemy GUIDs:
+
+    AUTO_ATTACK_OTHER       arg1=attackerGuid  arg2=targetGuid
+    SPELL_DAMAGE_EVENT_OTHER arg1=targetGuid   arg2=casterGuid  arg3=spellId
+    SPELL_MISS_OTHER        arg1=casterGuid    arg2=targetGuid  arg3=spellId
+    SPELL_HEAL_BY_OTHER     arg1=targetGuid    arg2=casterGuid  arg3=spellId
+    SPELL_ENERGIZE_BY_OTHER arg1=targetGuid    arg2=casterGuid  arg3=spellId  (Innervate, Mana Tide etc.)
+    AURA_CAST_ON_OTHER      arg1=spellId       arg2=casterGuid  arg3=targetGuid (backup when BUFF_ADDED misses due to cap)
+    BUFF_ADDED_OTHER        arg1=guid          (aura applied)
+    BUFF_REMOVED_OTHER      arg1=guid          (aura removed – stealth dropped)
+    DEBUFF_ADDED_OTHER      arg1=guid
+    DEBUFF_REMOVED_OTHER    arg1=guid
+    DAMAGE_SHIELD_OTHER     arg1=unitGuid      arg2=targetGuid  (Thorns etc.)
+
+    For BUFF/DEBUFF: arg3=spellId so we can detect stealth-buff application
+    even when SPELL_START_OTHER didn't fire (e.g. re-stealth out of combat).
+=============================================================================]]
+
+local combatFrame = CreateFrame("Frame")
+combatFrame:RegisterEvent("PLAYER_LOGOUT")
+combatFrame:RegisterEvent("AUTO_ATTACK_OTHER")
+combatFrame:RegisterEvent("SPELL_DAMAGE_EVENT_OTHER")
+combatFrame:RegisterEvent("SPELL_MISS_OTHER")
+combatFrame:RegisterEvent("SPELL_HEAL_BY_OTHER")
+combatFrame:RegisterEvent("SPELL_ENERGIZE_BY_OTHER")
+combatFrame:RegisterEvent("AURA_CAST_ON_OTHER")
+combatFrame:RegisterEvent("BUFF_ADDED_OTHER")
+combatFrame:RegisterEvent("BUFF_REMOVED_OTHER")
+combatFrame:RegisterEvent("DEBUFF_ADDED_OTHER")
+combatFrame:RegisterEvent("DEBUFF_REMOVED_OTHER")
+combatFrame:RegisterEvent("DAMAGE_SHIELD_OTHER")
+
+combatFrame:SetScript("OnEvent", function()
+    if event == "PLAYER_LOGOUT" then
+        SpyNP.isShuttingDown = true
+        this:UnregisterAllEvents()
+        this:SetScript("OnEvent", nil)
+        return
+    end
+
+    if SpyNP.isShuttingDown then return end
+
+    local fullEnabled = IsFullyEnabled()
+    local stealthOnly = IsStealthOnlyMode()
+    if not fullEnabled and not stealthOnly then return end
+
+    -- ── Resolve which GUID is the enemy we care about ───────────────────
+    -- For each event, pick the GUID that belongs to the enemy player.
+    local guid
+
+    if event == "AUTO_ATTACK_OTHER" then
+        -- arg1=attackerGuid, arg2=targetGuid
+        -- The attacker is the one we want to track.
+        guid = arg1
+
+    elseif event == "SPELL_DAMAGE_EVENT_OTHER" then
+        -- arg1=targetGuid, arg2=casterGuid
+        guid = arg2
+
+    elseif event == "SPELL_MISS_OTHER" then
+        -- arg1=casterGuid, arg2=targetGuid
+        guid = arg1
+
+    elseif event == "SPELL_HEAL_BY_OTHER" then
+        -- arg1=targetGuid, arg2=casterGuid
+        -- Track the healer (casterGuid).
+        guid = arg2
+
+    elseif event == "SPELL_ENERGIZE_BY_OTHER" then
+        -- arg1=targetGuid, arg2=casterGuid
+        guid = arg2
+
+    elseif event == "AURA_CAST_ON_OTHER" then
+        -- arg1=spellId, arg2=casterGuid, arg3=targetGuid
+        -- NP_EnableAuraCastEvents CVar must be 1 (set in Initialize)
+        guid = arg2
+
+    elseif event == "BUFF_ADDED_OTHER"
+        or event == "BUFF_REMOVED_OTHER"
+        or event == "DEBUFF_ADDED_OTHER"
+        or event == "DEBUFF_REMOVED_OTHER"
+    then
+        -- arg1=guid, arg3=spellId
+        guid = arg1
+
+        -- Special: BUFF_ADDED_OTHER with a stealth spellId → stealth alert
+        if event == "BUFF_ADDED_OTHER" then
+            local spellId    = arg3
+            local stealthType = spellId and SpyNP.STEALTH_SPELL_IDS[spellId]
+            if stealthType and guid then
+                -- Invalidate aura cache so next scan re-checks
+                SpyNP.auraScannedGuids[guid] = nil
+                -- Try to resolve name for immediate stealth alert
+                if GuidExists(guid) and UnitIsPlayer(guid) then
+                    local playerName = UnitName(guid)
+                    if playerName and not SpyNP.lastStealthState[playerName] then
+                        -- Faction check
+                        local pf = UnitFactionGroup("player")
+                        local tf = UnitFactionGroup(guid)
+                        local isEnemy = (pf and tf) and (pf ~= tf)
+                                     or UnitIsEnemy("player", guid)
+                        if isEnemy then
+                            if IsDebugMode() then
+                                DEFAULT_CHAT_FRAME:AddMessage(
+                                    TS() .. "|cffff00ff[SpyNP BUFF_ADDED]|r "
+                                    .. playerName .. " → " .. stealthType
+                                )
+                            end
+                            TriggerStealthAlert(playerName, stealthType)
+                            SpyNP.lastStealthState[playerName] = true
+                        end
+                    end
+                end
+            end
+        elseif event == "BUFF_REMOVED_OTHER" then
+            -- Clear stealth state when stealth buff drops
+            local spellId    = arg3
+            local stealthType = spellId and SpyNP.STEALTH_SPELL_IDS[spellId]
+            if stealthType and guid then
+                SpyNP.auraScannedGuids[guid] = nil
+                if GuidExists(guid) and UnitIsPlayer(guid) then
+                    local playerName = UnitName(guid)
+                    if playerName then
+                        SpyNP.lastStealthState[playerName] = nil
+                        if IsDebugMode() then
+                            DEFAULT_CHAT_FRAME:AddMessage(
+                                TS() .. "|cffaaaaaa[SpyNP BUFF_REMOVED]|r "
+                                .. playerName .. " left stealth"
+                            )
+                        end
+                    end
+                end
+            end
+        end
+
+    elseif event == "DAMAGE_SHIELD_OTHER" then
+        -- arg1=unitGuid (shield owner), arg2=targetGuid (attacker who triggered it)
+        -- The attacker (arg2) is an enemy who hit someone — track them.
+        guid = arg2
+    end
+
+    if not guid then return end
+
+    -- ── Standard enemy-player checks ────────────────────────────────────
+    if not GuidExists(guid)   then return end
+    if not UnitIsPlayer(guid) then return end
+
+    local pf = UnitFactionGroup("player")
+    local tf = UnitFactionGroup(guid)
+    local isEnemy = (pf and tf) and (pf ~= tf) or UnitIsEnemy("player", guid)
+    if not isEnemy then return end
+
+    SpyNP.Stats.eventsProcessed = SpyNP.Stats.eventsProcessed + 1
+
+    -- BUFF/DEBUFF events don't require UnitCanAttack (unit may be out of combat range)
+    -- but all other combat events imply the unit just acted near someone we know about.
+    -- We still let AddGUID's own filters decide.
+    SpyNP:AddGUID(guid)
+
+    -- Fire the appropriate hook so Spy.lua doesn't need to register these events itself
+    if event == "AUTO_ATTACK_OTHER" then
+        FireHooks(SpyNP.hooks.on_auto_attack, arg1, arg2, arg3 or 0, arg4 or 0)
+    elseif event == "SPELL_DAMAGE_EVENT_OTHER" then
+        FireHooks(SpyNP.hooks.on_spell_dmg, arg2, arg1, arg3, arg4 or 0)
+    elseif event == "SPELL_MISS_OTHER" then
+        FireHooks(SpyNP.hooks.on_spell_miss, arg1, arg2, arg3, arg4)
+    elseif event == "SPELL_HEAL_BY_OTHER" then
+        FireHooks(SpyNP.hooks.on_spell_heal, arg2, arg1, arg3, arg4 or 0)
+    elseif event == "SPELL_ENERGIZE_BY_OTHER" then
+        FireHooks(SpyNP.hooks.on_energize, arg2, arg1, arg3, arg4, arg5 or 0)
+    elseif event == "AURA_CAST_ON_OTHER" then
+        FireHooks(SpyNP.hooks.on_aura_cast, arg1, arg2, arg3)
+    elseif event == "BUFF_ADDED_OTHER" then
+        FireHooks(SpyNP.hooks.on_buff_added, arg1, arg3, arg4 or 0)
+    elseif event == "BUFF_REMOVED_OTHER" then
+        FireHooks(SpyNP.hooks.on_buff_removed, arg1, arg3)
+    elseif event == "DEBUFF_ADDED_OTHER" then
+        FireHooks(SpyNP.hooks.on_debuff_added, arg1, arg3, arg4 or 0)
+    elseif event == "DEBUFF_REMOVED_OTHER" then
+        FireHooks(SpyNP.hooks.on_debuff_removed, arg1, arg3)
+    elseif event == "DAMAGE_SHIELD_OTHER" then
+        FireHooks(SpyNP.hooks.on_dmg_shield, arg1, arg2, arg3 or 0)
+    end
+    FireHooks(SpyNP.hooks.on_guid_seen, guid)
+
+    if IsDebugMode() then
+        local playerName = UnitName(guid) or tostring(guid)
+        DEFAULT_CHAT_FRAME:AddMessage(
+            TS() .. "|cff00ffff[SpyNP " .. event .. "]|r " .. playerName
+        )
     end
 end)
 
@@ -1005,6 +1275,9 @@ diedFrame:SetScript("OnEvent", function()
         end
     end
 
+    -- Fire hook AFTER internal state is cleaned up
+    FireHooks(SpyNP.hooks.on_unit_died, guid)
+
     if IsDebugMode() then
         DEFAULT_CHAT_FRAME:AddMessage(
             TS() .. "|cffaaaaaa[SpyNP]|r UNIT_DIED -> Inactive " .. tostring(guid)
@@ -1020,6 +1293,7 @@ function SpyNP:Enable()
     scanFrame:Show()
     guidFrame:Show()
     spellGoFrame:Show()
+    combatFrame:Show()
     diedFrame:Show()
 end
 
@@ -1027,6 +1301,7 @@ function SpyNP:Disable()
     scanFrame:Hide()
     guidFrame:Hide()
     spellGoFrame:Hide()
+    combatFrame:Hide()
     diedFrame:Hide()
 end
 
@@ -1175,6 +1450,24 @@ function SpyNP:Initialize()
                 TS() .. "|cff00ff00[SpyNP]|r NP_EnableSpellStartEvents → 1"
             )
         end
+        if GetCVar("NP_EnableSpellGoEvents") ~= "1" then
+            SetCVar("NP_EnableSpellGoEvents", "1")
+            DEFAULT_CHAT_FRAME:AddMessage(
+                TS() .. "|cff00ff00[SpyNP]|r NP_EnableSpellGoEvents → 1"
+            )
+        end
+        if GetCVar("NP_EnableAutoAttackEvents") ~= "1" then
+            SetCVar("NP_EnableAutoAttackEvents", "1")
+            DEFAULT_CHAT_FRAME:AddMessage(
+                TS() .. "|cff00ff00[SpyNP]|r NP_EnableAutoAttackEvents → 1"
+            )
+        end
+        if GetCVar("NP_EnableAuraCastEvents") ~= "1" then
+            SetCVar("NP_EnableAuraCastEvents", "1")
+            DEFAULT_CHAT_FRAME:AddMessage(
+                TS() .. "|cff00ff00[SpyNP]|r NP_EnableAuraCastEvents → 1"
+            )
+        end
     end
 
     -- Confirm GetUnitGUID availability
@@ -1279,9 +1572,41 @@ SlashCmdList["SPYPETTEST"] = function()
     DEFAULT_CHAT_FRAME:AddMessage("GUID:         " .. tostring(guid))
 end
 
--- SPELL_START_OTHER cast logger (toggleable, /spyevent)
+--[[===========================================================================
+    /spyevent  –  toggleable event logger for debugging detection coverage.
+    Shows every Nampower combat event that Spy uses to detect enemy players.
+    Useful to verify which events fire for a given class/situation.
+=============================================================================]]
+
 local castLogger = CreateFrame("Frame")
 local isLogging  = false
+castLogger:Show()  -- must be visible to receive events in vanilla WoW
+
+-- Events the logger can subscribe to (all gated, registered only when active)
+local LOG_EVENTS = {
+    -- spell events
+    "SPELL_START_OTHER",
+    "SPELL_GO_OTHER",
+    "SPELL_DAMAGE_EVENT_OTHER",
+    "SPELL_MISS_OTHER",
+    "SPELL_HEAL_BY_OTHER",
+    "SPELL_ENERGIZE_BY_OTHER",
+    -- melee
+    "AUTO_ATTACK_OTHER",
+    -- aura events
+    "AURA_CAST_ON_OTHER",
+    "BUFF_ADDED_OTHER",
+    "BUFF_REMOVED_OTHER",
+    "DEBUFF_ADDED_OTHER",
+    "DEBUFF_REMOVED_OTHER",
+    "DAMAGE_SHIELD_OTHER",
+    -- GUID events
+    "UNIT_AURA_GUID",
+    "UNIT_FLAGS_GUID",
+    "UNIT_HEALTH_GUID",
+    "UNIT_COMBAT_GUID",
+}
+
 castLogger:RegisterEvent("PLAYER_LOGOUT")
 castLogger:SetScript("OnEvent", function()
     if event == "PLAYER_LOGOUT" then
@@ -1289,33 +1614,220 @@ castLogger:SetScript("OnEvent", function()
         this:SetScript("OnEvent", nil)
         return
     end
-    if event ~= "SPELL_START_OTHER" then return end
-    local spellId    = arg2
-    local casterGuid = arg3
-    local casterName = (casterGuid and UnitExists(casterGuid)
-                        and UnitName(casterGuid)) or tostring(casterGuid)
-    local spellName  = (GetSpellRecField
-                        and GetSpellRecField(spellId, "name"))
-                       or ("spell#" .. tostring(spellId))
-    DEFAULT_CHAT_FRAME:AddMessage(
-        "|cffff00ff[CAST LOG]|r " .. tostring(casterName)
-        .. " cast " .. tostring(spellName)
-        .. " (id=" .. tostring(spellId) .. ")"
-    )
+
+    -- ── SPELL_START_OTHER / SPELL_GO_OTHER ──────────────────────────────
+    if event == "SPELL_START_OTHER" or event == "SPELL_GO_OTHER" then
+        local spellId    = arg2
+        local casterGuid = arg3
+        local casterName = (casterGuid and UnitExists(casterGuid)
+                            and UnitName(casterGuid)) or tostring(casterGuid)
+        local spellName  = (GetSpellRecField
+                            and GetSpellRecField(spellId, "name"))
+                           or ("spell#" .. tostring(spellId))
+        DEFAULT_CHAT_FRAME:AddMessage(
+            "|cffff00ff[" .. event .. "]|r "
+            .. tostring(casterName)
+            .. " → " .. tostring(spellName)
+            .. " (id=" .. tostring(spellId) .. ")"
+        )
+
+    -- ── AUTO_ATTACK_OTHER ───────────────────────────────────────────────
+    elseif event == "AUTO_ATTACK_OTHER" then
+        local attackerGuid = arg1
+        local targetGuid   = arg2
+        local damage       = arg3 or 0
+        local attackerName = (attackerGuid and UnitExists(attackerGuid)
+                              and UnitName(attackerGuid)) or tostring(attackerGuid)
+        local targetName   = (targetGuid and UnitExists(targetGuid)
+                              and UnitName(targetGuid)) or tostring(targetGuid)
+        DEFAULT_CHAT_FRAME:AddMessage(
+            "|cffff8800[AUTO_ATTACK_OTHER]|r "
+            .. tostring(attackerName) .. " → " .. tostring(targetName)
+            .. " (" .. damage .. " dmg)"
+        )
+
+    -- ── SPELL_DAMAGE_EVENT_OTHER ────────────────────────────────────────
+    elseif event == "SPELL_DAMAGE_EVENT_OTHER" then
+        local targetGuid = arg1
+        local casterGuid = arg2
+        local spellId    = arg3
+        local amount     = arg4 or 0
+        local casterName = (casterGuid and UnitExists(casterGuid)
+                            and UnitName(casterGuid)) or tostring(casterGuid)
+        local spellName  = (GetSpellRecField
+                            and GetSpellRecField(spellId, "name"))
+                           or ("spell#" .. tostring(spellId))
+        DEFAULT_CHAT_FRAME:AddMessage(
+            "|cffff4444[SPELL_DMG_OTHER]|r "
+            .. tostring(casterName)
+            .. " → " .. tostring(spellName)
+            .. " " .. amount .. " dmg"
+        )
+
+    -- ── SPELL_MISS_OTHER ────────────────────────────────────────────────
+    elseif event == "SPELL_MISS_OTHER" then
+        local casterGuid = arg1
+        local spellId    = arg3
+        local missInfo   = arg4
+        local missNames  = { [1]="Miss",[2]="Resist",[3]="Dodge",[4]="Parry",
+                             [5]="Block",[6]="Evade",[7]="Immune",[8]="Immune",
+                             [9]="Deflect",[10]="Absorb",[11]="Reflect" }
+        local casterName = (casterGuid and UnitExists(casterGuid)
+                            and UnitName(casterGuid)) or tostring(casterGuid)
+        local spellName  = (GetSpellRecField
+                            and GetSpellRecField(spellId, "name"))
+                           or ("spell#" .. tostring(spellId))
+        DEFAULT_CHAT_FRAME:AddMessage(
+            "|cffaaaaff[SPELL_MISS_OTHER]|r "
+            .. tostring(casterName)
+            .. " → " .. tostring(spellName)
+            .. " [" .. (missNames[missInfo] or tostring(missInfo)) .. "]"
+        )
+
+    -- ── SPELL_HEAL_BY_OTHER ─────────────────────────────────────────────
+    elseif event == "SPELL_HEAL_BY_OTHER" then
+        local targetGuid = arg1
+        local casterGuid = arg2
+        local spellId    = arg3
+        local amount     = arg4 or 0
+        local casterName = (casterGuid and UnitExists(casterGuid)
+                            and UnitName(casterGuid)) or tostring(casterGuid)
+        local spellName  = (GetSpellRecField
+                            and GetSpellRecField(spellId, "name"))
+                           or ("spell#" .. tostring(spellId))
+        DEFAULT_CHAT_FRAME:AddMessage(
+            "|cff00ff88[SPELL_HEAL_OTHER]|r "
+            .. tostring(casterName)
+            .. " healed for " .. amount
+            .. " (" .. tostring(spellName) .. ")"
+        )
+
+    -- ── BUFF_ADDED_OTHER / BUFF_REMOVED_OTHER ───────────────────────────
+    elseif event == "BUFF_ADDED_OTHER" or event == "BUFF_REMOVED_OTHER" then
+        local guid    = arg1
+        local spellId = arg3
+        local name    = (guid and UnitExists(guid)
+                         and UnitName(guid)) or tostring(guid)
+        local spellName = (GetSpellRecField
+                           and GetSpellRecField(spellId, "name"))
+                          or ("spell#" .. tostring(spellId))
+        local stealthMark = SpyNP.STEALTH_SPELL_IDS[spellId]
+                            and " |cffff0000<STEALTH>|r" or ""
+        local col = (event == "BUFF_ADDED_OTHER") and "|cff88ff88" or "|cffaaaaaa"
+        DEFAULT_CHAT_FRAME:AddMessage(
+            col .. "[" .. event .. "]|r "
+            .. tostring(name)
+            .. " → " .. tostring(spellName) .. stealthMark
+        )
+
+    -- ── DEBUFF_ADDED_OTHER / DEBUFF_REMOVED_OTHER ───────────────────────
+    elseif event == "DEBUFF_ADDED_OTHER" or event == "DEBUFF_REMOVED_OTHER" then
+        local guid    = arg1
+        local spellId = arg3
+        local name    = (guid and UnitExists(guid)
+                         and UnitName(guid)) or tostring(guid)
+        local spellName = (GetSpellRecField
+                           and GetSpellRecField(spellId, "name"))
+                          or ("spell#" .. tostring(spellId))
+        local col = (event == "DEBUFF_ADDED_OTHER") and "|cffff8844" or "|cffaaaaaa"
+        DEFAULT_CHAT_FRAME:AddMessage(
+            col .. "[" .. event .. "]|r "
+            .. tostring(name)
+            .. " → " .. tostring(spellName)
+        )
+
+    -- ── DAMAGE_SHIELD_OTHER ─────────────────────────────────────────────
+    elseif event == "DAMAGE_SHIELD_OTHER" then
+        local shieldOwner = arg1
+        local attackerGuid = arg2
+        local damage       = arg3 or 0
+        local ownerName   = (shieldOwner and UnitExists(shieldOwner)
+                             and UnitName(shieldOwner)) or tostring(shieldOwner)
+        local atkName     = (attackerGuid and UnitExists(attackerGuid)
+                             and UnitName(attackerGuid)) or tostring(attackerGuid)
+        DEFAULT_CHAT_FRAME:AddMessage(
+            "|cffff44ff[DAMAGE_SHIELD_OTHER]|r "
+            .. tostring(atkName) .. " hit " .. tostring(ownerName)
+            .. "'s shield for " .. damage
+        )
+
+    -- ── SPELL_ENERGIZE_BY_OTHER ─────────────────────────────────────────
+    elseif event == "SPELL_ENERGIZE_BY_OTHER" then
+        local targetGuid = arg1
+        local casterGuid = arg2
+        local spellId    = arg3
+        local powerType  = arg4
+        local amount     = arg5 or 0
+        local powerNames = { [0]="Mana",[1]="Rage",[2]="Focus",[3]="Energy",[4]="Happiness" }
+        local casterName = (casterGuid and UnitExists(casterGuid)
+                            and UnitName(casterGuid)) or tostring(casterGuid)
+        local spellName  = (GetSpellRecField
+                            and GetSpellRecField(spellId, "name"))
+                           or ("spell#" .. tostring(spellId))
+        DEFAULT_CHAT_FRAME:AddMessage(
+            "|cff44ffcc[SPELL_ENERGIZE_OTHER]|r "
+            .. tostring(casterName)
+            .. " → " .. tostring(spellName)
+            .. " +" .. amount .. " " .. (powerNames[powerType] or "?")
+        )
+
+    -- ── AURA_CAST_ON_OTHER ──────────────────────────────────────────────
+    elseif event == "AURA_CAST_ON_OTHER" then
+        local spellId    = arg1
+        local casterGuid = arg2
+        local targetGuid = arg3
+        local casterName = (casterGuid and UnitExists(casterGuid)
+                            and UnitName(casterGuid)) or tostring(casterGuid)
+        local spellName  = (GetSpellRecField
+                            and GetSpellRecField(spellId, "name"))
+                           or ("spell#" .. tostring(spellId))
+        DEFAULT_CHAT_FRAME:AddMessage(
+            "|cffccaaff[AURA_CAST_OTHER]|r "
+            .. tostring(casterName)
+            .. " → " .. tostring(spellName)
+        )
+
+    -- ── UNIT_*_GUID events ───────────────────────────────────────────────
+    elseif event == "UNIT_AURA_GUID"
+        or event == "UNIT_FLAGS_GUID"
+        or event == "UNIT_HEALTH_GUID"
+        or event == "UNIT_COMBAT_GUID"
+    then
+        local guid     = arg1
+        local isPlayer = (arg2 == 1)
+        if not isPlayer then return end
+        local name = (guid and UnitExists(guid) and UnitName(guid)) or tostring(guid)
+        local col  = "|cff888888"
+        if event == "UNIT_AURA_GUID"   then col = "|cff88ff88" end
+        if event == "UNIT_COMBAT_GUID" then col = "|cffffaa44" end
+        DEFAULT_CHAT_FRAME:AddMessage(
+            col .. "[" .. event .. "]|r " .. tostring(name)
+        )
+    end
 end)
 
 SLASH_SPYEVENT1 = "/spyevent"
 SlashCmdList["SPYEVENT"] = function()
     isLogging = not isLogging
     if isLogging then
-        castLogger:RegisterEvent("SPELL_START_OTHER")
+        for _, ev in ipairs(LOG_EVENTS) do
+            castLogger:RegisterEvent(ev)
+        end
         DEFAULT_CHAT_FRAME:AddMessage(
-            TS() .. "|cff00ff00[SpyNP]|r Cast Logger ENABLED (SPELL_START_OTHER)"
+            TS() .. "|cff00ff00[SpyNP]|r Event Logger |cff00ff00ENABLED|r"
+            .. " – logging " .. table.getn(LOG_EVENTS) .. " events"
+        )
+        DEFAULT_CHAT_FRAME:AddMessage(
+            "|cffffcc00  START/GO · AUTO_ATTACK · SPELL_DMG · SPELL_MISS"
+            .. " · HEAL · ENERGIZE · AURA_CAST · BUFF/DEBUFF · DMG_SHIELD"
+            .. " · UNIT_AURA/FLAGS/HEALTH/COMBAT_GUID|r"
         )
     else
-        castLogger:UnregisterEvent("SPELL_START_OTHER")
+        for _, ev in ipairs(LOG_EVENTS) do
+            castLogger:UnregisterEvent(ev)
+        end
         DEFAULT_CHAT_FRAME:AddMessage(
-            TS() .. "|cffff0000[SpyNP]|r Cast Logger DISABLED"
+            TS() .. "|cffff0000[SpyNP]|r Event Logger |cffff0000DISABLED|r"
         )
     end
 end

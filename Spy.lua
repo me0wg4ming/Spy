@@ -1995,8 +1995,30 @@ function Spy:OnEnable(first)
 		-- Nampower is available - use GUID-based scanning
 		Spy.SuperWoW:Enable()
 		
-		-- Register SPELL_GO_OTHER for LastAttack tracking (replaces RAW_COMBATLOG)
-		Spy:RegisterEvent("SPELL_GO_OTHER", "SpellGoOtherLastAttack")
+		-- Register SPELL_GO_OTHER for LastAttack tracking via SpyNampower hook
+		-- (SpyNampower owns all Nampower event registrations centrally)
+		if SpyModules and SpyModules.Nampower and SpyModules.Nampower.hooks then
+			SpyModules.Nampower.hooks.on_spell_go["spy_lastattack"] = function(spellId, casterGuid, targetGuid, numHit, numMissed)
+				if not Spy.EnabledInZone then return end
+				if numMissed and numMissed > 0 and (not numHit or numHit == 0) then return end
+				if not UnitExists(casterGuid) then return end
+				if not UnitIsPlayer(casterGuid) then return end
+				local playerFaction   = UnitFactionGroup("player")
+				local attackerFaction = UnitFactionGroup(casterGuid)
+				if playerFaction and attackerFaction and playerFaction == attackerFaction then return end
+				local attackerName = UnitName(casterGuid)
+				if not attackerName then return end
+				if attackerName == UnitName("player") then return end
+				Spy.LastAttack     = attackerName
+				Spy.LastAttackGuid = casterGuid
+				if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+					DEFAULT_CHAT_FRAME:AddMessage(
+						"|cffff9900[Spy LastAttack via SPELL_GO hook]|r Set to: "
+						.. attackerName .. " [spellId=" .. tostring(spellId) .. "]"
+					)
+				end
+			end
+		end
 		
 		-- Register minimal events for Win/Loss tracking
 		Spy:RegisterEvent("CHAT_MSG_COMBAT_FRIENDLY_DEATH", "DeathLogEvent")
@@ -2085,7 +2107,10 @@ function Spy:OnDisable()
 		Spy:UnregisterEvent("ZONE_CHANGED_INDOORS")
 		Spy:UnregisterEvent("PLAYER_ENTERING_WORLD")
 		Spy:UnregisterEvent("UNIT_FACTION")
-		Spy:UnregisterEvent("SPELL_GO_OTHER")
+		-- Remove SpyNampower hook instead of unregistering the event directly
+		if SpyModules and SpyModules.Nampower and SpyModules.Nampower.hooks then
+			SpyModules.Nampower.hooks.on_spell_go["spy_lastattack"] = nil
+		end
 		Spy:UnregisterEvent("CHAT_MSG_COMBAT_FRIENDLY_DEATH")
 		Spy:UnregisterEvent("CHAT_MSG_COMBAT_HOSTILE_DEATH")
 		Spy:UnregisterEvent("PLAYER_REGEN_ENABLED")
@@ -2596,51 +2621,8 @@ function Spy:ProcessPlayerDeath()
 	end
 end
 
--- LastAttack tracking via SPELL_GO_OTHER (Nampower)
--- Replaces RAW_COMBATLOG which was a SuperWoW-only event.
--- arg1=itemId  arg2=spellId  arg3=casterGuid  arg4=targetGuid  arg6=numHit  arg7=numMissed
-local COMBATLOG_THROTTLE = 0.05
-local lastCombatLogProcess = 0
-
-function Spy:SpellGoOtherLastAttack()
-	if not Spy.EnabledInZone then return end
-
-	local now = GetTime()
-	if now - lastCombatLogProcess < COMBATLOG_THROTTLE then return end
-	lastCombatLogProcess = now
-
-	local spellId    = arg2
-	local casterGuid = arg3
-	local numHit     = arg6 or 0
-	local numMissed  = arg7 or 0
-
-	if not casterGuid then return end
-	if numMissed > 0 and numHit == 0 then return end  -- spell missed entirely
-
-	if not UnitExists(casterGuid) then return end
-	if not UnitIsPlayer(casterGuid) then return end
-
-	-- Enemy faction only
-	local playerFaction  = UnitFactionGroup("player")
-	local attackerFaction = UnitFactionGroup(casterGuid)
-	if playerFaction and attackerFaction and playerFaction == attackerFaction then return end
-
-	local attackerName = UnitName(casterGuid)
-	if not attackerName then return end
-
-	local localPlayerName = UnitName("player")
-	if attackerName == localPlayerName then return end
-
-	Spy.LastAttack     = attackerName
-	Spy.LastAttackGuid = casterGuid
-
-	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-		DEFAULT_CHAT_FRAME:AddMessage(
-			"|cffff9900[Spy LastAttack via SPELL_START]|r Set to: "
-			.. attackerName .. " [spellId=" .. tostring(spellId) .. "]"
-		)
-	end
-end
+-- LastAttack via SPELL_GO_OTHER is now handled through SpyNampower hook system.
+-- See SpyNampower.hooks.on_spell_go["spy_lastattack"] registered in OnEnable.
 
 function Spy:LeftCombatEvent()
 	-- ✅ FIX: Don't clear LastAttack if we're processing a death
