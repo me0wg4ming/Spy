@@ -19,7 +19,10 @@ Detection sources:
   - UNIT_AURA_GUID         → aura change on any tracked GUID (Nampower GUID event)
   - UNIT_FLAGS_GUID        → flags change (PvP, combat)
   - UNIT_HEALTH_GUID       → health change
+  - UNIT_MANA_GUID         → mana change (casters, druids, etc.)
   - UNIT_COMBAT_GUID       → combat feedback
+  - UNIT_NAME_UPDATE_GUID  → name resolved (e.g. player exits stealth)
+  - SPELL_DISPEL_BY_OTHER  → dispeller GUID revealed when enemy dispels
   - UNIT_DIED              → real death → immediate GUID cleanup
   - UPDATE_MOUSEOVER_UNIT, PLAYER_TARGET_CHANGED, PLAYER_ENTERING_WORLD
     → opportunistic collection via GetUnitGUID(token)
@@ -141,6 +144,7 @@ SpyNP.hooks = {
     on_dmg_shield  = {},   -- DAMAGE_SHIELD_OTHER (shieldOwnerGuid, attackerGuid, damage)
     on_energize    = {},   -- SPELL_ENERGIZE_BY_OTHER (casterGuid, targetGuid, spellId, powerType, amount)
     on_aura_cast   = {},   -- AURA_CAST_ON_OTHER (spellId, casterGuid, targetGuid)
+    on_dispel      = {},   -- SPELL_DISPEL_BY_OTHER (casterGuid, targetGuid, spellId)
     on_unit_died   = {},   -- UNIT_DIED  (guid)
     on_guid_seen   = {},   -- fires whenever any GUID event reveals an enemy player (guid)
 }
@@ -790,7 +794,9 @@ guidFrame:RegisterEvent("PLAYER_LOGOUT")
 guidFrame:RegisterEvent("UNIT_AURA_GUID")
 guidFrame:RegisterEvent("UNIT_FLAGS_GUID")
 guidFrame:RegisterEvent("UNIT_HEALTH_GUID")
+guidFrame:RegisterEvent("UNIT_MANA_GUID")
 guidFrame:RegisterEvent("UNIT_COMBAT_GUID")
+guidFrame:RegisterEvent("UNIT_NAME_UPDATE_GUID")
 
 guidFrame:SetScript("OnEvent", function()
     if event == "PLAYER_LOGOUT" then
@@ -838,7 +844,9 @@ guidFrame:SetScript("OnEvent", function()
     elseif event == "UNIT_AURA_GUID"
         or event == "UNIT_FLAGS_GUID"
         or event == "UNIT_HEALTH_GUID"
+        or event == "UNIT_MANA_GUID"
         or event == "UNIT_COMBAT_GUID"
+        or event == "UNIT_NAME_UPDATE_GUID"
     then
         -- arg1 = guid, arg2 = isPlayer (1 = yes)
         local guid     = arg1
@@ -1055,6 +1063,7 @@ combatFrame:RegisterEvent("BUFF_REMOVED_OTHER")
 combatFrame:RegisterEvent("DEBUFF_ADDED_OTHER")
 combatFrame:RegisterEvent("DEBUFF_REMOVED_OTHER")
 combatFrame:RegisterEvent("DAMAGE_SHIELD_OTHER")
+combatFrame:RegisterEvent("SPELL_DISPEL_BY_OTHER")
 
 combatFrame:SetScript("OnEvent", function()
     if event == "PLAYER_LOGOUT" then
@@ -1163,6 +1172,11 @@ combatFrame:SetScript("OnEvent", function()
         -- arg1=unitGuid (shield owner), arg2=targetGuid (attacker who triggered it)
         -- The attacker (arg2) is an enemy who hit someone — track them.
         guid = arg2
+
+    elseif event == "SPELL_DISPEL_BY_OTHER" then
+        -- arg1=casterGuid, arg2=targetGuid, arg3=spellId
+        -- Track the dispeller.
+        guid = arg1
     end
 
     if not guid then return end
@@ -1206,6 +1220,8 @@ combatFrame:SetScript("OnEvent", function()
         FireHooks(SpyNP.hooks.on_debuff_removed, arg1, arg3)
     elseif event == "DAMAGE_SHIELD_OTHER" then
         FireHooks(SpyNP.hooks.on_dmg_shield, arg1, arg2, arg3 or 0)
+    elseif event == "SPELL_DISPEL_BY_OTHER" then
+        FireHooks(SpyNP.hooks.on_dispel, arg1, arg2, arg3)
     end
     FireHooks(SpyNP.hooks.on_guid_seen, guid)
 
@@ -1600,11 +1616,14 @@ local LOG_EVENTS = {
     "DEBUFF_ADDED_OTHER",
     "DEBUFF_REMOVED_OTHER",
     "DAMAGE_SHIELD_OTHER",
+    "SPELL_DISPEL_BY_OTHER",
     -- GUID events
     "UNIT_AURA_GUID",
     "UNIT_FLAGS_GUID",
     "UNIT_HEALTH_GUID",
+    "UNIT_MANA_GUID",
     "UNIT_COMBAT_GUID",
+    "UNIT_NAME_UPDATE_GUID",
 }
 
 castLogger:RegisterEvent("PLAYER_LOGOUT")
@@ -1791,17 +1810,37 @@ castLogger:SetScript("OnEvent", function()
     elseif event == "UNIT_AURA_GUID"
         or event == "UNIT_FLAGS_GUID"
         or event == "UNIT_HEALTH_GUID"
+        or event == "UNIT_MANA_GUID"
         or event == "UNIT_COMBAT_GUID"
+        or event == "UNIT_NAME_UPDATE_GUID"
     then
         local guid     = arg1
         local isPlayer = (arg2 == 1)
         if not isPlayer then return end
         local name = (guid and UnitExists(guid) and UnitName(guid)) or tostring(guid)
         local col  = "|cff888888"
-        if event == "UNIT_AURA_GUID"   then col = "|cff88ff88" end
-        if event == "UNIT_COMBAT_GUID" then col = "|cffffaa44" end
+        if event == "UNIT_AURA_GUID"        then col = "|cff88ff88" end
+        if event == "UNIT_COMBAT_GUID"      then col = "|cffffaa44" end
+        if event == "UNIT_MANA_GUID"        then col = "|cff88ccff" end
+        if event == "UNIT_NAME_UPDATE_GUID" then col = "|cffffcc00" end
         DEFAULT_CHAT_FRAME:AddMessage(
             col .. "[" .. event .. "]|r " .. tostring(name)
+        )
+
+    -- ── SPELL_DISPEL_BY_OTHER ────────────────────────────────────────────
+    elseif event == "SPELL_DISPEL_BY_OTHER" then
+        local casterGuid = arg1
+        local targetGuid = arg2
+        local spellId    = arg3
+        local casterName = (casterGuid and UnitExists(casterGuid)
+                            and UnitName(casterGuid)) or tostring(casterGuid)
+        local spellName  = (GetSpellRecField
+                            and GetSpellRecField(spellId, "name"))
+                           or ("spell#" .. tostring(spellId))
+        DEFAULT_CHAT_FRAME:AddMessage(
+            "|cffff88ff[SPELL_DISPEL_OTHER]|r "
+            .. tostring(casterName)
+            .. " dispelled " .. tostring(spellName)
         )
     end
 end)
@@ -1819,8 +1858,8 @@ SlashCmdList["SPYEVENT"] = function()
         )
         DEFAULT_CHAT_FRAME:AddMessage(
             "|cffffcc00  START/GO · AUTO_ATTACK · SPELL_DMG · SPELL_MISS"
-            .. " · HEAL · ENERGIZE · AURA_CAST · BUFF/DEBUFF · DMG_SHIELD"
-            .. " · UNIT_AURA/FLAGS/HEALTH/COMBAT_GUID|r"
+            .. " · HEAL · ENERGIZE · AURA_CAST · BUFF/DEBUFF · DMG_SHIELD · DISPEL"
+            .. " · UNIT_AURA/FLAGS/HEALTH/MANA/COMBAT/NAME_GUID|r"
         )
     else
         for _, ev in ipairs(LOG_EVENTS) do
