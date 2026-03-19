@@ -111,6 +111,7 @@ SpyNP.Stats = {
 SpyNP.guids             = {}   -- guid  → timestamp (all tracked enemies)
 SpyNP.enemyGuids        = {}   -- guid  → timestamp (enemy subset, mirrors guids)
 SpyNP.nameToGuid        = {}   -- name  → guid
+SpyNP.guidToName        = {}   -- guid  → name (reverse map, avoids O(n) lookup in cleanup)
 SpyNP.detectedPlayers   = {}   -- name  → timestamp (reported to Spy core)
 SpyNP.lastStealthState  = {}   -- name  → bool
 SpyNP.auraScannedGuids  = {}   -- guid  → bool (aura scanned this range-cycle)
@@ -227,6 +228,14 @@ function SpyNP:AddGUID(guid)
     if not guid then return end
     if not GuidExists(guid) then return end
 
+    -- Early return: already a known enemy - just refresh timestamp, skip all checks
+    if self.guids[guid] then
+        local now = GetTime()
+        self.guids[guid]      = now
+        self.enemyGuids[guid] = now
+        return
+    end
+
     local isPlayer     = UnitIsPlayer(guid)
     local isControlled = UnitPlayerControlled(guid)
     local isPet        = not isPlayer and isControlled
@@ -266,8 +275,7 @@ function SpyNP:AddGUID(guid)
         if hp ~= nil and hp == 0 then return end
     end
 
-    local isNew = (self.guids[guid] == nil)
-    local now   = GetTime()
+    local now = GetTime()
     self.guids[guid]      = now
     self.enemyGuids[guid] = now
     if tf then self.factionCache[guid] = tf end
@@ -275,6 +283,7 @@ function SpyNP:AddGUID(guid)
     local name = UnitName(guid)
     if name then
         self.nameToGuid[name] = guid
+        self.guidToName[guid] = name  -- maintain reverse map
         -- ✅ FIX: Clear dead flag when player is alive again (respawned)
         if self.deadGuids[name] then
             self.deadGuids[name]       = nil
@@ -285,14 +294,12 @@ function SpyNP:AddGUID(guid)
         end
     end
 
-    if isNew then
-        self.Stats.guidsCollected = self.Stats.guidsCollected + 1
-        if IsDebugMode() then
-            DEFAULT_CHAT_FRAME:AddMessage(
-                TS() .. "|cffff00ff[SpyNP]|r GUID collected: "
-                .. (name or "?") .. " (" .. class .. ")"
-            )
-        end
+    self.Stats.guidsCollected = self.Stats.guidsCollected + 1
+    if IsDebugMode() then
+        DEFAULT_CHAT_FRAME:AddMessage(
+            TS() .. "|cffff00ff[SpyNP]|r GUID collected: "
+            .. (name or "?") .. " (" .. class .. ")"
+        )
     end
 end
 
@@ -323,6 +330,7 @@ function SpyNP:GetGUIDFromName(playerName)
             local n = UnitName(guid)
             if n == playerName then
                 self.nameToGuid[playerName] = guid
+                self.guidToName[guid]       = playerName
                 return guid
             end
         end
@@ -505,11 +513,8 @@ function SpyNP:CleanupOldGUIDs(currentTime)
             end
 
             if shouldRemove then
-                -- Reverse-lookup the name
-                local playerName
-                for n, g in pairs(self.nameToGuid) do
-                    if g == guid then playerName = n; break end
-                end
+                -- O(1) reverse lookup via guidToName map
+                local playerName = self.guidToName[guid]
 
                 if playerName then
                     self.detectedPlayers[playerName]  = nil
@@ -524,6 +529,7 @@ function SpyNP:CleanupOldGUIDs(currentTime)
                 self.auraScannedGuids[guid] = nil
                 self.lastScanPresent[guid]  = nil
                 self.factionCache[guid]     = nil
+                self.guidToName[guid]       = nil
                 removed = removed + 1
 
                 if IsDebugMode() then
@@ -808,6 +814,7 @@ guidFrame:SetScript("OnEvent", function()
         for k in pairs(SpyNP.deadGuids)         do SpyNP.deadGuids[k]         = nil end
         for k in pairs(SpyNP.enemyGuids)      do SpyNP.enemyGuids[k]      = nil end
         for k in pairs(SpyNP.nameToGuid)      do SpyNP.nameToGuid[k]      = nil end
+        for k in pairs(SpyNP.guidToName)      do SpyNP.guidToName[k]      = nil end
         for k in pairs(SpyNP.detectedPlayers) do SpyNP.detectedPlayers[k] = nil end
         for k in pairs(SpyNP.factionCache)    do SpyNP.factionCache[k]    = nil end
         return
@@ -1268,26 +1275,25 @@ diedFrame:SetScript("OnEvent", function()
     SpyNP.lastScanPresent[guid]  = nil
     SpyNP.factionCache[guid]     = nil
 
-    for name, g in pairs(SpyNP.nameToGuid) do
-        if g == guid then
-            SpyNP.deadGuids[name]        = true  -- blocks reactivation + hides distance
-            SpyNP.detectedPlayers[name]  = nil   -- stop scan loop from re-reporting
-            SpyNP.lastStealthState[name] = nil
-            SpyNP.nameToGuid[name]       = nil
+    local name = SpyNP.guidToName[guid]
+    if name then
+        SpyNP.deadGuids[name]        = true  -- blocks reactivation + hides distance
+        SpyNP.detectedPlayers[name]  = nil   -- stop scan loop from re-reporting
+        SpyNP.lastStealthState[name] = nil
+        SpyNP.nameToGuid[name]       = nil
+        SpyNP.guidToName[guid]       = nil
 
-            -- Move to Inactive (grayed out), let normal cleanup timer remove from Nearby.
-            -- Use time() as the Inactive timestamp so InactiveTimeout counts from NOW,
-            -- not from when they were last seen active (which could be old).
-            if Spy.ActiveList[name] then
-                Spy.InactiveList[name] = time()
-                Spy.ActiveList[name]   = nil
-                Spy:RefreshCurrentList()
-                Spy:UpdateActiveCount()
-            elseif not Spy.InactiveList[name] then
-                -- Already inactive (e.g. hp=0 path got there first) - ensure timestamp is fresh
-                Spy.InactiveList[name] = time()
-            end
-            break
+        -- Move to Inactive (grayed out), let normal cleanup timer remove from Nearby.
+        -- Use time() as the Inactive timestamp so InactiveTimeout counts from NOW,
+        -- not from when they were last seen active (which could be old).
+        if Spy.ActiveList[name] then
+            Spy.InactiveList[name] = time()
+            Spy.ActiveList[name]   = nil
+            Spy:RefreshCurrentList()
+            Spy:UpdateActiveCount()
+        elseif not Spy.InactiveList[name] then
+            -- Already inactive (e.g. hp=0 path got there first) - ensure timestamp is fresh
+            Spy.InactiveList[name] = time()
         end
     end
 
