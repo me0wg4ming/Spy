@@ -2939,8 +2939,21 @@ function Spy:ParseUnitDetails(name, class, level, race, zone, subZone, mapX, map
 	-- Set timestamp
 	playerData.time = time()
 	
-	-- Set isEnemy flag (important for filtering)
-	playerData.isEnemy = true
+	-- Set isEnemy flag only when faction is confirmed via GUID.
+	-- If GUID is unknown we cannot verify faction, so default to false
+	-- to avoid showing friendly players from opposite-faction Spy reports.
+	local isActualEnemy = false
+	if SpySW and SpySW.nameToGuid then
+		local g = SpySW.nameToGuid[name]
+		if g then
+			local pf = UnitFactionGroup("player")
+			local tf = UnitFactionGroup(g)
+			if pf and tf and pf ~= tf then
+				isActualEnemy = true
+			end
+		end
+	end
+	playerData.isEnemy = isActualEnemy
 	
 	return learnt, playerData
 end
