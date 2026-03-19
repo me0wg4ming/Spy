@@ -1462,7 +1462,7 @@ hpUpdateFrame:SetScript("OnUpdate", function()
 							if SpySW and SpySW.deadGuids then
 								SpySW.deadGuids[playerName] = nil
 							end
-							Spy.ActiveList[playerName]   = GetTime()
+							Spy.ActiveList[playerName]   = time()
 							Spy.InactiveList[playerName] = nil
 							Spy:RefreshCurrentList()
 							Spy:UpdateActiveCount()

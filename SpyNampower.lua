@@ -504,11 +504,13 @@ function SpyNP:CleanupOldGUIDs(currentTime)
     for guid, lastSeen in pairs(self.guids) do
         if not GuidExists(guid) then
             local age = currentTime - lastSeen
+            local isEnemy = self.enemyGuids[guid]
             local shouldRemove = false
 
-            if self.enemyGuids[guid] then
+            if isEnemy then
                 if timeout > 0 and age > timeout then shouldRemove = true end
             else
+                -- Friendly / unknown → clean up immediately
                 shouldRemove = true
             end
 
@@ -516,12 +518,26 @@ function SpyNP:CleanupOldGUIDs(currentTime)
                 -- O(1) reverse lookup via guidToName map
                 local playerName = self.guidToName[guid]
 
+                -- ✅ FIX: For enemy players still shown in NearbyList, keep
+                -- detectedPlayers and nameToGuid alive so the scan loop does
+                -- NOT treat them as a brand-new detection when they return to
+                -- range.  Only wipe these when the player has actually left
+                -- the Nearby list (i.e. InactiveTimeout expired).
+                -- For friendly / non-enemy players we can clean up everything
+                -- immediately since they are never in NearbyList.
+                local stillInNearby = playerName
+                    and isEnemy
+                    and Spy.NearbyList[playerName]
+
                 if playerName then
-                    self.detectedPlayers[playerName]  = nil
-                    self.lastStealthState[playerName] = nil
-                    if self.nameToGuid[playerName] == guid then
-                        self.nameToGuid[playerName] = nil
+                    if not stillInNearby then
+                        -- Player is gone from Nearby → full cleanup
+                        self.detectedPlayers[playerName]  = nil
+                        self.nameToGuid[playerName]       = nil
                     end
+                    -- Stealth state can always be cleared; it will be
+                    -- re-evaluated on the next scan if the unit returns.
+                    self.lastStealthState[playerName] = nil
                 end
 
                 self.guids[guid]            = nil
@@ -536,6 +552,7 @@ function SpyNP:CleanupOldGUIDs(currentTime)
                     DEFAULT_CHAT_FRAME:AddMessage(
                         TS() .. "|cffaaaaaa[SpyNP Cleanup]|r Removed "
                         .. (playerName or guid)
+                        .. (stillInNearby and " (GUID only, kept detectedPlayers)" or "")
                         .. " after " .. math.floor(age) .. "s"
                     )
                 end
@@ -635,6 +652,15 @@ local function ReportPlayerToSpy(playerData, currentTime)
     local wasDetected    = SpyNP.detectedPlayers[playerName]
     local wasStealthed   = SpyNP.lastStealthState[playerName]
 
+    -- ✅ FIX: If GUID cleanup wiped detectedPlayers but the player is still
+    -- shown in the Nearby list (active or inactive), treat them as already
+    -- detected so we never fire a duplicate "Player detected" alert.
+    if not wasDetected and Spy.NearbyList[playerName] then
+        wasDetected = true
+        -- Restore detectedPlayers entry so future scans take the fast path
+        SpyNP.detectedPlayers[playerName] = currentTime
+    end
+
     -- ── Stealth-Only mode ──────────────────────────────────────────────────
     if stealthOnly then
         if isNowStealthed and not wasStealthed then
@@ -688,7 +714,7 @@ local function ReportPlayerToSpy(playerData, currentTime)
 
             -- hp=0 on first sight: put straight into InactiveList (grayed out)
             if isNowDead then
-                Spy.InactiveList[playerName] = currentTime
+                Spy.InactiveList[playerName] = time()
                 Spy.ActiveList[playerName]   = nil
             end
 

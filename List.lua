@@ -711,11 +711,17 @@ end
 function Spy:ManageNearbyListExpirations()
 	local expired = false
 	local currentTime = time()
+	local debugMode = Spy.db and Spy.db.profile and Spy.db.profile.DebugMode
 	for player in pairs(Spy.ActiveList) do
-		if (currentTime - Spy.ActiveList[player]) > Spy.ActiveTimeout then
+		local age = currentTime - Spy.ActiveList[player]
+		if age > Spy.ActiveTimeout then
 			Spy.InactiveList[player] = Spy.ActiveList[player]
 			Spy.ActiveList[player] = nil
 			expired = true
+			if debugMode then
+				DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Spy Expiry]|r " .. player
+					.. " Active→Inactive (age=" .. age .. "s, timeout=" .. Spy.ActiveTimeout .. "s)")
+			end
 		end
 	end
 	for player in pairs(Spy.InactiveList) do
@@ -723,11 +729,26 @@ function Spy:ManageNearbyListExpirations()
 		-- so they remain visible in Nearby regardless of 'Remove Undetected' setting.
 		local isDead = SpySW and SpySW.deadGuids and SpySW.deadGuids[player]
 		local effectiveTimeout = isDead and math.max(Spy.InactiveTimeout, 30) or Spy.InactiveTimeout
-		if (currentTime - Spy.InactiveList[player]) > effectiveTimeout then
+		local age = currentTime - Spy.InactiveList[player]
+		if age > effectiveTimeout then
+			if debugMode then
+				DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Spy Expiry]|r " .. player
+					.. " Inactive→REMOVED (age=" .. age .. "s, timeout=" .. effectiveTimeout .. "s)")
+			end
 			-- Map note cleanup removed - MapNoteList no longer exists
 			if SpySW and SpySW.deadGuids then SpySW.deadGuids[player] = nil end
 			Spy.InactiveList[player] = nil
 			Spy.NearbyList[player] = nil
+			-- ✅ FIX: Also clear detectedPlayers/nameToGuid so that when the
+			-- player is next seen it counts as a fresh detection.
+			-- (CleanupOldGUIDs may have already removed the GUID but kept
+			-- detectedPlayers alive while the player was still in NearbyList.)
+			if SpySW and SpySW.detectedPlayers then
+				SpySW.detectedPlayers[player] = nil
+			end
+			if SpySW and SpySW.nameToGuid then
+				SpySW.nameToGuid[player] = nil
+			end
 			-- Destroy player frame when removed from Nearby
 			Spy:DestroyPlayerFrame(player)
 			expired = true
@@ -763,6 +784,13 @@ function Spy:RemovePlayerFromList(player)
 	Spy.NearbyList[player] = nil
 	Spy.ActiveList[player] = nil
 	Spy.InactiveList[player] = nil
+	-- ✅ FIX: Clear SpyNP detection state so next sighting is a fresh detection
+	if SpySW and SpySW.detectedPlayers then
+		SpySW.detectedPlayers[player] = nil
+	end
+	if SpySW and SpySW.nameToGuid then
+		SpySW.nameToGuid[player] = nil
+	end
 	-- ✅ FIX: Destroy player frame when manually removed
 	Spy:DestroyPlayerFrame(player)
 	-- Map note cleanup removed - MapNoteList no longer exists
@@ -780,6 +808,15 @@ function Spy:ClearList()
 		Spy.InactiveList = {}
 		Spy.PlayerCommList = {}
 		Spy.ListAmountDisplayed = 0
+		-- ✅ FIX: Clear SpyNP detection state so all players are fresh on next scan
+		if SpySW then
+			if SpySW.detectedPlayers then
+				for k in pairs(SpySW.detectedPlayers) do SpySW.detectedPlayers[k] = nil end
+			end
+			if SpySW.nameToGuid then
+				for k in pairs(SpySW.nameToGuid) do SpySW.nameToGuid[k] = nil end
+			end
+		end
 		Spy:SetCurrentList(1)
 		if IsControlKeyDown() then
 			Spy:EnableSpy(not Spy.db.profile.Enabled, false)
