@@ -2377,14 +2377,13 @@ function Spy:OnInitialize()
 end
 
 function Spy:ZoneChangedEvent()
+	-- UNIT_FACTION fires for every nearby player's faction change.
+	-- Only our own faction change matters (PvP flag toggle etc.)
+	if event == "UNIT_FACTION" and arg1 ~= "player" then return end
+
 	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
 		local trigger = event or "manual"
-		local extra = ""
-		if trigger == "UNIT_FACTION" and arg1 then
-			local unitName = UnitName(arg1) or arg1
-			extra = " (" .. unitName .. ")"
-		end
-		DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[Spy DEBUG]|r ========== ZoneChangedEvent START [" .. trigger .. extra .. "] ==========")
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[Spy DEBUG]|r ========== ZoneChangedEvent START [" .. trigger .. "] ==========")
 	end
 
 	if not Spy.MainWindow then
