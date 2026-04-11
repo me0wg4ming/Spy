@@ -2020,6 +2020,78 @@ function Spy:OnEnable(first)
 			end
 		end
 		
+		-- LastAttack via SPELL_DAMAGE_EVENT_OTHER: if YOU are the target, caster is your attacker
+		if SpyModules.Nampower.hooks.on_spell_dmg then
+			SpyModules.Nampower.hooks.on_spell_dmg["spy_lastattack_dmg"] = function(casterGuid, targetGuid, spellId, amount)
+				if not Spy.EnabledInZone then return end
+				local playerGuid = GetUnitGUID and GetUnitGUID("player")
+				if not playerGuid or targetGuid ~= playerGuid then return end
+				if not UnitExists(casterGuid) or not UnitIsPlayer(casterGuid) then return end
+				local pf = UnitFactionGroup("player")
+				local cf = UnitFactionGroup(casterGuid)
+				if pf and cf and pf == cf then return end
+				local name = UnitName(casterGuid)
+				if name then
+					Spy.LastAttack     = name
+					Spy.LastAttackGuid = casterGuid
+					if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+						DEFAULT_CHAT_FRAME:AddMessage(
+							"|cffff9900[Spy LastAttack via SPELL_DMG]|r Set to: "
+							.. name .. " [spellId=" .. tostring(spellId) .. "]"
+						)
+					end
+				end
+			end
+		end
+
+		-- LastAttack via AUTO_ATTACK_OTHER: if YOU are the target, attacker is your attacker
+		if SpyModules.Nampower.hooks.on_auto_attack then
+			SpyModules.Nampower.hooks.on_auto_attack["spy_lastattack_melee"] = function(attackerGuid, targetGuid, damage, hitInfo)
+				if not Spy.EnabledInZone then return end
+				local playerGuid = GetUnitGUID and GetUnitGUID("player")
+				if not playerGuid or targetGuid ~= playerGuid then return end
+				if not UnitExists(attackerGuid) or not UnitIsPlayer(attackerGuid) then return end
+				local pf = UnitFactionGroup("player")
+				local cf = UnitFactionGroup(attackerGuid)
+				if pf and cf and pf == cf then return end
+				local name = UnitName(attackerGuid)
+				if name then
+					Spy.LastAttack     = name
+					Spy.LastAttackGuid = attackerGuid
+					if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+						DEFAULT_CHAT_FRAME:AddMessage(
+							"|cffff9900[Spy LastAttack via AUTO_ATTACK]|r Set to: "
+							.. name .. " [dmg=" .. tostring(damage) .. "]"
+						)
+					end
+				end
+			end
+		end
+
+		-- LastAttack via SPELL_MISS_OTHER: if YOU are the target, caster tried to hit you
+		if SpyModules.Nampower.hooks.on_spell_miss then
+			SpyModules.Nampower.hooks.on_spell_miss["spy_lastattack_miss"] = function(casterGuid, targetGuid, spellId, missInfo)
+				if not Spy.EnabledInZone then return end
+				local playerGuid = GetUnitGUID and GetUnitGUID("player")
+				if not playerGuid or targetGuid ~= playerGuid then return end
+				if not UnitExists(casterGuid) or not UnitIsPlayer(casterGuid) then return end
+				local pf = UnitFactionGroup("player")
+				local cf = UnitFactionGroup(casterGuid)
+				if pf and cf and pf == cf then return end
+				local name = UnitName(casterGuid)
+				if name then
+					Spy.LastAttack     = name
+					Spy.LastAttackGuid = casterGuid
+					if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
+						DEFAULT_CHAT_FRAME:AddMessage(
+							"|cffff9900[Spy LastAttack via SPELL_MISS]|r Set to: "
+							.. name .. " [spellId=" .. tostring(spellId) .. "]"
+						)
+					end
+				end
+			end
+		end
+
 		-- Register minimal events for Win/Loss tracking
 		Spy:RegisterEvent("CHAT_MSG_COMBAT_FRIENDLY_DEATH", "DeathLogEvent")
 		Spy:RegisterEvent("CHAT_MSG_COMBAT_HOSTILE_DEATH", "DeathLogEvent")
@@ -2110,6 +2182,9 @@ function Spy:OnDisable()
 		-- Remove SpyNampower hook instead of unregistering the event directly
 		if SpyModules and SpyModules.Nampower and SpyModules.Nampower.hooks then
 			SpyModules.Nampower.hooks.on_spell_go["spy_lastattack"] = nil
+			SpyModules.Nampower.hooks.on_spell_dmg["spy_lastattack_dmg"] = nil
+			SpyModules.Nampower.hooks.on_auto_attack["spy_lastattack_melee"] = nil
+			SpyModules.Nampower.hooks.on_spell_miss["spy_lastattack_miss"] = nil
 		end
 		Spy:UnregisterEvent("CHAT_MSG_COMBAT_FRIENDLY_DEATH")
 		Spy:UnregisterEvent("CHAT_MSG_COMBAT_HOSTILE_DEATH")

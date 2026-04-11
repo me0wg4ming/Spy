@@ -16,10 +16,13 @@ Detection sources:
   - DEBUFF_ADDED_OTHER     → enemy gains a debuff (in combat signal)
   - DEBUFF_REMOVED_OTHER   → debuff removed
   - DAMAGE_SHIELD_OTHER    → Thorns/Fire Shield proc reveals attacker GUID
+  - ENVIRONMENTAL_DMG_OTHER → fall/lava/drowning damage reveals GUID without combat
   - UNIT_AURA_GUID         → aura change on any tracked GUID (Nampower GUID event)
   - UNIT_FLAGS_GUID        → flags change (PvP, combat)
   - UNIT_HEALTH_GUID       → health change
   - UNIT_MANA_GUID         → mana change (casters, druids, etc.)
+  - UNIT_RAGE_GUID         → rage change (warriors, bear druids)
+  - UNIT_ENERGY_GUID       → energy change (rogues, cat druids)
   - UNIT_COMBAT_GUID       → combat feedback
   - UNIT_NAME_UPDATE_GUID  → name resolved (e.g. player exits stealth)
   - SPELL_DISPEL_BY_OTHER  → dispeller GUID revealed when enemy dispels
@@ -827,6 +830,8 @@ guidFrame:RegisterEvent("UNIT_AURA_GUID")
 guidFrame:RegisterEvent("UNIT_FLAGS_GUID")
 guidFrame:RegisterEvent("UNIT_HEALTH_GUID")
 guidFrame:RegisterEvent("UNIT_MANA_GUID")
+guidFrame:RegisterEvent("UNIT_RAGE_GUID")
+guidFrame:RegisterEvent("UNIT_ENERGY_GUID")
 guidFrame:RegisterEvent("UNIT_COMBAT_GUID")
 guidFrame:RegisterEvent("UNIT_NAME_UPDATE_GUID")
 
@@ -878,6 +883,8 @@ guidFrame:SetScript("OnEvent", function()
         or event == "UNIT_FLAGS_GUID"
         or event == "UNIT_HEALTH_GUID"
         or event == "UNIT_MANA_GUID"
+        or event == "UNIT_RAGE_GUID"
+        or event == "UNIT_ENERGY_GUID"
         or event == "UNIT_COMBAT_GUID"
         or event == "UNIT_NAME_UPDATE_GUID"
     then
@@ -1097,6 +1104,7 @@ combatFrame:RegisterEvent("DEBUFF_ADDED_OTHER")
 combatFrame:RegisterEvent("DEBUFF_REMOVED_OTHER")
 combatFrame:RegisterEvent("DAMAGE_SHIELD_OTHER")
 combatFrame:RegisterEvent("SPELL_DISPEL_BY_OTHER")
+combatFrame:RegisterEvent("ENVIRONMENTAL_DMG_OTHER")
 
 combatFrame:SetScript("OnEvent", function()
     if event == "PLAYER_LOGOUT" then
@@ -1205,6 +1213,11 @@ combatFrame:SetScript("OnEvent", function()
         -- arg1=unitGuid (shield owner), arg2=targetGuid (attacker who triggered it)
         -- The attacker (arg2) is an enemy who hit someone — track them.
         guid = arg2
+
+    elseif event == "ENVIRONMENTAL_DMG_OTHER" then
+        -- arg1=unitGuid (unit that took env damage), arg2=dmgType, arg3=damage
+        -- Free GUID collection: enemy took fall/lava/drowning damage nearby.
+        guid = arg1
 
     elseif event == "SPELL_DISPEL_BY_OTHER" then
         -- arg1=casterGuid, arg2=targetGuid, arg3=spellId
@@ -1649,11 +1662,14 @@ local LOG_EVENTS = {
     "DEBUFF_REMOVED_OTHER",
     "DAMAGE_SHIELD_OTHER",
     "SPELL_DISPEL_BY_OTHER",
+    "ENVIRONMENTAL_DMG_OTHER",
     -- GUID events
     "UNIT_AURA_GUID",
     "UNIT_FLAGS_GUID",
     "UNIT_HEALTH_GUID",
     "UNIT_MANA_GUID",
+    "UNIT_RAGE_GUID",
+    "UNIT_ENERGY_GUID",
     "UNIT_COMBAT_GUID",
     "UNIT_NAME_UPDATE_GUID",
 }
@@ -1838,11 +1854,28 @@ castLogger:SetScript("OnEvent", function()
             .. " → " .. tostring(spellName)
         )
 
+    -- ── ENVIRONMENTAL_DMG_OTHER ──────────────────────────────────────────
+    elseif event == "ENVIRONMENTAL_DMG_OTHER" then
+        local unitGuid = arg1
+        local dmgType  = arg2 or 0
+        local damage   = arg3 or 0
+        local envNames = { [0]="Exhausted",[1]="Drowning",[2]="Fall",
+                           [3]="Lava",[4]="Slime",[5]="Fire",[6]="FallToVoid" }
+        local name = (unitGuid and UnitExists(unitGuid)
+                      and UnitName(unitGuid)) or tostring(unitGuid)
+        DEFAULT_CHAT_FRAME:AddMessage(
+            "|cffcc6600[ENVIRONMENTAL_DMG_OTHER]|r "
+            .. tostring(name) .. " took " .. damage
+            .. " " .. (envNames[dmgType] or "?") .. " damage"
+        )
+
     -- ── UNIT_*_GUID events ───────────────────────────────────────────────
     elseif event == "UNIT_AURA_GUID"
         or event == "UNIT_FLAGS_GUID"
         or event == "UNIT_HEALTH_GUID"
         or event == "UNIT_MANA_GUID"
+        or event == "UNIT_RAGE_GUID"
+        or event == "UNIT_ENERGY_GUID"
         or event == "UNIT_COMBAT_GUID"
         or event == "UNIT_NAME_UPDATE_GUID"
     then
@@ -1854,6 +1887,8 @@ castLogger:SetScript("OnEvent", function()
         if event == "UNIT_AURA_GUID"        then col = "|cff88ff88" end
         if event == "UNIT_COMBAT_GUID"      then col = "|cffffaa44" end
         if event == "UNIT_MANA_GUID"        then col = "|cff88ccff" end
+        if event == "UNIT_RAGE_GUID"        then col = "|cffff4444" end
+        if event == "UNIT_ENERGY_GUID"      then col = "|cffffff44" end
         if event == "UNIT_NAME_UPDATE_GUID" then col = "|cffffcc00" end
         DEFAULT_CHAT_FRAME:AddMessage(
             col .. "[" .. event .. "]|r " .. tostring(name)
