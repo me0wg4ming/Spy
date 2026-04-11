@@ -1173,8 +1173,12 @@ combatFrame:SetScript("OnEvent", function()
                         -- Faction check
                         local pf = UnitFactionGroup("player")
                         local tf = UnitFactionGroup(guid)
-                        local isEnemy = (pf and tf) and (pf ~= tf)
-                                     or UnitIsEnemy("player", guid)
+                        local isEnemy
+                        if pf and tf then
+                            isEnemy = (pf ~= tf)
+                        else
+                            isEnemy = UnitIsEnemy("player", guid)
+                        end
                         if isEnemy then
                             if IsDebugMode() then
                                 DEFAULT_CHAT_FRAME:AddMessage(
@@ -1233,7 +1237,12 @@ combatFrame:SetScript("OnEvent", function()
 
     local pf = UnitFactionGroup("player")
     local tf = UnitFactionGroup(guid)
-    local isEnemy = (pf and tf) and (pf ~= tf) or UnitIsEnemy("player", guid)
+    local isEnemy
+    if pf and tf then
+        isEnemy = (pf ~= tf)
+    else
+        isEnemy = UnitIsEnemy("player", guid)
+    end
     if not isEnemy then return end
 
     SpyNP.Stats.eventsProcessed = SpyNP.Stats.eventsProcessed + 1
