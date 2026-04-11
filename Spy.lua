@@ -2939,17 +2939,20 @@ function Spy:ParseUnitDetails(name, class, level, race, zone, subZone, mapX, map
 	-- Set timestamp
 	playerData.time = time()
 	
-	-- Set isEnemy flag only when faction is confirmed via GUID.
-	-- If GUID is unknown we cannot verify faction, so default to false
-	-- to avoid showing friendly players from opposite-faction Spy reports.
-	local isActualEnemy = false
+	-- Set isEnemy flag.
+	-- ParseUnitDetails is ONLY called from CommReceived, which receives enemy
+	-- reports from same-faction Spy users. Default to true (like SuperWoW).
+	-- Only override to false if we have a GUID that PROVES same-faction
+	-- (e.g. duel scenario where both players are on the same side).
+	local isActualEnemy = true
 	if SpySW and SpySW.nameToGuid then
 		local g = SpySW.nameToGuid[name]
 		if g then
 			local pf = UnitFactionGroup("player")
 			local tf = UnitFactionGroup(g)
-			if pf and tf and pf ~= tf then
-				isActualEnemy = true
+			if pf and tf and pf == tf then
+				-- GUID confirms same faction → not an enemy (duel or error)
+				isActualEnemy = false
 			end
 		end
 	end
