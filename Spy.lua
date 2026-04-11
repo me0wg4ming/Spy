@@ -626,6 +626,19 @@ Spy.options = {
 						Spy.db.profile.OnlySoundKoS = value
 					end,
 				},
+				MuteSoundInBattlegrounds = {
+					name = L["MuteSoundInBattlegrounds"],
+					desc = L["MuteSoundInBattlegroundsDescription"],
+					type = "toggle",
+					order = 5,
+					width = "full",
+					get = function(info)
+						return Spy.db.profile.MuteSoundInBattlegrounds
+					end,
+					set = function(info, value)
+						Spy.db.profile.MuteSoundInBattlegrounds = value
+					end,
+				},
 				StopAlertsOnTaxi = {
 					name = L["StopAlertsOnTaxi"],
 					desc = L["StopAlertsOnTaxiDescription"],
@@ -1405,6 +1418,7 @@ local Default_Profile = {
 		DisplayWarnings = "Default",
 		EnableSound = true,
 		OnlySoundKoS = false,
+		MuteSoundInBattlegrounds = false,
 		StopAlertsOnTaxi = true,
 		RemoveUndetectedTime = 5,
 		ShowNearbyList = true,
@@ -2250,6 +2264,12 @@ function Spy:EnableSound(value)
 	else
 		DEFAULT_CHAT_FRAME:AddMessage(L["SoundDisabled"])
 	end
+end
+
+function Spy:IsSoundEnabled()
+	if not Spy.db.profile.EnableSound then return false end
+	if Spy.db.profile.MuteSoundInBattlegrounds and Spy.InInstance then return false end
+	return true
 end
 
 function Spy:OnInitialize()

@@ -1089,7 +1089,7 @@ function Spy:AlertPlayer(player, source)
 				Spy:ShowAlert("kos", player, nil, reasonText)
 			end
 		end
-		if Spy.db.profile.EnableSound then
+		if Spy:IsSoundEnabled() then
 			if source ~= nil and source ~= Spy.CharacterName then
 				PlaySoundFile("Interface\\AddOns\\Spy\\Sounds\\detected-kosaway.wav")
 			else
@@ -1111,7 +1111,7 @@ function Spy:AlertPlayer(player, source)
 					Spy:ShowAlert("kosguild", "<" .. playerData.guild .. ">")
 				end
 			end
-			if Spy.db.profile.EnableSound then
+			if Spy:IsSoundEnabled() then
 				if source ~= nil and source ~= Spy.CharacterName then
 					PlaySoundFile("Interface\\AddOns\\Spy\\Sounds\\detected-kosaway.wav")
 				else
@@ -1119,7 +1119,7 @@ function Spy:AlertPlayer(player, source)
 				end
 			end
 		else
-			if Spy.db.profile.EnableSound and not Spy.db.profile.OnlySoundKoS then
+			if Spy:IsSoundEnabled() and not Spy.db.profile.OnlySoundKoS then
 				if source == nil or source == Spy.CharacterName then
 					if playerData and Spy.db.profile.WarnOnRace and playerData.race == Spy.db.profile.SelectWarnRace then --++
 						PlaySoundFile("Interface\\AddOns\\Spy\\Sounds\\detected-race.wav") 
@@ -1129,7 +1129,7 @@ function Spy:AlertPlayer(player, source)
 				end
 			end
 		end
-	elseif Spy.db.profile.EnableSound and not Spy.db.profile.OnlySoundKoS then
+	elseif Spy:IsSoundEnabled() and not Spy.db.profile.OnlySoundKoS then
 		if source == nil or source == Spy.CharacterName then
 			if playerData and Spy.db.profile.WarnOnRace and playerData.race == Spy.db.profile.SelectWarnRace then --++
 				PlaySoundFile("Interface\\AddOns\\Spy\\Sounds\\detected-race.wav") 
@@ -1150,7 +1150,7 @@ function Spy:AlertStealthPlayer(player)
 		else
 			Spy:ShowAlert("stealth", player)
 		end
-		if Spy.db.profile.EnableSound then
+		if Spy:IsSoundEnabled() then
 			PlaySoundFile("Interface\\AddOns\\Spy\\Sounds\\detected-stealth.wav")
 		end
 	end
@@ -1318,13 +1318,13 @@ function Spy:ToggleIgnorePlayer(ignore, player)
 	if ignore then
 		Spy:AddIgnoreData(player)
 		Spy:RemoveKOSData(player)
-		if Spy.db.profile.EnableSound then
+		if Spy:IsSoundEnabled() then
 			PlaySoundFile("Interface\\AddOns\\Spy\\Sounds\\list-add.wav")
 		end
 		DEFAULT_CHAT_FRAME:AddMessage(L["SpySignatureColored"] .. L["PlayerAddedToIgnoreColored"] .. player)
 	else
 		Spy:RemoveIgnoreData(player)
-		if Spy.db.profile.EnableSound then
+		if Spy:IsSoundEnabled() then
 			PlaySoundFile("Interface\\AddOns\\Spy\\Sounds\\list-remove.wav")
 		end
 		DEFAULT_CHAT_FRAME:AddMessage(L["SpySignatureColored"] .. L["PlayerRemovedFromIgnoreColored"] .. player)
@@ -1343,13 +1343,13 @@ function Spy:ToggleKOSPlayer(kos, player)
 			Spy:UpdatePlayerStatus(player, nil, nil, nil, nil, true, nil)
 			SpyPerCharDB.PlayerData[player].kos = 1
 		end
-		if Spy.db.profile.EnableSound then
+		if Spy:IsSoundEnabled() then
 			PlaySoundFile("Interface\\AddOns\\Spy\\Sounds\\list-add.wav")
 		end
 		DEFAULT_CHAT_FRAME:AddMessage(L["SpySignatureColored"] .. L["PlayerAddedToKOSColored"] .. player)
 	else
 		Spy:RemoveKOSData(player)
-		if Spy.db.profile.EnableSound then
+		if Spy:IsSoundEnabled() then
 			PlaySoundFile("Interface\\AddOns\\Spy\\Sounds\\list-remove.wav")
 		end
 		DEFAULT_CHAT_FRAME:AddMessage(L["SpySignatureColored"] .. L["PlayerRemovedFromKOSColored"] .. player)
