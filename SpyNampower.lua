@@ -1691,191 +1691,141 @@ castLogger:SetScript("OnEvent", function()
         return
     end
 
+    -- Helper: resolve GUID to "Name (GUID)" with faction color tag
+    local function FmtUnit(guid)
+        if not guid then return "|cff888888nil|r" end
+        local name = UnitName(guid)
+        local display = name or tostring(guid)
+        -- Faction tag
+        local tag = ""
+        local pf = UnitFactionGroup("player")
+        local tf = UnitFactionGroup(guid)
+        if pf and tf then
+            if pf == tf then
+                tag = " |cff00ff00[FRIENDLY]|r"
+            else
+                tag = " |cffff0000[HOSTILE]|r"
+            end
+        elseif name then
+            tag = " |cff888888[?]|r"
+        end
+        if name and not UnitIsPlayer(guid) then
+            tag = tag .. " |cffcccccc[NPC]|r"
+        end
+        return display .. tag .. " |cff666666(" .. tostring(guid) .. ")|r"
+    end
+
+    local function SpellName(spellId)
+        if not spellId then return "?" end
+        return (GetSpellRecField and GetSpellRecField(spellId, "name"))
+               or ("spell#" .. tostring(spellId))
+    end
+
     -- ── SPELL_START_OTHER / SPELL_GO_OTHER ──────────────────────────────
     if event == "SPELL_START_OTHER" or event == "SPELL_GO_OTHER" then
-        local spellId    = arg2
-        local casterGuid = arg3
-        local casterName = (casterGuid and UnitExists(casterGuid)
-                            and UnitName(casterGuid)) or tostring(casterGuid)
-        local spellName  = (GetSpellRecField
-                            and GetSpellRecField(spellId, "name"))
-                           or ("spell#" .. tostring(spellId))
         DEFAULT_CHAT_FRAME:AddMessage(
             "|cffff00ff[" .. event .. "]|r "
-            .. tostring(casterName)
-            .. " → " .. tostring(spellName)
-            .. " (id=" .. tostring(spellId) .. ")"
+            .. FmtUnit(arg3)
+            .. " → " .. SpellName(arg2)
+            .. " (id=" .. tostring(arg2) .. ")"
         )
 
     -- ── AUTO_ATTACK_OTHER ───────────────────────────────────────────────
     elseif event == "AUTO_ATTACK_OTHER" then
-        local attackerGuid = arg1
-        local targetGuid   = arg2
-        local damage       = arg3 or 0
-        local attackerName = (attackerGuid and UnitExists(attackerGuid)
-                              and UnitName(attackerGuid)) or tostring(attackerGuid)
-        local targetName   = (targetGuid and UnitExists(targetGuid)
-                              and UnitName(targetGuid)) or tostring(targetGuid)
         DEFAULT_CHAT_FRAME:AddMessage(
             "|cffff8800[AUTO_ATTACK_OTHER]|r "
-            .. tostring(attackerName) .. " → " .. tostring(targetName)
-            .. " (" .. damage .. " dmg)"
+            .. FmtUnit(arg1) .. " → " .. FmtUnit(arg2)
+            .. " (" .. (arg3 or 0) .. " dmg)"
         )
 
     -- ── SPELL_DAMAGE_EVENT_OTHER ────────────────────────────────────────
     elseif event == "SPELL_DAMAGE_EVENT_OTHER" then
-        local targetGuid = arg1
-        local casterGuid = arg2
-        local spellId    = arg3
-        local amount     = arg4 or 0
-        local casterName = (casterGuid and UnitExists(casterGuid)
-                            and UnitName(casterGuid)) or tostring(casterGuid)
-        local spellName  = (GetSpellRecField
-                            and GetSpellRecField(spellId, "name"))
-                           or ("spell#" .. tostring(spellId))
         DEFAULT_CHAT_FRAME:AddMessage(
             "|cffff4444[SPELL_DMG_OTHER]|r "
-            .. tostring(casterName)
-            .. " → " .. tostring(spellName)
-            .. " " .. amount .. " dmg"
+            .. FmtUnit(arg2)
+            .. " → " .. SpellName(arg3)
+            .. " " .. (arg4 or 0) .. " dmg on " .. FmtUnit(arg1)
         )
 
     -- ── SPELL_MISS_OTHER ────────────────────────────────────────────────
     elseif event == "SPELL_MISS_OTHER" then
-        local casterGuid = arg1
-        local spellId    = arg3
-        local missInfo   = arg4
-        local missNames  = { [1]="Miss",[2]="Resist",[3]="Dodge",[4]="Parry",
+        local missNames = { [1]="Miss",[2]="Resist",[3]="Dodge",[4]="Parry",
                              [5]="Block",[6]="Evade",[7]="Immune",[8]="Immune",
                              [9]="Deflect",[10]="Absorb",[11]="Reflect" }
-        local casterName = (casterGuid and UnitExists(casterGuid)
-                            and UnitName(casterGuid)) or tostring(casterGuid)
-        local spellName  = (GetSpellRecField
-                            and GetSpellRecField(spellId, "name"))
-                           or ("spell#" .. tostring(spellId))
         DEFAULT_CHAT_FRAME:AddMessage(
             "|cffaaaaff[SPELL_MISS_OTHER]|r "
-            .. tostring(casterName)
-            .. " → " .. tostring(spellName)
-            .. " [" .. (missNames[missInfo] or tostring(missInfo)) .. "]"
+            .. FmtUnit(arg1)
+            .. " → " .. SpellName(arg3)
+            .. " [" .. (missNames[arg4] or tostring(arg4)) .. "]"
+            .. " on " .. FmtUnit(arg2)
         )
 
     -- ── SPELL_HEAL_BY_OTHER ─────────────────────────────────────────────
     elseif event == "SPELL_HEAL_BY_OTHER" then
-        local targetGuid = arg1
-        local casterGuid = arg2
-        local spellId    = arg3
-        local amount     = arg4 or 0
-        local casterName = (casterGuid and UnitExists(casterGuid)
-                            and UnitName(casterGuid)) or tostring(casterGuid)
-        local spellName  = (GetSpellRecField
-                            and GetSpellRecField(spellId, "name"))
-                           or ("spell#" .. tostring(spellId))
         DEFAULT_CHAT_FRAME:AddMessage(
             "|cff00ff88[SPELL_HEAL_OTHER]|r "
-            .. tostring(casterName)
-            .. " healed for " .. amount
-            .. " (" .. tostring(spellName) .. ")"
+            .. FmtUnit(arg2)
+            .. " healed " .. FmtUnit(arg1)
+            .. " for " .. (arg4 or 0)
+            .. " (" .. SpellName(arg3) .. ")"
         )
 
     -- ── BUFF_ADDED_OTHER / BUFF_REMOVED_OTHER ───────────────────────────
     elseif event == "BUFF_ADDED_OTHER" or event == "BUFF_REMOVED_OTHER" then
-        local guid    = arg1
-        local spellId = arg3
-        local name    = (guid and UnitExists(guid)
-                         and UnitName(guid)) or tostring(guid)
-        local spellName = (GetSpellRecField
-                           and GetSpellRecField(spellId, "name"))
-                          or ("spell#" .. tostring(spellId))
-        local stealthMark = SpyNP.STEALTH_SPELL_IDS[spellId]
+        local stealthMark = (arg3 and SpyNP.STEALTH_SPELL_IDS[arg3])
                             and " |cffff0000<STEALTH>|r" or ""
         local col = (event == "BUFF_ADDED_OTHER") and "|cff88ff88" or "|cffaaaaaa"
         DEFAULT_CHAT_FRAME:AddMessage(
             col .. "[" .. event .. "]|r "
-            .. tostring(name)
-            .. " → " .. tostring(spellName) .. stealthMark
+            .. FmtUnit(arg1)
+            .. " → " .. SpellName(arg3) .. stealthMark
         )
 
     -- ── DEBUFF_ADDED_OTHER / DEBUFF_REMOVED_OTHER ───────────────────────
     elseif event == "DEBUFF_ADDED_OTHER" or event == "DEBUFF_REMOVED_OTHER" then
-        local guid    = arg1
-        local spellId = arg3
-        local name    = (guid and UnitExists(guid)
-                         and UnitName(guid)) or tostring(guid)
-        local spellName = (GetSpellRecField
-                           and GetSpellRecField(spellId, "name"))
-                          or ("spell#" .. tostring(spellId))
         local col = (event == "DEBUFF_ADDED_OTHER") and "|cffff8844" or "|cffaaaaaa"
         DEFAULT_CHAT_FRAME:AddMessage(
             col .. "[" .. event .. "]|r "
-            .. tostring(name)
-            .. " → " .. tostring(spellName)
+            .. FmtUnit(arg1)
+            .. " → " .. SpellName(arg3)
         )
 
     -- ── DAMAGE_SHIELD_OTHER ─────────────────────────────────────────────
     elseif event == "DAMAGE_SHIELD_OTHER" then
-        local shieldOwner = arg1
-        local attackerGuid = arg2
-        local damage       = arg3 or 0
-        local ownerName   = (shieldOwner and UnitExists(shieldOwner)
-                             and UnitName(shieldOwner)) or tostring(shieldOwner)
-        local atkName     = (attackerGuid and UnitExists(attackerGuid)
-                             and UnitName(attackerGuid)) or tostring(attackerGuid)
         DEFAULT_CHAT_FRAME:AddMessage(
             "|cffff44ff[DAMAGE_SHIELD_OTHER]|r "
-            .. tostring(atkName) .. " hit " .. tostring(ownerName)
-            .. "'s shield for " .. damage
+            .. FmtUnit(arg2) .. " hit " .. FmtUnit(arg1)
+            .. "'s shield for " .. (arg3 or 0)
         )
 
     -- ── SPELL_ENERGIZE_BY_OTHER ─────────────────────────────────────────
     elseif event == "SPELL_ENERGIZE_BY_OTHER" then
-        local targetGuid = arg1
-        local casterGuid = arg2
-        local spellId    = arg3
-        local powerType  = arg4
-        local amount     = arg5 or 0
         local powerNames = { [0]="Mana",[1]="Rage",[2]="Focus",[3]="Energy",[4]="Happiness" }
-        local casterName = (casterGuid and UnitExists(casterGuid)
-                            and UnitName(casterGuid)) or tostring(casterGuid)
-        local spellName  = (GetSpellRecField
-                            and GetSpellRecField(spellId, "name"))
-                           or ("spell#" .. tostring(spellId))
         DEFAULT_CHAT_FRAME:AddMessage(
             "|cff44ffcc[SPELL_ENERGIZE_OTHER]|r "
-            .. tostring(casterName)
-            .. " → " .. tostring(spellName)
-            .. " +" .. amount .. " " .. (powerNames[powerType] or "?")
+            .. FmtUnit(arg2)
+            .. " → " .. SpellName(arg3)
+            .. " +" .. (arg5 or 0) .. " " .. (powerNames[arg4] or "?")
         )
 
     -- ── AURA_CAST_ON_OTHER ──────────────────────────────────────────────
     elseif event == "AURA_CAST_ON_OTHER" then
-        local spellId    = arg1
-        local casterGuid = arg2
-        local targetGuid = arg3
-        local casterName = (casterGuid and UnitExists(casterGuid)
-                            and UnitName(casterGuid)) or tostring(casterGuid)
-        local spellName  = (GetSpellRecField
-                            and GetSpellRecField(spellId, "name"))
-                           or ("spell#" .. tostring(spellId))
         DEFAULT_CHAT_FRAME:AddMessage(
             "|cffccaaff[AURA_CAST_OTHER]|r "
-            .. tostring(casterName)
-            .. " → " .. tostring(spellName)
+            .. FmtUnit(arg2)
+            .. " → " .. SpellName(arg1)
+            .. " on " .. FmtUnit(arg3)
         )
 
     -- ── ENVIRONMENTAL_DMG_OTHER ──────────────────────────────────────────
     elseif event == "ENVIRONMENTAL_DMG_OTHER" then
-        local unitGuid = arg1
-        local dmgType  = arg2 or 0
-        local damage   = arg3 or 0
         local envNames = { [0]="Exhausted",[1]="Drowning",[2]="Fall",
                            [3]="Lava",[4]="Slime",[5]="Fire",[6]="FallToVoid" }
-        local name = (unitGuid and UnitExists(unitGuid)
-                      and UnitName(unitGuid)) or tostring(unitGuid)
         DEFAULT_CHAT_FRAME:AddMessage(
             "|cffcc6600[ENVIRONMENTAL_DMG_OTHER]|r "
-            .. tostring(name) .. " took " .. damage
-            .. " " .. (envNames[dmgType] or "?") .. " damage"
+            .. FmtUnit(arg1)
+            .. " took " .. (arg3 or 0)
+            .. " " .. (envNames[arg2 or 0] or "?") .. " damage"
         )
 
     -- ── UNIT_*_GUID events ───────────────────────────────────────────────
@@ -1891,7 +1841,6 @@ castLogger:SetScript("OnEvent", function()
         local guid     = arg1
         local isPlayer = (arg2 == 1)
         if not isPlayer then return end
-        local name = (guid and UnitExists(guid) and UnitName(guid)) or tostring(guid)
         local col  = "|cff888888"
         if event == "UNIT_AURA_GUID"        then col = "|cff88ff88" end
         if event == "UNIT_COMBAT_GUID"      then col = "|cffffaa44" end
@@ -1900,23 +1849,16 @@ castLogger:SetScript("OnEvent", function()
         if event == "UNIT_ENERGY_GUID"      then col = "|cffffff44" end
         if event == "UNIT_NAME_UPDATE_GUID" then col = "|cffffcc00" end
         DEFAULT_CHAT_FRAME:AddMessage(
-            col .. "[" .. event .. "]|r " .. tostring(name)
+            col .. "[" .. event .. "]|r " .. FmtUnit(guid)
         )
 
     -- ── SPELL_DISPEL_BY_OTHER ────────────────────────────────────────────
     elseif event == "SPELL_DISPEL_BY_OTHER" then
-        local casterGuid = arg1
-        local targetGuid = arg2
-        local spellId    = arg3
-        local casterName = (casterGuid and UnitExists(casterGuid)
-                            and UnitName(casterGuid)) or tostring(casterGuid)
-        local spellName  = (GetSpellRecField
-                            and GetSpellRecField(spellId, "name"))
-                           or ("spell#" .. tostring(spellId))
         DEFAULT_CHAT_FRAME:AddMessage(
             "|cffff88ff[SPELL_DISPEL_OTHER]|r "
-            .. tostring(casterName)
-            .. " dispelled " .. tostring(spellName)
+            .. FmtUnit(arg1)
+            .. " dispelled " .. SpellName(arg3)
+            .. " from " .. FmtUnit(arg2)
         )
     end
 end)

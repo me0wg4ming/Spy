@@ -2378,7 +2378,13 @@ end
 
 function Spy:ZoneChangedEvent()
 	if Spy.db and Spy.db.profile and Spy.db.profile.DebugMode then
-		DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[Spy DEBUG]|r ========== ZoneChangedEvent START ==========")
+		local trigger = event or "manual"
+		local extra = ""
+		if trigger == "UNIT_FACTION" and arg1 then
+			local unitName = UnitName(arg1) or arg1
+			extra = " (" .. unitName .. ")"
+		end
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[Spy DEBUG]|r ========== ZoneChangedEvent START [" .. trigger .. extra .. "] ==========")
 	end
 
 	if not Spy.MainWindow then
