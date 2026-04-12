@@ -10,13 +10,17 @@ Detection sources:
   - AUTO_ATTACK_OTHER      → melee auto-attacks (Warriors, Rogues who never cast)
   - SPELL_DAMAGE_EVENT_OTHER → spell/DoT damage without a preceding GO event
   - SPELL_MISS_OTHER       → missed/dodged/resisted attacks reveal attacker GUID
-  - SPELL_HEAL_BY_OTHER    → enemy healer healing someone
+  - SPELL_HEAL_BY_OTHER    → enemy healer healing someone (requires NP_EnableSpellHealEvents)
+  - SPELL_ENERGIZE_BY_OTHER → Innervate, Mana Tide etc. (requires NP_EnableSpellEnergizeEvents)
+  - SPELL_FAILED_OTHER     → failed cast still reveals caster GUID (OOM, out of range, etc.)
   - BUFF_ADDED_OTHER       → aura applied (catches stealth going UP)
   - BUFF_REMOVED_OTHER     → aura removed (catches stealth dropping)
   - DEBUFF_ADDED_OTHER     → enemy gains a debuff (in combat signal)
   - DEBUFF_REMOVED_OTHER   → debuff removed
   - DAMAGE_SHIELD_OTHER    → Thorns/Fire Shield proc reveals attacker GUID
   - ENVIRONMENTAL_DMG_OTHER → fall/lava/drowning damage reveals GUID without combat
+  - AURA_CAST_ON_OTHER     → aura application (backup when buff cap blocks BUFF_ADDED)
+  - SPELL_DISPEL_BY_OTHER  → dispeller GUID revealed when enemy dispels
   - UNIT_AURA_GUID         → aura change on any tracked GUID (Nampower GUID event)
   - UNIT_FLAGS_GUID        → flags change (PvP, combat)
   - UNIT_HEALTH_GUID       → health change
@@ -25,15 +29,28 @@ Detection sources:
   - UNIT_ENERGY_GUID       → energy change (rogues, cat druids)
   - UNIT_COMBAT_GUID       → combat feedback
   - UNIT_NAME_UPDATE_GUID  → name resolved (e.g. player exits stealth)
-  - SPELL_DISPEL_BY_OTHER  → dispeller GUID revealed when enemy dispels
+  - UNIT_DYNAMIC_FLAGS_GUID → dynamic flag changes (lootable, tapped)
+  - UNIT_MODEL_CHANGED_GUID → model change (druid shapeshift, disguise)
+  - UNIT_PORTRAIT_UPDATE_GUID → portrait change (zone transitions, visual updates)
+  - UNIT_INVENTORY_CHANGED_GUID → gear swaps (weapon swap in combat)
   - UNIT_DIED              → real death → immediate GUID cleanup
   - UPDATE_MOUSEOVER_UNIT, PLAYER_TARGET_CHANGED, PLAYER_ENTERING_WORLD
     → opportunistic collection via GetUnitGUID(token)
 
+  Proactive scanning:
+  - Nameplate GUID scan via CSimpleFrame:GetName(1)
+  - Target-chain scanning via GetUnitField(guid, "target")
+    → discovers enemies targeted by already-known enemies
+  - Secondary GUID collection from dual-GUID combat events
+    → both participants (caster + target) are collected, not just one
+
 Required CVars (set automatically on Initialize):
-  NP_EnableSpellStartEvents = 1
-  NP_EnableSpellGoEvents    = 1
-  NP_EnableAutoAttackEvents = 1
+  NP_EnableSpellStartEvents    = 1
+  NP_EnableSpellGoEvents       = 1
+  NP_EnableAutoAttackEvents    = 1
+  NP_EnableAuraCastEvents      = 1
+  NP_EnableSpellHealEvents     = 1
+  NP_EnableSpellEnergizeEvents = 1
 
 GUID handling:
   - GetUnitGUID(token) is the primary source for GUIDs.
@@ -41,9 +58,7 @@ GUID handling:
     party1-4, raid1-40, pet, mark1-8, and raw "0x..." GUID strings.
   - UnitExists(guid) works because Nampower supports raw GUIDs as unit tokens.
   - Stealth detection uses GetUnitField(guid, "aura") to scan aura slots.
-
-Required CVars set automatically on Initialize:
-  NP_EnableSpellStartEvents, NP_EnableSpellGoEvents, NP_EnableAutoAttackEvents
+  - Target-chain uses GetUnitField(guid, "target") to read enemy targets.
 ]]
 
 -- Register SpyModules.Nampower IMMEDIATELY as very first line of code.
@@ -449,6 +464,10 @@ function SpyNP:ScanNearbyPlayers(currentTime)
     for guid in pairs(self.lastScanPresent) do prevPresent[guid] = true end
     self.lastScanPresent = {}
 
+    -- ✅ NEW: Collect GUIDs to add from target-chain scanning
+    -- We can't modify enemyGuids while iterating it, so collect first.
+    local targetChainGuids = {}
+
     for guid in pairs(self.enemyGuids) do
         if GuidExists(guid) then
             self.enemyGuids[guid]      = currentTime
@@ -474,8 +493,42 @@ function SpyNP:ScanNearbyPlayers(currentTime)
             then
                 local data = GetPlayerData(guid)
                 if data then tinsert(found, data) end
+
+                -- ✅ NEW: Target-chain scan — if this enemy is targeting someone,
+                -- that someone might be an unknown enemy player we haven't seen yet.
+                -- Uses GetUnitField(guid, "target") to read the unit's target GUID
+                -- directly from unit fields — no need to /target them.
+                if GetUnitField then
+                    local targetGuid = GetUnitField(guid, "target")
+                    if targetGuid
+                       and targetGuid ~= "0x0000000000000000"
+                       and not self.guids[targetGuid]
+                    then
+                        tinsert(targetChainGuids, targetGuid)
+                    end
+                end
             end
         end
+    end
+
+    -- ✅ NEW: Process target-chain GUIDs outside the iterator
+    for _, tguid in ipairs(targetChainGuids) do
+        self:AddGUID(tguid)
+        if IsDebugMode() then
+            local n = GuidExists(tguid) and UnitName(tguid)
+            if n then
+                DEFAULT_CHAT_FRAME:AddMessage(
+                    TS() .. "|cff00ffff[SpyNP TARGET-CHAIN]|r Discovered: " .. n
+                )
+            end
+        end
+    end
+
+    -- ✅ Also scan: current target's target (targettarget)
+    -- Opportunistic: if we have a target, check what they're targeting
+    local ttGuid = GUIDOf("targettarget")
+    if ttGuid and not self.guids[ttGuid] then
+        self:AddGUID(ttGuid)
     end
 
     -- Clear aura scan cache for players who left range
@@ -834,6 +887,11 @@ guidFrame:RegisterEvent("UNIT_RAGE_GUID")
 guidFrame:RegisterEvent("UNIT_ENERGY_GUID")
 guidFrame:RegisterEvent("UNIT_COMBAT_GUID")
 guidFrame:RegisterEvent("UNIT_NAME_UPDATE_GUID")
+-- ✅ NEW: Additional GUID events for broader detection
+guidFrame:RegisterEvent("UNIT_DYNAMIC_FLAGS_GUID")   -- lootable/tapped state changes
+guidFrame:RegisterEvent("UNIT_MODEL_CHANGED_GUID")   -- shapeshift (druids), transform
+guidFrame:RegisterEvent("UNIT_PORTRAIT_UPDATE_GUID")  -- visual changes, zone transitions
+guidFrame:RegisterEvent("UNIT_INVENTORY_CHANGED_GUID") -- gear swaps in combat
 
 guidFrame:SetScript("OnEvent", function()
     if event == "PLAYER_LOGOUT" then
@@ -887,6 +945,11 @@ guidFrame:SetScript("OnEvent", function()
         or event == "UNIT_ENERGY_GUID"
         or event == "UNIT_COMBAT_GUID"
         or event == "UNIT_NAME_UPDATE_GUID"
+        -- ✅ NEW: Additional GUID events for broader detection
+        or event == "UNIT_DYNAMIC_FLAGS_GUID"
+        or event == "UNIT_MODEL_CHANGED_GUID"
+        or event == "UNIT_PORTRAIT_UPDATE_GUID"
+        or event == "UNIT_INVENTORY_CHANGED_GUID"
     then
         -- arg1 = guid, arg2 = isPlayer (1 = yes)
         local guid     = arg1
@@ -1105,6 +1168,8 @@ combatFrame:RegisterEvent("DEBUFF_REMOVED_OTHER")
 combatFrame:RegisterEvent("DAMAGE_SHIELD_OTHER")
 combatFrame:RegisterEvent("SPELL_DISPEL_BY_OTHER")
 combatFrame:RegisterEvent("ENVIRONMENTAL_DMG_OTHER")
+-- ✅ NEW: Failed casts still reveal the caster's GUID (no CVar needed)
+combatFrame:RegisterEvent("SPELL_FAILED_OTHER")
 
 combatFrame:SetScript("OnEvent", function()
     if event == "PLAYER_LOGOUT" then
@@ -1227,6 +1292,12 @@ combatFrame:SetScript("OnEvent", function()
         -- arg1=casterGuid, arg2=targetGuid, arg3=spellId
         -- Track the dispeller.
         guid = arg1
+
+    elseif event == "SPELL_FAILED_OTHER" then
+        -- arg1=casterGuid, arg2=spellId
+        -- ✅ NEW: Failed casts still reveal the caster's GUID.
+        -- E.g. a Rogue trying Sap out of range, or someone going OOM mid-cast.
+        guid = arg1
     end
 
     if not guid then return end
@@ -1251,6 +1322,32 @@ combatFrame:SetScript("OnEvent", function()
     -- but all other combat events imply the unit just acted near someone we know about.
     -- We still let AddGUID's own filters decide.
     SpyNP:AddGUID(guid)
+
+    -- ✅ NEW: Collect the SECONDARY GUID from dual-GUID events.
+    -- E.g. if an enemy healer heals another enemy, we want BOTH GUIDs.
+    -- If an enemy attacks someone, we want the attack target too.
+    -- AddGUID's own filters (player, enemy, PvP) will reject friendlies/NPCs.
+    local secondaryGuid
+    if event == "AUTO_ATTACK_OTHER" then
+        secondaryGuid = arg2  -- target of the auto-attack
+    elseif event == "SPELL_DAMAGE_EVENT_OTHER" then
+        secondaryGuid = arg1  -- target that took damage
+    elseif event == "SPELL_MISS_OTHER" then
+        secondaryGuid = arg2  -- target that was missed
+    elseif event == "SPELL_HEAL_BY_OTHER" then
+        secondaryGuid = arg1  -- target that was healed (enemy healer → enemy target)
+    elseif event == "SPELL_ENERGIZE_BY_OTHER" then
+        secondaryGuid = arg1  -- target that received mana/energy
+    elseif event == "AURA_CAST_ON_OTHER" then
+        secondaryGuid = arg3  -- target that received the aura
+    elseif event == "DAMAGE_SHIELD_OTHER" then
+        secondaryGuid = arg1  -- shield owner (we tracked the attacker as primary)
+    elseif event == "SPELL_DISPEL_BY_OTHER" then
+        secondaryGuid = arg2  -- target that was dispelled
+    end
+    if secondaryGuid and secondaryGuid ~= guid then
+        SpyNP:AddGUID(secondaryGuid)
+    end
 
     -- Fire the appropriate hook so Spy.lua doesn't need to register these events itself
     if event == "AUTO_ATTACK_OTHER" then
@@ -1538,6 +1635,20 @@ function SpyNP:Initialize()
                 TS() .. "|cff00ff00[SpyNP]|r NP_EnableAuraCastEvents → 1"
             )
         end
+        -- ✅ FIX: Enable SPELL_HEAL_BY_OTHER events (was default 0 = never firing!)
+        if GetCVar("NP_EnableSpellHealEvents") ~= "1" then
+            SetCVar("NP_EnableSpellHealEvents", "1")
+            DEFAULT_CHAT_FRAME:AddMessage(
+                TS() .. "|cff00ff00[SpyNP]|r NP_EnableSpellHealEvents → 1"
+            )
+        end
+        -- ✅ FIX: Enable SPELL_ENERGIZE_BY_OTHER events (was default 0 = never firing!)
+        if GetCVar("NP_EnableSpellEnergizeEvents") ~= "1" then
+            SetCVar("NP_EnableSpellEnergizeEvents", "1")
+            DEFAULT_CHAT_FRAME:AddMessage(
+                TS() .. "|cff00ff00[SpyNP]|r NP_EnableSpellEnergizeEvents → 1"
+            )
+        end
     end
 
     -- Confirm GetUnitGUID availability
@@ -1672,6 +1783,7 @@ local LOG_EVENTS = {
     "DAMAGE_SHIELD_OTHER",
     "SPELL_DISPEL_BY_OTHER",
     "ENVIRONMENTAL_DMG_OTHER",
+    "SPELL_FAILED_OTHER",
     -- GUID events
     "UNIT_AURA_GUID",
     "UNIT_FLAGS_GUID",
@@ -1681,6 +1793,10 @@ local LOG_EVENTS = {
     "UNIT_ENERGY_GUID",
     "UNIT_COMBAT_GUID",
     "UNIT_NAME_UPDATE_GUID",
+    "UNIT_DYNAMIC_FLAGS_GUID",
+    "UNIT_MODEL_CHANGED_GUID",
+    "UNIT_PORTRAIT_UPDATE_GUID",
+    "UNIT_INVENTORY_CHANGED_GUID",
 }
 
 castLogger:RegisterEvent("PLAYER_LOGOUT")
@@ -1837,17 +1953,24 @@ castLogger:SetScript("OnEvent", function()
         or event == "UNIT_ENERGY_GUID"
         or event == "UNIT_COMBAT_GUID"
         or event == "UNIT_NAME_UPDATE_GUID"
+        or event == "UNIT_DYNAMIC_FLAGS_GUID"
+        or event == "UNIT_MODEL_CHANGED_GUID"
+        or event == "UNIT_PORTRAIT_UPDATE_GUID"
+        or event == "UNIT_INVENTORY_CHANGED_GUID"
     then
         local guid     = arg1
         local isPlayer = (arg2 == 1)
         if not isPlayer then return end
         local col  = "|cff888888"
-        if event == "UNIT_AURA_GUID"        then col = "|cff88ff88" end
-        if event == "UNIT_COMBAT_GUID"      then col = "|cffffaa44" end
-        if event == "UNIT_MANA_GUID"        then col = "|cff88ccff" end
-        if event == "UNIT_RAGE_GUID"        then col = "|cffff4444" end
-        if event == "UNIT_ENERGY_GUID"      then col = "|cffffff44" end
-        if event == "UNIT_NAME_UPDATE_GUID" then col = "|cffffcc00" end
+        if event == "UNIT_AURA_GUID"              then col = "|cff88ff88" end
+        if event == "UNIT_COMBAT_GUID"            then col = "|cffffaa44" end
+        if event == "UNIT_MANA_GUID"              then col = "|cff88ccff" end
+        if event == "UNIT_RAGE_GUID"              then col = "|cffff4444" end
+        if event == "UNIT_ENERGY_GUID"            then col = "|cffffff44" end
+        if event == "UNIT_NAME_UPDATE_GUID"       then col = "|cffffcc00" end
+        if event == "UNIT_MODEL_CHANGED_GUID"     then col = "|cffcc88ff" end
+        if event == "UNIT_DYNAMIC_FLAGS_GUID"     then col = "|cff66aaaa" end
+        if event == "UNIT_INVENTORY_CHANGED_GUID" then col = "|cffaa8844" end
         DEFAULT_CHAT_FRAME:AddMessage(
             col .. "[" .. event .. "]|r " .. FmtUnit(guid)
         )
@@ -1859,6 +1982,14 @@ castLogger:SetScript("OnEvent", function()
             .. FmtUnit(arg1)
             .. " dispelled " .. SpellName(arg3)
             .. " from " .. FmtUnit(arg2)
+        )
+
+    -- ── SPELL_FAILED_OTHER ───────────────────────────────────────────────
+    elseif event == "SPELL_FAILED_OTHER" then
+        DEFAULT_CHAT_FRAME:AddMessage(
+            "|cffff6666[SPELL_FAILED_OTHER]|r "
+            .. FmtUnit(arg1)
+            .. " failed " .. SpellName(arg2)
         )
     end
 end)
@@ -1875,9 +2006,9 @@ SlashCmdList["SPYEVENT"] = function()
             .. " – logging " .. table.getn(LOG_EVENTS) .. " events"
         )
         DEFAULT_CHAT_FRAME:AddMessage(
-            "|cffffcc00  START/GO · AUTO_ATTACK · SPELL_DMG · SPELL_MISS"
+            "|cffffcc00  START/GO · AUTO_ATTACK · SPELL_DMG · SPELL_MISS · SPELL_FAILED"
             .. " · HEAL · ENERGIZE · AURA_CAST · BUFF/DEBUFF · DMG_SHIELD · DISPEL"
-            .. " · UNIT_AURA/FLAGS/HEALTH/MANA/COMBAT/NAME_GUID|r"
+            .. " · UNIT_*_GUID (AURA/FLAGS/HEALTH/MANA/COMBAT/NAME/MODEL/DYNFLAGS/INV)|r"
         )
     else
         for _, ev in ipairs(LOG_EVENTS) do
